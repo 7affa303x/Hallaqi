@@ -371,8 +371,6 @@ export default function BarberDetailPage() {
               // Show from availability_schedules table
               daysArSchedule.map((dayLabel, idx) => {
                 const schedule = availabilitySchedule.find(s => s.day_of_week === idx);
-                // Map schedule day_of_week (0=Sat) to JS getDay() (0=Sun, 6=Sat)
-                const jsDay = idx === 0 ? 6 : idx; // Sat=6 in JS
                 const isToday = new Date().getDay() === (idx === 0 ? 6 : idx === 1 ? 0 : idx);
                 return (
                   <div key={idx} className="flex items-center justify-between py-2.5 px-3 rounded-xl"
