@@ -55,10 +55,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [screenParams, setScreenParams] = useState<ScreenParams | undefined>(undefined);
   const [, setHistory] = useState<HistoryEntry[]>([{ screen: 'home' }]);
 
+  /* ---- Initialize screen from URL on mount ---- */
+  useEffect(() => {
+    const pathname = window.location.pathname;
+    if (pathname === '/reset-password') {
+      setScreen('reset-password');
+      setHistory([{ screen: 'reset-password' }]);
+    } else if (pathname === '/forgot-password') {
+      setScreen('forgot-password');
+      setHistory([{ screen: 'forgot-password' }]);
+    }
+  }, []);
+
   const navigate = useCallback((nextScreen: ScreenName, params?: ScreenParams) => {
     setScreen(nextScreen);
     setScreenParams(params);
     setHistory(prev => [...prev, { screen: nextScreen, params }]);
+    // Update URL for password reset flows
+    if (nextScreen === 'reset-password' || nextScreen === 'forgot-password') {
+      window.history.pushState({}, '', `/${nextScreen}`);
+    }
   }, []);
 
   const goBack = useCallback(() => {
@@ -68,6 +84,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const last = next[next.length - 1];
       setScreen(last.screen);
       setScreenParams(last.params);
+      // Update URL when going back
+      if (last.screen === 'reset-password' || last.screen === 'forgot-password') {
+        window.history.pushState({}, '', `/${last.screen}`);
+      } else if (last.screen === 'home') {
+        window.history.pushState({}, '', '/');
+      }
       return next;
     });
   }, []);
@@ -159,6 +181,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => { refreshData(); }, [refreshData]);
 
+  /* ---- Handle browser back/forward buttons ---- */
+  useEffect(() => {
+    const handlePopState = () => {
+      const pathname = window.location.pathname;
+      if (pathname === '/reset-password') {
+        setScreen('reset-password');
+      } else if (pathname === '/forgot-password') {
+        setScreen('forgot-password');
+      } else {
+        setScreen('home');
+      }
+      setScreenParams(undefined);
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
   /* ---- UI ---- */
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -245,7 +285,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const getBarberById = useCallback((id: string) => barbers.find(b => b.id === id), [barbers]);
   const getPostById = useCallback((id: string) => forumPosts.find(p => p.id === id), [forumPosts]);
 
+  /* ---- Ensure forgot-password routes to ForgotPassword component ---- */
+  useEffect(() => {
+    if (screen === 'forgot-password' && window.location.pathname !== '/forgot-password') {
+      window.history.replaceState({}, '', '/forgot-password');
+    }
+  }, [screen]);
+
   const themeConfig = themes[currentTheme];
+
+  /* ---- Sync screen changes to URL (for password reset flows) ---- */
+  useEffect(() => {
+    if (screen === 'reset-password' || screen === 'forgot-password') {
+      const currentPath = window.location.pathname;
+      const targetPath = `/${screen}`;
+      if (currentPath !== targetPath) {
+        window.history.replaceState({}, '', targetPath);
+      }
+    }
+  }, [screen]);
 
   return (
     <AppContext.Provider value={{
