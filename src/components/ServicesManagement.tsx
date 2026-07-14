@@ -94,10 +94,21 @@ export default function ServicesManagement({ onBack }: ServicesManagementProps) 
       setError('اسم الخدمة مطلوب');
       return false;
     }
-    if (formData.price < 0) {
-      setError('السعر يجب أن يكون موجباً');
+    
+    // Validate price: must be non-negative, numeric, and within reasonable limits
+    if (isNaN(formData.price) || formData.price < 0) {
+      setError('السعر يجب أن يكون رقماً موجباً');
       return false;
     }
+    if (formData.price > 999999) {
+      setError('السعر يجب أن يكون أقل من 999,999');
+      return false;
+    }
+    if (formData.price === 0) {
+      setError('السعر يجب أن يكون أكبر من 0');
+      return false;
+    }
+    
     if (formData.duration < 5) {
       setError('المدة يجب أن تكون 5 دقائق على الأقل');
       return false;
@@ -278,9 +289,22 @@ export default function ServicesManagement({ onBack }: ServicesManagementProps) 
                 </label>
                 <input
                   type="number"
-                  value={formData.price}
-                  onChange={(e) => setFormData({ ...formData, price: Math.max(0, parseInt(e.target.value) || 0) })}
-                  placeholder="0"
+                  value={formData.price || ''}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === '') {
+                      setFormData({ ...formData, price: 0 });
+                    } else {
+                      const numValue = parseFloat(value);
+                      if (!isNaN(numValue) && numValue >= 0 && numValue <= 999999) {
+                        setFormData({ ...formData, price: numValue });
+                      }
+                    }
+                  }}
+                  placeholder="أدخل السعر"
+                  min="0"
+                  max="999999"
+                  step="0.01"
                   className="w-full px-3 py-2 rounded-lg text-sm border"
                   style={{
                     backgroundColor: themeConfig.colors.background,
