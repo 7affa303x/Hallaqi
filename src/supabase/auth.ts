@@ -79,7 +79,7 @@ export async function resetPassword(email: string) {
 export async function fetchUserProfile(userId: string): Promise<AppUser | null> {
   if (!isSupabaseConfigured()) return null;
 
-  const { data, error } = await supabase.from('users').select('*').eq('id', userId).single();
+  const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
   if (error || !data) return null;
   return data as unknown as AppUser;
 }
