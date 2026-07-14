@@ -1,30 +1,44 @@
 import { supabase, STORAGE, isSupabaseConfigured } from './client';
 
-export type UploadProgressCallback = (_progress: number) => void;
+export type UploadProgressCallback = (progress: number) => void;
 
 function guard(): void {
   if (!isSupabaseConfigured()) throw new Error('التخزين غير متوفر في وضع العرض التجريبي');
 }
 
-export async function uploadFile(bucket: string, path: string, file: File): Promise<string> {
+export async function uploadFile(bucket: string, path: string, file: File, onProgress?: UploadProgressCallback): Promise<string> {
   guard();
+  
+  // Supabase JS SDK doesn't support onUploadProgress in upload options.
+  // For now, we simulate progress with a simple approach.
+  // In production, consider using the REST API directly for progress tracking.
+  if (onProgress) {
+    onProgress(0);
+  }
+  
   const { data, error } = await supabase.storage.from(bucket).upload(path, file, {
     cacheControl: '3600',
     upsert: true,
-  });
+  } as any);
+  
   if (error) throw new Error('فشل رفع الملف. حاول مرة أخرى.');
+  
+  if (onProgress) {
+    onProgress(100);
+  }
+  
   const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(data.path);
   return urlData.publicUrl;
 }
 
-export async function uploadAvatar(userId: string, file: File): Promise<string> {
+export async function uploadAvatar(userId: string, file: File, onProgress?: UploadProgressCallback): Promise<string> {
   const ext = file.name.split('.').pop() || 'jpg';
-  return uploadFile(STORAGE.AVATARS, `${userId}/avatar.${ext}`, file);
+  return uploadFile(STORAGE.AVATARS, `${userId}/avatar.${ext}`, file, onProgress);
 }
 
-export async function uploadPortfolioImage(barberId: string, file: File, index: number): Promise<string> {
+export async function uploadPortfolioImage(barberId: string, file: File, index: number, onProgress?: UploadProgressCallback): Promise<string> {
   const ext = file.name.split('.').pop() || 'jpg';
-  return uploadFile(STORAGE.PORTFOLIO, `${barberId}/image_${index}.${ext}`, file);
+  return uploadFile(STORAGE.PORTFOLIO, `${barberId}/image_${index}.${ext}`, file, onProgress);
 }
 
 export async function uploadIdCard(userId: string, file: File, side: 'front' | 'back' | 'selfie'): Promise<string> {

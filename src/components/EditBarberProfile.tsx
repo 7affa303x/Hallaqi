@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useApp } from '@/contexts/useApp';
 import { useAuth } from '@/hooks/useAuth';
 import { updateBarberProfile } from '@/supabase/database';
-import { uploadAvatar, uploadPortfolioImage, validateFile } from '@/supabase/storage';
+import { uploadAvatar, uploadPortfolioImage, validateFile, UPLOAD_LIMITS } from '@/supabase/storage';
 import {
   ArrowLeft, Save, AlertCircle, CheckCircle, Plus, Trash2, Upload
 } from 'lucide-react';
@@ -39,7 +39,10 @@ export default function EditBarberProfile({ onBack, userRole }: EditBarberProfil
 
   const [portfolioFiles, setPortfolioFiles] = useState<File[]>([]);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
-  const [previewUrls, setPreviewUrls] = useState<string[]>([]);
+  const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null);
+  const [portfolioPreviewUrls, setPortfolioPreviewUrls] = useState<string[]>([]);
+  const [avatarUploadProgress, setAvatarUploadProgress] = useState(0);
+  const [portfolioUploadProgress, setPortfolioUploadProgress] = useState<number[]>([]);
 
   // Fetch barber data on mount
   useEffect(() => {
@@ -76,7 +79,10 @@ export default function EditBarberProfile({ onBack, userRole }: EditBarberProfil
           portfolio: (barber.portfolio as string[]) || [],
           workingHours: (barber.working_hours as Record<string, { open: string; close: string; isOpen: boolean }>) || {},
         });
-        setPreviewUrls((barber.portfolio as string[]) || []);
+        if (barber.avatar) {
+          setAvatarPreviewUrl(barber.avatar as string);
+        }
+        setPortfolioPreviewUrls((barber.portfolio as string[]) || []);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'فشل تحميل البيانات');
       } finally {
@@ -106,13 +112,14 @@ export default function EditBarberProfile({ onBack, userRole }: EditBarberProfil
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const validation = validateFile(file, { maxSizeMB: 2 });
+    const validation = validateFile(file, { maxSizeMB: UPLOAD_LIMITS.AVATAR_MAX_SIZE });
     if (!validation.valid) {
       setError(validation.error || 'الملف غير صحيح');
       return;
     }
 
     setAvatarFile(file);
+    setAvatarPreviewUrl(URL.createObjectURL(file));
     setError(null);
   };
 
@@ -123,7 +130,7 @@ export default function EditBarberProfile({ onBack, userRole }: EditBarberProfil
 
     const validFiles: File[] = [];
     for (const file of files) {
-      const validation = validateFile(file, { maxSizeMB: 5 });
+      const validation = validateFile(file, { maxSizeMB: UPLOAD_LIMITS.PORTFOLIO_MAX_SIZE });
       if (!validation.valid) {
         setError(validation.error || 'أحد الملفات غير صحيح');
         return;
@@ -132,13 +139,18 @@ export default function EditBarberProfile({ onBack, userRole }: EditBarberProfil
     }
 
     setPortfolioFiles(prev => [...prev, ...validFiles]);
+    setPortfolioPreviewUrls(prev => [...prev, ...validFiles.map(file => URL.createObjectURL(file))]);
     setError(null);
   };
 
   // Remove portfolio image
   const removePortfolioImage = (index: number) => {
+    const removedFile = portfolioFiles[index];
+    if (removedFile) {
+      URL.revokeObjectURL(URL.createObjectURL(removedFile));
+    }
     setPortfolioFiles(prev => prev.filter((_, i) => i !== index));
-    setPreviewUrls(prev => prev.filter((_, i) => i !== index));
+    setPortfolioPreviewUrls(prev => prev.filter((_, i) => i !== index));
   };
 
   // Handle form submission
@@ -180,14 +192,16 @@ export default function EditBarberProfile({ onBack, userRole }: EditBarberProfil
         location: formData.location.trim(),
         wilaya: formData.wilaya.trim(),
         years_of_experience: formData.yearsOfExperience,
-        is_mobile: formData.isMobile,
-        uses_scissors: formData.usesScissors,
-        price_range: formData.priceRange.trim(),
+        isMobile: formData.isMobile,
+        usesScissors: formData.usesScissors,
+        priceRange: formData.priceRange.trim(),
       };
 
       // Upload avatar if changed
       if (avatarFile) {
-        const avatarUrl = await uploadAvatar(appUser.id, avatarFile);
+        const avatarUrl = await uploadAvatar(appUser.id, avatarFile, (progress) => {
+          setAvatarUploadProgress(progress);
+        });
         updates.avatar = avatarUrl;
       }
 
@@ -195,7 +209,13 @@ export default function EditBarberProfile({ onBack, userRole }: EditBarberProfil
       const updatedPortfolio = [...formData.portfolio];
       if (portfolioFiles.length > 0) {
         for (let i = 0; i < portfolioFiles.length; i++) {
-          const url = await uploadPortfolioImage(barberData.id as string, portfolioFiles[i], updatedPortfolio.length + i);
+          const url = await uploadPortfolioImage(barberData.id as string, portfolioFiles[i], updatedPortfolio.length + i, (progress) => {
+            setPortfolioUploadProgress(prev => {
+              const newProgress = [...prev];
+              newProgress[i] = progress;
+              return newProgress;
+            });
+          });
           updatedPortfolio.push(url);
         }
       }
@@ -212,6 +232,8 @@ export default function EditBarberProfile({ onBack, userRole }: EditBarberProfil
       setSuccess(true);
       setPortfolioFiles([]);
       setAvatarFile(null);
+      setAvatarUploadProgress(0);
+      setPortfolioUploadProgress([]);
       setTimeout(() => {
         onBack();
       }, 2000);
@@ -279,6 +301,54 @@ export default function EditBarberProfile({ onBack, userRole }: EditBarberProfil
             <p className="text-xs" style={{ color: themeConfig.colors.success }}>تم تحديث البيانات بنجاح</p>
           </div>
         )}
+
+        {/* Avatar Upload Section */}
+        <div>
+          <h3 className="text-xs font-bold mb-3 px-1" style={{ color: themeConfig.colors.textMuted }}>صورة الملف الشخصي</h3>
+          <div className="rounded-2xl border p-4 flex flex-col items-center justify-center space-y-3"
+            style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
+            {avatarPreviewUrl ? (
+              <div className="relative w-24 h-24 rounded-full overflow-hidden">
+                <img src={avatarPreviewUrl} alt="Avatar Preview" className="w-full h-full object-cover" />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAvatarFile(null);
+                    setAvatarPreviewUrl(null);
+                    setAvatarUploadProgress(0);
+                  }}
+                  className="absolute top-0 right-0 bg-red-500 text-white rounded-full p-1"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            ) : (
+              <div className="w-24 h-24 rounded-full flex items-center justify-center border-2 border-dashed"
+                style={{ borderColor: themeConfig.colors.border, color: themeConfig.colors.textMuted }}>
+                <Upload size={32} />
+              </div>
+            )}
+            <input
+              type="file"
+              id="avatar-upload"
+              accept="image/jpeg,image/png,image/webp"
+              onChange={handleAvatarChange}
+              className="hidden"
+            />
+            <label
+              htmlFor="avatar-upload"
+              className="cursor-pointer px-4 py-2 rounded-lg text-sm font-medium"
+              style={{ backgroundColor: themeConfig.colors.primary, color: '#ffffff' }}
+            >
+              {avatarFile ? 'تغيير الصورة' : 'رفع صورة'}
+            </label>
+            {avatarUploadProgress > 0 && avatarUploadProgress < 100 && (
+              <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700">
+                <div className="bg-blue-600 h-2.5 rounded-full" style={{ width: `${avatarUploadProgress}%` }}></div>
+              </div>
+            )}
+          </div>
+        </div>
 
         {/* Basic Info Section */}
         <div>
@@ -354,6 +424,56 @@ export default function EditBarberProfile({ onBack, userRole }: EditBarberProfil
           </div>
         </div>
 
+        {/* Portfolio Images Section */}
+        <div>
+          <h3 className="text-xs font-bold mb-3 px-1" style={{ color: themeConfig.colors.textMuted }}>صور الأعمال (البورتفوليو)</h3>
+          <div className="rounded-2xl border p-4 space-y-3"
+            style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
+            <div className="grid grid-cols-3 gap-3">
+              {portfolioPreviewUrls.map((url, index) => (
+                <div key={index} className="relative w-full h-24 rounded-lg overflow-hidden group">
+                  <img src={url} alt={`Portfolio ${index + 1}`} className="w-full h-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => removePortfolioImage(index)}
+                    className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <Trash2 size={24} color="white" />
+                  </button>
+                  {portfolioUploadProgress[index] > 0 && portfolioUploadProgress[index] < 100 && (
+                    <div className="absolute bottom-0 left-0 right-0 h-1 bg-gray-200">
+                      <div className="bg-blue-600 h-1" style={{ width: `${portfolioUploadProgress[index]}%` }}></div>
+                    </div>
+                  )}
+                </div>
+              ))}
+              {portfolioFiles.length < UPLOAD_LIMITS.PORTFOLIO_MAX_COUNT && (
+                <label
+                  htmlFor="portfolio-upload"
+                  className="flex flex-col items-center justify-center w-full h-24 rounded-lg border-2 border-dashed cursor-pointer"
+                  style={{ borderColor: themeConfig.colors.border, color: themeConfig.colors.textMuted }}
+                >
+                  <Plus size={24} />
+                  <span className="text-xs mt-1">أضف صورة</span>
+                  <input
+                    type="file"
+                    id="portfolio-upload"
+                    accept="image/jpeg,image/png,image/webp"
+                    multiple
+                    onChange={handlePortfolioChange}
+                    className="hidden"
+                  />
+                </label>
+              )}
+            </div>
+            {portfolioFiles.length >= UPLOAD_LIMITS.PORTFOLIO_MAX_COUNT && (
+              <p className="text-xs text-center" style={{ color: themeConfig.colors.textMuted }}>
+                وصلت إلى الحد الأقصى لعدد صور البورتفوليو ({UPLOAD_LIMITS.PORTFOLIO_MAX_COUNT}).
+              </p>
+            )}
+          </div>
+        </div>
+
         {/* Location Section */}
         <div>
           <h3 className="text-xs font-bold mb-3 px-1" style={{ color: themeConfig.colors.textMuted }}>الموقع</h3>
@@ -382,7 +502,7 @@ export default function EditBarberProfile({ onBack, userRole }: EditBarberProfil
                 type="text"
                 value={formData.wilaya}
                 onChange={(e) => handleInputChange('wilaya', e.target.value)}
-                placeholder="الولاية"
+                placeholder="مثال: الجزائر العاصمة"
                 className="w-full px-3 py-2.5 rounded-lg text-sm border"
                 style={{
                   backgroundColor: themeConfig.colors.background,
@@ -394,24 +514,47 @@ export default function EditBarberProfile({ onBack, userRole }: EditBarberProfil
           </div>
         </div>
 
-        {/* Experience Section */}
+        {/* Professional Info Section */}
         <div>
-          <h3 className="text-xs font-bold mb-3 px-1" style={{ color: themeConfig.colors.textMuted }}>الخبرة والخدمات</h3>
+          <h3 className="text-xs font-bold mb-3 px-1" style={{ color: themeConfig.colors.textMuted }}>المعلومات المهنية</h3>
           <div className="space-y-3 rounded-2xl border p-4" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
             {/* Years of Experience */}
             <div>
               <label className="text-xs font-bold mb-1.5 block" style={{ color: themeConfig.colors.text }}>سنوات الخبرة</label>
               <input
                 type="number"
-                min="0"
                 value={formData.yearsOfExperience}
-                onChange={(e) => handleInputChange('yearsOfExperience', parseInt(e.target.value) || 0)}
+                onChange={(e) => handleInputChange('yearsOfExperience', parseInt(e.target.value))}
+                placeholder="0"
+                min="0"
                 className="w-full px-3 py-2.5 rounded-lg text-sm border"
                 style={{
                   backgroundColor: themeConfig.colors.background,
                   borderColor: themeConfig.colors.border,
                   color: themeConfig.colors.text,
                 }}
+              />
+            </div>
+
+            {/* Is Mobile Barber */}
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-bold" style={{ color: themeConfig.colors.text }}>حلاق متنقل</label>
+              <input
+                type="checkbox"
+                checked={formData.isMobile}
+                onChange={(e) => handleInputChange('isMobile', e.target.checked)}
+                className="toggle toggle-primary"
+              />
+            </div>
+
+            {/* Uses Scissors */}
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-bold" style={{ color: themeConfig.colors.text }}>يستخدم المقص</label>
+              <input
+                type="checkbox"
+                checked={formData.usesScissors}
+                onChange={(e) => handleInputChange('usesScissors', e.target.checked)}
+                className="toggle toggle-primary"
               />
             </div>
 
@@ -431,53 +574,17 @@ export default function EditBarberProfile({ onBack, userRole }: EditBarberProfil
                 }}
               />
             </div>
-
-            {/* Mobile Service */}
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-bold" style={{ color: themeConfig.colors.text }}>خدمة متنقلة</label>
-              <input
-                type="checkbox"
-                checked={formData.isMobile}
-                onChange={(e) => handleInputChange('isMobile', e.target.checked)}
-                className="w-4 h-4 rounded"
-              />
-            </div>
-
-            {/* Uses Scissors */}
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-bold" style={{ color: themeConfig.colors.text }}>يستخدم المقص</label>
-              <input
-                type="checkbox"
-                checked={formData.usesScissors}
-                onChange={(e) => handleInputChange('usesScissors', e.target.checked)}
-                className="w-4 h-4 rounded"
-              />
-            </div>
           </div>
         </div>
 
-        {/* Avatar Section */}
+        {/* Working Hours Section */}
         <div>
-          <h3 className="text-xs font-bold mb-3 px-1" style={{ color: themeConfig.colors.textMuted }}>الصورة الشخصية</h3>
-          <div className="rounded-2xl border p-4" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
-            <label className="flex items-center justify-center gap-2 px-4 py-6 rounded-lg border-2 border-dashed cursor-pointer transition-all hover:bg-black/5"
-              style={{ borderColor: themeConfig.colors.border }}>
-              <Upload size={18} style={{ color: themeConfig.colors.primary }} />
-              <span className="text-xs font-bold" style={{ color: themeConfig.colors.text }}>
-                {avatarFile ? avatarFile.name : 'اختر صورة'}
-              </span>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleAvatarChange}
-                className="hidden"
-              />
-            </label>
-            {avatarFile && (
-              <p className="text-[10px] mt-2" style={{ color: themeConfig.colors.textMuted }}>
-                ✓ تم اختيار الصورة
-              </p>
-            )}
+          <h3 className="text-xs font-bold mb-3 px-1" style={{ color: themeConfig.colors.textMuted }}>ساعات العمل</h3>
+          <div className="space-y-3 rounded-2xl border p-4" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
+            {/* Working Hours (simplified for brevity) */}
+            <p className="text-sm" style={{ color: themeConfig.colors.textMuted }}>
+              (سيتم إضافة واجهة تحكم كاملة لساعات العمل لاحقًا)
+            </p>
           </div>
         </div>
 
@@ -500,9 +607,9 @@ export default function EditBarberProfile({ onBack, userRole }: EditBarberProfil
             </label>
 
             {/* Portfolio Images */}
-            {previewUrls.length > 0 && (
+            {portfolioPreviewUrls.length > 0 && (
               <div className="grid grid-cols-3 gap-2">
-                {previewUrls.map((url, idx) => (
+                {portfolioPreviewUrls.map((url: string, idx: number) => (
                   <div key={idx} className="relative rounded-lg overflow-hidden aspect-square">
                     <img src={url} alt={`Portfolio ${idx}`} className="w-full h-full object-cover" />
                     <button
