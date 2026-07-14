@@ -1,17 +1,36 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useApp } from '@/contexts/useApp';
 import { motion } from 'framer-motion';
 import {
   ArrowLeft, Check, Clock, MapPin, Car, CreditCard,
   Wallet, Banknote, Calendar, X
 } from 'lucide-react';
+import { getBarberAvailability, getBarberExceptions } from '@/supabase/database';
 
-const timeSlots = [
+const ALL_TIME_SLOTS = [
   '08:00', '08:30', '09:00', '09:30', '10:00', '10:30',
-  '11:00', '11:30', '12:00', '13:00', '13:30', '14:00',
+  '11:00', '11:30', '12:00', '12:30', '13:00', '13:30', '14:00',
   '14:30', '15:00', '15:30', '16:00', '16:30', '17:00',
-  '17:30', '18:00', '18:30', '19:00', '19:30', '20:00',
+  '17:30', '18:00', '18:30', '19:00', '19:30', '20:00', '20:30', '21:00',
 ];
+
+/** Convert JS Date getDay() (0=Sun) to our schedule day_of_week (0=Sat) */
+function jsDayToScheduleDay(jsDay: number): number {
+  // JS: 0=Sun,1=Mon,2=Tue,3=Wed,4=Thu,5=Fri,6=Sat
+  // Schedule: 0=Sat,1=Sun,2=Mon,3=Tue,4=Wed,5=Thu,6=Fri
+  return jsDay === 6 ? 0 : jsDay + 1;
+}
+
+/** Generate time slots between start and end times */
+function generateTimeSlotsForRange(start: string, end: string): string[] {
+  const slots: string[] = [];
+  for (const slot of ALL_TIME_SLOTS) {
+    if (slot >= start && slot < end) {
+      slots.push(slot);
+    }
+  }
+  return slots;
+}
 
 const generateDates = () => {
   const dates = [];
@@ -40,9 +59,64 @@ export default function BookingFlowPage() {
   const [isMobileService, setIsMobileService] = useState(false);
   const [address, setAddress] = useState('');
   const [confirmed, setConfirmed] = useState(false);
+  const [availabilitySchedule, setAvailabilitySchedule] = useState<Array<{ day_of_week: number; start_time: string; end_time: string; is_active: boolean }>>([]);
+  const [availabilityExceptions, setAvailabilityExceptions] = useState<Array<{ date: string; type: string }>>([]);
 
   const barber = barbers.find(b => b.id === screenParams?.barberId);
   const dates = generateDates();
+
+  useEffect(() => {
+    if (!barber?.id) return;
+    const fetchAvailability = async () => {
+      try {
+        const [schedData, excData] = await Promise.all([
+          getBarberAvailability(barber.id),
+          getBarberExceptions(barber.id),
+        ]);
+        setAvailabilitySchedule(schedData.map(s => ({
+          day_of_week: s.day_of_week as number,
+          start_time: s.start_time as string,
+          end_time: s.end_time as string,
+          is_active: s.is_active as boolean,
+        })));
+        setAvailabilityExceptions(excData.map(e => ({
+          date: e.date as string,
+          type: e.type as string,
+        })));
+      } catch (err) {
+        console.error('Failed to fetch availability:', err);
+      }
+    };
+    fetchAvailability();
+  }, [barber?.id]);
+
+  // Check if a date is available (not an exception day and barber works that day)
+  const isDateAvailable = (dateStr: string): boolean => {
+    // Check exceptions
+    if (availabilityExceptions.some(e => e.date === dateStr)) return false;
+    // Check schedule
+    if (availabilitySchedule.length === 0) return true; // No schedule = all days available (fallback)
+    const jsDay = new Date(dateStr).getDay();
+    const scheduleDay = jsDayToScheduleDay(jsDay);
+    const daySchedule = availabilitySchedule.find(s => s.day_of_week === scheduleDay);
+    return daySchedule?.is_active ?? false;
+  };
+
+  // Get available time slots for a specific date
+  const getAvailableTimeSlots = (dateStr: string): string[] => {
+    if (availabilitySchedule.length === 0) return ALL_TIME_SLOTS; // Fallback
+    const jsDay = new Date(dateStr).getDay();
+    const scheduleDay = jsDayToScheduleDay(jsDay);
+    const daySchedule = availabilitySchedule.find(s => s.day_of_week === scheduleDay);
+    if (!daySchedule || !daySchedule.is_active) return [];
+    return generateTimeSlotsForRange(daySchedule.start_time, daySchedule.end_time);
+  };
+
+  // Memoize available time slots for selected date
+  const timeSlots = useMemo(() => {
+    if (!selectedDate) return ALL_TIME_SLOTS;
+    return getAvailableTimeSlots(selectedDate);
+  }, [selectedDate, availabilitySchedule]);
 
   if (!barber) {
     return (
@@ -276,42 +350,55 @@ export default function BookingFlowPage() {
           {/* Date Selection */}
           <h3 className="text-sm font-bold mb-2" style={{ color: themeConfig.colors.text }}>اختر التاريخ</h3>
           <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide mb-4">
-            {dates.map(d => (
-              <button
-                key={d.full}
-                onClick={() => setSelectedDate(d.full)}
-                className="flex flex-col items-center justify-center min-w-[60px] h-16 rounded-xl border transition-all"
-                style={{
-                  backgroundColor: selectedDate === d.full ? themeConfig.colors.primary : themeConfig.colors.surface,
-                  borderColor: selectedDate === d.full ? themeConfig.colors.primary : themeConfig.colors.border,
-                  color: selectedDate === d.full ? '#fff' : themeConfig.colors.text,
-                }}
-              >
-                <span className="text-[10px]">{d.day}</span>
-                <span className="text-lg font-bold">{d.date}</span>
-                <span className="text-[9px]">{d.month}</span>
-              </button>
-            ))}
+            {dates.map(d => {
+              const available = isDateAvailable(d.full);
+              return (
+                <button
+                  key={d.full}
+                  onClick={() => available && (setSelectedDate(d.full), setSelectedTime(''))}
+                  disabled={!available}
+                  className="flex flex-col items-center justify-center min-w-[60px] h-16 rounded-xl border transition-all relative"
+                  style={{
+                    backgroundColor: !available ? themeConfig.colors.surface : selectedDate === d.full ? themeConfig.colors.primary : themeConfig.colors.surface,
+                    borderColor: !available ? themeConfig.colors.border : selectedDate === d.full ? themeConfig.colors.primary : themeConfig.colors.border,
+                    color: !available ? themeConfig.colors.textMuted : selectedDate === d.full ? '#fff' : themeConfig.colors.text,
+                    opacity: available ? 1 : 0.4,
+                  }}
+                >
+                  <span className="text-[10px]">{d.day}</span>
+                  <span className="text-lg font-bold">{d.date}</span>
+                  <span className="text-[9px]">{d.month}</span>
+                  {!available && <div className="absolute inset-0 flex items-center justify-center"><X size={20} className="opacity-30" style={{ color: themeConfig.colors.error }} /></div>}
+                </button>
+              );
+            })}
           </div>
 
           {/* Time Selection */}
           <h3 className="text-sm font-bold mb-2" style={{ color: themeConfig.colors.text }}>اختر الوقت</h3>
-          <div className="grid grid-cols-4 gap-2">
-            {timeSlots.map(t => (
-              <button
-                key={t}
-                onClick={() => setSelectedTime(t)}
-                className="py-2.5 rounded-xl border text-xs font-bold transition-all"
-                style={{
-                  backgroundColor: selectedTime === t ? themeConfig.colors.primary : themeConfig.colors.surface,
-                  borderColor: selectedTime === t ? themeConfig.colors.primary : themeConfig.colors.border,
-                  color: selectedTime === t ? '#fff' : themeConfig.colors.text,
-                }}
-              >
-                {t}
-              </button>
-            ))}
-          </div>
+          {timeSlots.length === 0 && selectedDate ? (
+            <div className="text-center py-6 rounded-xl border" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
+              <Clock size={24} className="mx-auto mb-2 opacity-40" style={{ color: themeConfig.colors.textMuted }} />
+              <p className="text-xs" style={{ color: themeConfig.colors.textMuted }}>لا توجد أوقات متاحة في هذا اليوم</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-4 gap-2">
+              {timeSlots.map(t => (
+                <button
+                  key={t}
+                  onClick={() => setSelectedTime(t)}
+                  className="py-2.5 rounded-xl border text-xs font-bold transition-all"
+                  style={{
+                    backgroundColor: selectedTime === t ? themeConfig.colors.primary : themeConfig.colors.surface,
+                    borderColor: selectedTime === t ? themeConfig.colors.primary : themeConfig.colors.border,
+                    color: selectedTime === t ? '#fff' : themeConfig.colors.text,
+                  }}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
       

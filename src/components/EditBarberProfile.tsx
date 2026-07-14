@@ -6,6 +6,8 @@ import { uploadAvatar, uploadPortfolioImage, validateFile, UPLOAD_LIMITS } from 
 import {
   ArrowLeft, Save, AlertCircle, CheckCircle, Plus, Trash2, Upload
 } from 'lucide-react';
+import WorkingHoursEditor from './WorkingHoursEditor';
+import AvailabilityExceptions from './AvailabilityExceptions';
 
 interface EditBarberProfileProps {
   onBack: () => void;
@@ -221,10 +223,7 @@ export default function EditBarberProfile({ onBack, userRole }: EditBarberProfil
       }
       updates.portfolio = updatedPortfolio;
 
-      // Update working hours if provided
-      if (Object.keys(formData.workingHours).length > 0) {
-        updates.working_hours = formData.workingHours;
-      }
+      // Working hours are now managed via availability_schedules table (WorkingHoursEditor component)
 
       // Update barber profile in database
       await updateBarberProfile(barberData.id as string, updates);
@@ -580,11 +579,15 @@ export default function EditBarberProfile({ onBack, userRole }: EditBarberProfil
         {/* Working Hours Section */}
         <div>
           <h3 className="text-xs font-bold mb-3 px-1" style={{ color: themeConfig.colors.textMuted }}>ساعات العمل</h3>
-          <div className="space-y-3 rounded-2xl border p-4" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
-            {/* Working Hours (simplified for brevity) */}
-            <p className="text-sm" style={{ color: themeConfig.colors.textMuted }}>
-              (سيتم إضافة واجهة تحكم كاملة لساعات العمل لاحقًا)
-            </p>
+          <div className="rounded-2xl border p-4" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
+            {barberData && <WorkingHoursEditor barberId={barberData.id as string} />}
+          </div>
+        </div>
+        {/* Availability Exceptions Section */}
+        <div>
+          <h3 className="text-xs font-bold mb-3 px-1" style={{ color: themeConfig.colors.textMuted }}>أيام الإغلاق</h3>
+          <div className="rounded-2xl border p-4" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
+            {barberData && <AvailabilityExceptions barberId={barberData.id as string} />}
           </div>
         </div>
 

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useApp } from '@/contexts/useApp';
 import { motion, AnimatePresence } from 'framer-motion';
 import { QRCodeSVG } from 'qrcode.react';
@@ -7,7 +7,10 @@ import {
   Scissors, Heart, Share2, Phone, MessageSquare,
   Calendar, Navigation, Globe, AlertTriangle
 } from 'lucide-react';
+import { getBarberAvailability, getBarberExceptions } from '@/supabase/database';
 
+// Saturday=0, Sunday=1, Monday=2, Tuesday=3, Wednesday=4, Thursday=5, Friday=6
+const daysArSchedule = ['السبت', 'الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة'];
 const daysAr = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
 const daysEn = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
 
@@ -31,9 +34,37 @@ export default function BarberDetailPage() {
   const [showReport, setShowReport] = useState(false);
   const [reportReason, setReportReason] = useState('');
   const [reportSent, setReportSent] = useState(false);
+  const [availabilitySchedule, setAvailabilitySchedule] = useState<Array<{ day_of_week: number; start_time: string; end_time: string; is_active: boolean }>>([]);
+  const [availabilityExceptions, setAvailabilityExceptions] = useState<Array<{ date: string; type: string; reason: string }>>([]);
 
   const { barbers } = useApp();
   const barber = barbers.find(b => b.id === screenParams?.barberId);
+
+  useEffect(() => {
+    if (!barber?.id) return;
+    const fetchAvailability = async () => {
+      try {
+        const [schedData, excData] = await Promise.all([
+          getBarberAvailability(barber.id),
+          getBarberExceptions(barber.id),
+        ]);
+        setAvailabilitySchedule(schedData.map(s => ({
+          day_of_week: s.day_of_week as number,
+          start_time: s.start_time as string,
+          end_time: s.end_time as string,
+          is_active: s.is_active as boolean,
+        })));
+        setAvailabilityExceptions(excData.map(e => ({
+          date: e.date as string,
+          type: e.type as string,
+          reason: e.reason as string,
+        })));
+      } catch (err) {
+        console.error('Failed to fetch availability:', err);
+      }
+    };
+    fetchAvailability();
+  }, [barber?.id]);
 
   if (!barber) {
     return (
@@ -336,23 +367,63 @@ export default function BarberDetailPage() {
         {activeSection === 'hours' && (
           <motion.div key="hours" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
             className="px-4 mt-3 space-y-1">
-            {daysEn.map((day, idx) => {
-              const hours = barber.workingHours[day];
-              const isToday = idx === new Date().getDay();
-              return (
-                <div key={day} className="flex items-center justify-between py-2.5 px-3 rounded-xl"
-                  style={{ backgroundColor: isToday ? themeConfig.colors.primary + '08' : themeConfig.colors.surface, border: isToday ? `1px solid ${themeConfig.colors.primary}20` : 'none' }}>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium" style={{ color: themeConfig.colors.text }}>{daysAr[idx]}</span>
-                    {isToday && <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold text-white" style={{ backgroundColor: themeConfig.colors.primary }}>اليوم</span>}
+            {availabilitySchedule.length > 0 ? (
+              // Show from availability_schedules table
+              daysArSchedule.map((dayLabel, idx) => {
+                const schedule = availabilitySchedule.find(s => s.day_of_week === idx);
+                // Map schedule day_of_week (0=Sat) to JS getDay() (0=Sun, 6=Sat)
+                const jsDay = idx === 0 ? 6 : idx; // Sat=6 in JS
+                const isToday = new Date().getDay() === (idx === 0 ? 6 : idx === 1 ? 0 : idx);
+                return (
+                  <div key={idx} className="flex items-center justify-between py-2.5 px-3 rounded-xl"
+                    style={{ backgroundColor: isToday ? themeConfig.colors.primary + '08' : themeConfig.colors.surface, border: isToday ? `1px solid ${themeConfig.colors.primary}20` : 'none' }}>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium" style={{ color: themeConfig.colors.text }}>{dayLabel}</span>
+                      {isToday && <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold text-white" style={{ backgroundColor: themeConfig.colors.primary }}>اليوم</span>}
+                    </div>
+                    {schedule?.is_active
+                      ? <span className="text-xs" style={{ color: themeConfig.colors.textMuted }}>{schedule.start_time} - {schedule.end_time}</span>
+                      : <span className="text-xs font-bold" style={{ color: themeConfig.colors.error }}>مغلق</span>
+                    }
                   </div>
-                  {hours?.isOpen
-                    ? <span className="text-xs" style={{ color: themeConfig.colors.textMuted }}>{hours.open} - {hours.close}</span>
-                    : <span className="text-xs font-bold" style={{ color: themeConfig.colors.error }}>مغلق</span>
-                  }
-                </div>
-              );
-            })}
+                );
+              })
+            ) : (
+              // Fallback to old workingHours field
+              daysEn.map((day, idx) => {
+                const hours = barber.workingHours[day];
+                const isToday = idx === new Date().getDay();
+                return (
+                  <div key={day} className="flex items-center justify-between py-2.5 px-3 rounded-xl"
+                    style={{ backgroundColor: isToday ? themeConfig.colors.primary + '08' : themeConfig.colors.surface, border: isToday ? `1px solid ${themeConfig.colors.primary}20` : 'none' }}>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium" style={{ color: themeConfig.colors.text }}>{daysAr[idx]}</span>
+                      {isToday && <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold text-white" style={{ backgroundColor: themeConfig.colors.primary }}>اليوم</span>}
+                    </div>
+                    {hours?.isOpen
+                      ? <span className="text-xs" style={{ color: themeConfig.colors.textMuted }}>{hours.open} - {hours.close}</span>
+                      : <span className="text-xs font-bold" style={{ color: themeConfig.colors.error }}>مغلق</span>
+                    }
+                  </div>
+                );
+              })
+            )}
+            {/* Upcoming exceptions */}
+            {availabilityExceptions.filter(e => new Date(e.date) >= new Date()).length > 0 && (
+              <div className="mt-3 pt-3 border-t" style={{ borderColor: themeConfig.colors.border }}>
+                <p className="text-[10px] font-bold mb-2" style={{ color: themeConfig.colors.textMuted }}>أيام الإغلاق القادمة</p>
+                {availabilityExceptions.filter(e => new Date(e.date) >= new Date()).slice(0, 5).map((exc, i) => (
+                  <div key={i} className="flex items-center justify-between py-1.5">
+                    <span className="text-[10px]" style={{ color: themeConfig.colors.text }}>
+                      {new Date(exc.date).toLocaleDateString('ar-DZ', { month: 'short', day: 'numeric' })}
+                    </span>
+                    <span className="text-[9px] px-2 py-0.5 rounded-full" style={{ backgroundColor: themeConfig.colors.error + '15', color: themeConfig.colors.error }}>
+                      {exc.reason || exc.type}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>

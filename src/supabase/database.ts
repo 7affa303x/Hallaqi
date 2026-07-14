@@ -147,6 +147,91 @@ export async function markNotificationRead(notificationId: string) {
   if (error) throw new Error(error.message);
 }
 
+/* ========== AVAILABILITY ========== */
+
+export async function getBarberAvailability(barberId: string) {
+  guard();
+  const { data, error } = await supabase
+    .from('availability_schedules')
+    .select('*')
+    .eq('professional_id', barberId)
+    .order('day_of_week', { ascending: true });
+  if (error) throw new Error(error.message);
+  return (data || []) as Record<string, unknown>[];
+}
+
+export async function updateBarberAvailability(
+  barberId: string,
+  schedules: Array<{ day_of_week: number; start_time: string; end_time: string; is_active: boolean }>
+) {
+  guard();
+  // Delete existing schedules for this barber
+  const { error: deleteError } = await supabase
+    .from('availability_schedules')
+    .delete()
+    .eq('professional_id', barberId);
+  if (deleteError) throw new Error(deleteError.message);
+
+  // Insert new schedules
+  if (schedules.length > 0) {
+    const rows = schedules.map(s => ({
+      professional_id: barberId,
+      day_of_week: s.day_of_week,
+      start_time: s.start_time,
+      end_time: s.end_time,
+      is_active: s.is_active,
+      updated_at: new Date().toISOString(),
+    }));
+    const { error: insertError } = await supabase
+      .from('availability_schedules')
+      .insert(rows as Record<string, unknown>[]);
+    if (insertError) throw new Error(insertError.message);
+  }
+}
+
+export async function getBarberExceptions(barberId: string) {
+  guard();
+  const { data, error } = await supabase
+    .from('availability_exceptions')
+    .select('*')
+    .eq('professional_id', barberId)
+    .order('date', { ascending: true });
+  if (error) throw new Error(error.message);
+  return (data || []) as Record<string, unknown>[];
+}
+
+export async function addBarberException(
+  barberId: string,
+  exception: { date: string; type: string; reason: string; start_time?: string; end_time?: string }
+) {
+  guard();
+  const row = {
+    professional_id: barberId,
+    date: exception.date,
+    type: exception.type,
+    reason: exception.reason,
+    start_time: exception.start_time || null,
+    end_time: exception.end_time || null,
+    updated_at: new Date().toISOString(),
+  };
+  const { data, error } = await supabase
+    .from('availability_exceptions')
+    .insert(row as Record<string, unknown>)
+    .select()
+    .single();
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export async function deleteBarberException(exceptionId: string) {
+  guard();
+  const { error } = await supabase
+    .from('availability_exceptions')
+    .delete()
+    .eq('id', exceptionId);
+  if (error) throw new Error(error.message);
+}
+
 /* ========== REAL-TIME ========== */
 export function subscribeToTable(table: string, callback: (payload: Record<string, unknown>) => void) {
   guard();
