@@ -29,17 +29,13 @@ export async function signUp(email: string, password: string, displayName: strin
   if (error) throw new Error(getAuthErrorMessage(error));
 
   if (data.user) {
-    await supabase.from('users').insert({
+    await supabase.from('profiles').upsert({
       id: data.user.id,
-      email,
-      display_name: displayName,
-      role: 'user',
-      is_verified: false,
-      is_id_verified: false,
-      theme: 'hallaqi',
-      language: 'ar',
-      followers: 0,
-      following: 0,
+      full_name: displayName,
+      user_role: 'client',
+      user_status: 'active',
+      verification_status: 'unverified',
+      updated_at: new Date().toISOString(),
     } as Record<string, unknown>);
   }
   return data;
@@ -53,7 +49,7 @@ export async function signIn(email: string, password: string) {
   if (error) throw new Error(getAuthErrorMessage(error));
 
   if (data.user) {
-    await supabase.from('users').update({ last_login_at: new Date().toISOString() } as Record<string, unknown>).eq('id', data.user.id);
+    await supabase.from('profiles').update({ updated_at: new Date().toISOString() } as Record<string, unknown>).eq('id', data.user.id);
   }
   return data;
 }
