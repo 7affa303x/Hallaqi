@@ -5,6 +5,12 @@ function guard(): void {
 }
 
 /* ========== BARBERS ========== */
+/**
+ * Fetches a list of barbers from the Supabase 'barbers' table.
+ * Services for each barber are embedded as a JSONB array within the 'services' column.
+ * @param filters - Optional filters for tag, wilaya, or search query.
+ * @returns A promise that resolves to an array of barber records.
+ */
 export async function getBarbers(filters?: { tag?: string; wilaya?: string; search?: string }) {
   guard();
   let query = supabase.from('barbers').select('*').order('rating', { ascending: false });

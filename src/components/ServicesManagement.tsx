@@ -64,6 +64,8 @@ export default function ServicesManagement({ onBack }: ServicesManagementProps) 
         if (!response.ok) throw new Error('فشل تحميل البيانات');
         
         const allBarbers = await response.json();
+        // The `barber.services` property is already an array of ServiceDoc objects
+        // due to the Supabase schema design (jsonb column) and API handling.
         const barber = allBarbers.find((b: Record<string, unknown>) => b.user_id === appUser.id);
 
         if (!barber) {
@@ -73,6 +75,8 @@ export default function ServicesManagement({ onBack }: ServicesManagementProps) 
         }
 
         setBarberId(barber.id);
+        // Extract services directly from the barber object. The data is already typed as Service[]
+        // because it's stored as a JSONB array in Supabase and retrieved as such.
         const barberServices = (barber.services as Service[]) || [];
         setServices(barberServices);
       } catch (err) {
