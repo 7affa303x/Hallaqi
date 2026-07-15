@@ -8,11 +8,22 @@ export const isSupabaseConfigured = (): boolean => {
   return supabaseUrl.length > 10 && supabaseKey.length > 10 && supabaseUrl.startsWith('http');
 };
 
-export const isDeveloperMode = localStorage.getItem("hallaqi_dev_mode") === "true";
+export const isDeveloperMode = (() => {
+  try {
+    return typeof window !== 'undefined' && window.localStorage?.getItem('hallaqi_dev_mode') === 'true';
+  } catch {
+    return false;
+  }
+})();
+
 export function toggleDeveloperMode() {
-  const current = localStorage.getItem("hallaqi_dev_mode") === "true";
-  localStorage.setItem("hallaqi_dev_mode", (!current).toString());
-  window.location.reload();
+  try {
+    const current = localStorage.getItem('hallaqi_dev_mode') === 'true';
+    localStorage.setItem('hallaqi_dev_mode', (!current).toString());
+    window.location.reload();
+  } catch {
+    // ignore
+  }
 }
 
 export const supabase = isSupabaseConfigured()
