@@ -2,33 +2,33 @@ import { useState, useCallback, useEffect, type ReactNode } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useStore } from '@/store/useStore';
 import { isSupabaseConfigured, isDeveloperMode } from '@/supabase/client';
-import { getBarbers, getUserBookings, getForumPosts, getUserNotifications, updateBookingStatus } from '@/supabase/database';
+import { getProfessionals, getClientBookings, getForumPosts, getUserNotifications, updateBookingStatus } from '@/supabase/database';
 import { AppContext } from './context';
 import { themes } from '@/data/themes';
 import { mockCurrentUser, mockBarbers, mockBookings, mockForumPosts, mockNotifications } from '@/data/mockData';
 import type { Barber, Booking, Chat, ForumPost, AppNotification, TabName, ThemeName, AnimationStyle, AppSettings, ScreenName, ScreenParams, User, Service } from '@/types';
-import type { AppUser } from '@/types/supabase';
+import type { Profile } from '@/types/supabase';
 
-const convertAppUserToUser = (appUser: AppUser): User => ({
-  id: appUser.id,
-  name: appUser.display_name || appUser.email.split('@')[0],
-  email: appUser.email,
-  phone: appUser.phone || '',
-  avatar: appUser.photo_url || '',
-  isVerified: appUser.is_verified,
-  idCardVerified: appUser.is_id_verified,
-  role: appUser.role,
-  joinedDate: appUser.created_at,
-  bio: appUser.bio || undefined,
-  location: appUser.location || undefined,
-  wilaya: appUser.wilaya || '',
-  followers: appUser.followers,
-  following: appUser.following,
+const convertProfileToUser = (profile: Profile): User => ({
+  id: profile.id,
+  name: profile.full_name || profile.username || 'مستخدم',
+  email: '', // Profile table doesn't store email; comes from auth.user
+  phone: profile.phone_number || '',
+  avatar: profile.avatar_url || '',
+  isVerified: profile.verification_status === 'verified' || profile.verification_status === 'premium',
+  idCardVerified: false, // Not in profiles table
+  role: (profile.user_role === 'barber' || profile.user_role === 'specialist') ? 'barber' : profile.user_role === 'admin' ? 'admin' : 'user',
+  joinedDate: profile.updated_at || new Date().toISOString(),
+  bio: undefined,
+  location: profile.city || undefined,
+  wilaya: profile.city || '',
+  followers: 0,
+  following: 0,
   bookings: [],
   savedBarbers: [],
   notificationsEnabled: true,
-  theme: appUser.theme as ThemeName,
-  language: appUser.language,
+  theme: 'hallaqi',
+  language: 'ar',
   isSubscribed: false,
   badges: [],
   stats: { totalBookings: 0, totalSpent: 0, streakDays: 0, points: 0, rank: 'bronze' },
@@ -37,25 +37,28 @@ const convertAppUserToUser = (appUser: AppUser): User => ({
 
 /** Transform a Supabase booking row into the app's Booking type */
 function transformBookingRow(row: Record<string, unknown>): Booking {
+  const startTime = (row.booking_start_time as string) || '';
+  const date = startTime ? startTime.split('T')[0] : '';
+  const time = startTime ? startTime.split('T')[1]?.substring(0, 5) : '';
   return {
     id: row.id as string,
-    barberId: row.barberId as string,
-    barberName: (row.barberName as string) || '',
-    barberAvatar: (row.barberAvatar as string) || '',
-    services: ((row.services as Service[]) || []),
-    date: (row.date as string) || '',
-    time: (row.time as string) || '',
+    barberId: (row.professional_id as string) || '',
+    barberName: '', // Fetched separately via join
+    barberAvatar: '',
+    services: [],
+    date,
+    time,
     status: (row.status as Booking['status']) || 'pending',
-    totalPrice: (row.totalPrice as number) || 0,
-    note: (row.note as string) || undefined,
+    totalPrice: (row.total_price as number) || 0,
+    note: (row.notes as string) || undefined,
     createdAt: (row.created_at as string) || new Date().toISOString(),
-    location: (row.location as string) || '',
-    isMobileService: (row.isMobileService as boolean) || false,
-    paymentMethod: (row.paymentMethod as Booking['paymentMethod']) || 'cash',
-    paymentStatus: (row.paymentStatus as Booking['paymentStatus']) || 'pending',
-    reviewed: (row.reviewed as boolean) || false,
-    rating: (row.rating as number) || undefined,
-    address: (row.address as string) || undefined,
+    location: '',
+    isMobileService: false,
+    paymentMethod: 'cash',
+    paymentStatus: (row.payment_status as Booking['paymentStatus']) || 'pending',
+    reviewed: false,
+    rating: undefined,
+    address: undefined,
   };
 }
 
@@ -95,7 +98,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setScreen(nextScreen);
     setScreenParams(params);
     setHistory(prev => [...prev, { screen: nextScreen, params }]);
-    // Update URL for password reset flows
     if (nextScreen === 'reset-password' || nextScreen === 'forgot-password') {
       window.history.pushState({}, '', `/${nextScreen}`);
     }
@@ -108,7 +110,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const last = next[next.length - 1];
       setScreen(last.screen);
       setScreenParams(last.params);
-      // Update URL when going back
       if (last.screen === 'reset-password' || last.screen === 'forgot-password') {
         window.history.pushState({}, '', `/${last.screen}`);
       } else if (last.screen === 'home') {
@@ -143,13 +144,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     useStore.getState().setAnimationStyle(style);
   }, []);
 
-  /* ---- Data (empty by default, loaded from Supabase) ---- */
+  /* ---- Data ---- */
   const [barbers, setBarbers] = useState<Barber[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [chats] = useState<Chat[]>([]);
   const [forumPosts, setForumPosts] = useState<ForumPost[]>([]);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
-  const [currentUser] = useState<User | null>(isDeveloperMode ? mockCurrentUser : (appUser ? convertAppUserToUser(appUser) : null));
+  const [currentUser] = useState<User | null>(isDeveloperMode ? mockCurrentUser : (appUser ? convertProfileToUser(appUser) : null));
 
   const [isLoading, setIsLoading] = useState<DataLoadingState>({
     barbers: false, bookings: false, forumPosts: false, notifications: false,
@@ -159,7 +160,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   /* ---- Load from Supabase ---- */
   const refreshData = useCallback(async () => {
     if (!isSupabaseConfigured()) {
-      // In developer mode, use mock data
       if (isDeveloperMode) {
         setBarbers(mockBarbers as unknown as Barber[]);
         setBookings(mockBookings as unknown as Booking[]);
@@ -175,14 +175,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setDataError(null);
 
     try {
-      const barbersData = await getBarbers();
+      const barbersData = await getProfessionals();
       if (barbersData && barbersData.length > 0) setBarbers(barbersData as unknown as Barber[]);
-    } catch (err) { console.warn('[AppContext] barbers fetch failed:', err); }
+    } catch (err) { console.warn('[AppContext] professionals fetch failed:', err); }
     finally { setIsLoading(p => ({ ...p, barbers: false })); }
 
     if (appUser) {
       try {
-        const bookingsData = await getUserBookings(appUser.id);
+        const bookingsData = await getClientBookings(appUser.id);
         if (bookingsData && bookingsData.length > 0) {
           setBookings(bookingsData.map(transformBookingRow));
         } else {
@@ -268,12 +268,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [appUser]);
 
   const toggleLike = useCallback((postId: string) => {
-    if (isDeveloperMode) {
-      setForumPosts(prev => prev.map(p =>
-        p.id === postId ? { ...p, isLiked: !p.isLiked, likes: p.isLiked ? p.likes - 1 : p.likes + 1 } : p
-      ));
-      return;
-    }
     setForumPosts(prev => prev.map(p =>
       p.id === postId ? { ...p, isLiked: !p.isLiked, likes: p.isLiked ? p.likes - 1 : p.likes + 1 } : p
     ));
@@ -287,37 +281,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
   }, []);
 
-  /** Add booking: prepend to local state (Supabase save handled by caller) */
   const addBooking = useCallback((booking: Booking) => {
     setBookings(prev => [booking, ...prev]);
   }, []);
 
-  /** Cancel booking: update Supabase first, then local state */
   const cancelBooking = useCallback(async (id: string) => {
-    // Optimistic UI update
     setBookings(prev => prev.map(b => b.id === id ? { ...b, status: 'cancelled' as const } : b));
-    // Sync to Supabase
     if (!isDeveloperMode && isSupabaseConfigured()) {
       try {
         await updateBookingStatus(id, 'cancelled');
       } catch (err) {
-        console.error('[AppContext] Failed to cancel booking in Supabase:', err);
+        console.error('[AppContext] Failed to cancel booking:', err);
       }
     }
   }, []);
 
   const sendMessage = useCallback((_chatId: string, _content: string) => {
-    if (isDeveloperMode) {
-      console.log('[AppContext] Developer Mode: Message (local):', _content);
-      return;
-    }
-    console.log('[AppContext] Message (local):', _content);
+    console.log('[AppContext] Message:', _content);
   }, []);
 
   const getBarberById = useCallback((id: string) => barbers.find(b => b.id === id), [barbers]);
   const getPostById = useCallback((id: string) => forumPosts.find(p => p.id === id), [forumPosts]);
 
-  /* ---- Ensure forgot-password routes to ForgotPassword component ---- */
+  /* ---- Ensure forgot-password routes correctly ---- */
   useEffect(() => {
     if (screen === 'forgot-password' && window.location.pathname !== '/forgot-password') {
       window.history.replaceState({}, '', '/forgot-password');
@@ -326,7 +312,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const themeConfig = themes[currentTheme];
 
-  /* ---- Sync screen changes to URL (for password reset flows) ---- */
   useEffect(() => {
     if (screen === 'reset-password' || screen === 'forgot-password') {
       const currentPath = window.location.pathname;
