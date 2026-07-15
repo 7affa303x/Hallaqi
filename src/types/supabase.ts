@@ -1,10 +1,3 @@
-/**
- * Hallaqi - Supabase Types
- * Auto-generated from Live Database Schema
- * Source of Truth: npkmqlupkvijhumkldpm
- * Generated: 2026-07-15
- */
-
 export type Json =
   | string
   | number
@@ -19,92 +12,674 @@ export type Database = {
   }
   public: {
     Tables: {
-      profiles: {
+      availability_exceptions: {
         Row: {
+          created_at: string | null
+          date: string
+          end_time: string | null
           id: string
+          professional_id: string | null
+          reason: string | null
+          start_time: string | null
+          type: string
           updated_at: string | null
-          username: string | null
-          full_name: string | null
-          avatar_url: string | null
-          website: string | null
-          phone_number: string | null
-          address: string | null
-          city: string | null
-          country: string | null
-          user_role: Database["public"]["Enums"]["user_role"] | null
-          user_status: Database["public"]["Enums"]["user_status"] | null
-          verification_status: Database["public"]["Enums"]["verification_status"] | null
         }
         Insert: {
-          id: string
+          created_at?: string | null
+          date: string
+          end_time?: string | null
+          id?: string
+          professional_id?: string | null
+          reason?: string | null
+          start_time?: string | null
+          type: string
           updated_at?: string | null
-          username?: string | null
-          full_name?: string | null
-          avatar_url?: string | null
-          website?: string | null
-          phone_number?: string | null
-          address?: string | null
-          city?: string | null
-          country?: string | null
-          user_role?: Database["public"]["Enums"]["user_role"] | null
-          user_status?: Database["public"]["Enums"]["user_status"] | null
-          verification_status?: Database["public"]["Enums"]["verification_status"] | null
         }
         Update: {
+          created_at?: string | null
+          date?: string
+          end_time?: string | null
           id?: string
+          professional_id?: string | null
+          reason?: string | null
+          start_time?: string | null
+          type?: string
           updated_at?: string | null
-          username?: string | null
-          full_name?: string | null
-          avatar_url?: string | null
-          website?: string | null
-          phone_number?: string | null
-          address?: string | null
-          city?: string | null
-          country?: string | null
-          user_role?: Database["public"]["Enums"]["user_role"] | null
-          user_status?: Database["public"]["Enums"]["user_status"] | null
-          verification_status?: Database["public"]["Enums"]["verification_status"] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "availability_exceptions_professional_id_fkey"
+            columns: ["professional_id"]
+            isOneToOne: false
+            referencedRelation: "professionals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      availability_schedules: {
+        Row: {
+          created_at: string | null
+          day_of_week: number
+          end_time: string
+          id: string
+          is_active: boolean | null
+          professional_id: string | null
+          start_time: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          day_of_week: number
+          end_time: string
+          id?: string
+          is_active?: boolean | null
+          professional_id?: string | null
+          start_time: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          day_of_week?: number
+          end_time?: string
+          id?: string
+          is_active?: boolean | null
+          professional_id?: string | null
+          start_time?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "availability_schedules_professional_id_fkey"
+            columns: ["professional_id"]
+            isOneToOne: false
+            referencedRelation: "professionals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bookings: {
+        Row: {
+          booking_end_time: string
+          booking_start_time: string
+          client_id: string | null
+          created_at: string | null
+          id: string
+          notes: string | null
+          payment_status: Database["public"]["Enums"]["payment_status"] | null
+          professional_id: string | null
+          service_id: string | null
+          status: Database["public"]["Enums"]["booking_status"] | null
+          total_price: number
+          updated_at: string | null
+        }
+        Insert: {
+          booking_end_time: string
+          booking_start_time: string
+          client_id?: string | null
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          payment_status?: Database["public"]["Enums"]["payment_status"] | null
+          professional_id?: string | null
+          service_id?: string | null
+          status?: Database["public"]["Enums"]["booking_status"] | null
+          total_price: number
+          updated_at?: string | null
+        }
+        Update: {
+          booking_end_time?: string
+          booking_start_time?: string
+          client_id?: string | null
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          payment_status?: Database["public"]["Enums"]["payment_status"] | null
+          professional_id?: string | null
+          service_id?: string | null
+          status?: Database["public"]["Enums"]["booking_status"] | null
+          total_price?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bookings_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bookings_professional_id_fkey"
+            columns: ["professional_id"]
+            isOneToOne: false
+            referencedRelation: "professionals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bookings_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conversation_members: {
+        Row: {
+          conversation_id: string
+          id: string
+          joined_at: string | null
+          last_read_at: string | null
+          user_id: string
+        }
+        Insert: {
+          conversation_id: string
+          id?: string
+          joined_at?: string | null
+          last_read_at?: string | null
+          user_id: string
+        }
+        Update: {
+          conversation_id?: string
+          id?: string
+          joined_at?: string | null
+          last_read_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_members_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_members_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conversations: {
+        Row: {
+          created_at: string | null
+          id: string
+          last_message_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          last_message_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          last_message_at?: string | null
+          updated_at?: string | null
         }
         Relationships: []
       }
+      favorites: {
+        Row: {
+          created_at: string | null
+          id: string
+          professional_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          professional_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          professional_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "favorites_professional_id_fkey"
+            columns: ["professional_id"]
+            isOneToOne: false
+            referencedRelation: "professionals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "favorites_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      forum_categories: {
+        Row: {
+          color: string | null
+          created_at: string | null
+          description: string | null
+          icon: string | null
+          id: string
+          name: string
+          slug: string
+          sort_order: number | null
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string | null
+          description?: string | null
+          icon?: string | null
+          id?: string
+          name: string
+          slug: string
+          sort_order?: number | null
+        }
+        Update: {
+          color?: string | null
+          created_at?: string | null
+          description?: string | null
+          icon?: string | null
+          id?: string
+          name?: string
+          slug?: string
+          sort_order?: number | null
+        }
+        Relationships: []
+      }
+      forum_comments: {
+        Row: {
+          author_id: string
+          content: string
+          created_at: string | null
+          id: string
+          likes_count: number | null
+          parent_id: string | null
+          post_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          author_id: string
+          content: string
+          created_at?: string | null
+          id?: string
+          likes_count?: number | null
+          parent_id?: string | null
+          post_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          author_id?: string
+          content?: string
+          created_at?: string | null
+          id?: string
+          likes_count?: number | null
+          parent_id?: string | null
+          post_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "forum_comments_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "forum_comments_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "forum_comments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "forum_comments_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "forum_posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      forum_likes: {
+        Row: {
+          comment_id: string | null
+          created_at: string | null
+          id: string
+          post_id: string | null
+          user_id: string
+        }
+        Insert: {
+          comment_id?: string | null
+          created_at?: string | null
+          id?: string
+          post_id?: string | null
+          user_id: string
+        }
+        Update: {
+          comment_id?: string | null
+          created_at?: string | null
+          id?: string
+          post_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "forum_likes_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: false
+            referencedRelation: "forum_comments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "forum_likes_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "forum_posts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "forum_likes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      forum_posts: {
+        Row: {
+          author_id: string
+          category_id: string | null
+          comments_count: number | null
+          content: string
+          created_at: string | null
+          id: string
+          image_url: string | null
+          is_locked: boolean | null
+          is_pinned: boolean | null
+          likes_count: number | null
+          title: string
+          type: string | null
+          updated_at: string | null
+          views_count: number | null
+        }
+        Insert: {
+          author_id: string
+          category_id?: string | null
+          comments_count?: number | null
+          content: string
+          created_at?: string | null
+          id?: string
+          image_url?: string | null
+          is_locked?: boolean | null
+          is_pinned?: boolean | null
+          likes_count?: number | null
+          title: string
+          type?: string | null
+          updated_at?: string | null
+          views_count?: number | null
+        }
+        Update: {
+          author_id?: string
+          category_id?: string | null
+          comments_count?: number | null
+          content?: string
+          created_at?: string | null
+          id?: string
+          image_url?: string | null
+          is_locked?: boolean | null
+          is_pinned?: boolean | null
+          likes_count?: number | null
+          title?: string
+          type?: string | null
+          updated_at?: string | null
+          views_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "forum_posts_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "forum_posts_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "forum_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      forum_reports: {
+        Row: {
+          comment_id: string | null
+          created_at: string | null
+          id: string
+          post_id: string | null
+          reason: string
+          reporter_id: string
+          status: string | null
+        }
+        Insert: {
+          comment_id?: string | null
+          created_at?: string | null
+          id?: string
+          post_id?: string | null
+          reason: string
+          reporter_id: string
+          status?: string | null
+        }
+        Update: {
+          comment_id?: string | null
+          created_at?: string | null
+          id?: string
+          post_id?: string | null
+          reason?: string
+          reporter_id?: string
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "forum_reports_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: false
+            referencedRelation: "forum_comments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "forum_reports_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "forum_posts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "forum_reports_reporter_id_fkey"
+            columns: ["reporter_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      messages: {
+        Row: {
+          content: string
+          conversation_id: string
+          created_at: string | null
+          id: string
+          sender_id: string
+          status: string | null
+          type: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          content: string
+          conversation_id: string
+          created_at?: string | null
+          id?: string
+          sender_id: string
+          status?: string | null
+          type?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          content?: string
+          conversation_id?: string
+          created_at?: string | null
+          id?: string
+          sender_id?: string
+          status?: string | null
+          type?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_sender_id_fkey"
+            columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notifications: {
+        Row: {
+          created_at: string | null
+          id: string
+          message: string
+          metadata: Json | null
+          read: boolean | null
+          title: string
+          type: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          message: string
+          metadata?: Json | null
+          read?: boolean | null
+          title: string
+          type: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          message?: string
+          metadata?: Json | null
+          read?: boolean | null
+          title?: string
+          type?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      portfolio_items: {
+        Row: {
+          caption: string | null
+          created_at: string | null
+          id: string
+          professional_id: string | null
+          sort_order: number | null
+          thumbnail_url: string | null
+          type: Database["public"]["Enums"]["media_type"]
+          url: string
+        }
+        Insert: {
+          caption?: string | null
+          created_at?: string | null
+          id?: string
+          professional_id?: string | null
+          sort_order?: number | null
+          thumbnail_url?: string | null
+          type: Database["public"]["Enums"]["media_type"]
+          url: string
+        }
+        Update: {
+          caption?: string | null
+          created_at?: string | null
+          id?: string
+          professional_id?: string | null
+          sort_order?: number | null
+          thumbnail_url?: string | null
+          type?: Database["public"]["Enums"]["media_type"]
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "portfolio_items_professional_id_fkey"
+            columns: ["professional_id"]
+            isOneToOne: false
+            referencedRelation: "professionals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       professionals: {
         Row: {
-          id: string
-          bio: string | null
           average_rating: number | null
-          review_count: number | null
+          bio: string | null
+          business_address: string | null
+          business_email: string | null
+          business_name: string | null
+          business_phone: string | null
+          id: string
           latitude: number | null
           longitude: number | null
-          business_name: string | null
-          business_address: string | null
-          business_phone: string | null
-          business_email: string | null
+          review_count: number | null
           website_url: string | null
         }
         Insert: {
-          id: string
-          bio?: string | null
           average_rating?: number | null
-          review_count?: number | null
+          bio?: string | null
+          business_address?: string | null
+          business_email?: string | null
+          business_name?: string | null
+          business_phone?: string | null
+          id: string
           latitude?: number | null
           longitude?: number | null
-          business_name?: string | null
-          business_address?: string | null
-          business_phone?: string | null
-          business_email?: string | null
+          review_count?: number | null
           website_url?: string | null
         }
         Update: {
-          id?: string
-          bio?: string | null
           average_rating?: number | null
-          review_count?: number | null
+          bio?: string | null
+          business_address?: string | null
+          business_email?: string | null
+          business_name?: string | null
+          business_phone?: string | null
+          id?: string
           latitude?: number | null
           longitude?: number | null
-          business_name?: string | null
-          business_address?: string | null
-          business_phone?: string | null
-          business_email?: string | null
+          review_count?: number | null
           website_url?: string | null
         }
         Relationships: [
@@ -114,717 +689,163 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "profiles"
             referencedColumns: ["id"]
-          }
+          },
         ]
       }
-      services: {
+      profiles: {
         Row: {
+          address: string | null
+          avatar_url: string | null
+          city: string | null
+          country: string | null
+          full_name: string | null
           id: string
-          professional_id: string | null
-          name: string
-          description: string | null
-          price: number
-          duration_minutes: number
-          category: Database["public"]["Enums"]["service_category"] | null
-          is_active: boolean | null
-          created_at: string | null
+          phone_number: string | null
           updated_at: string | null
+          user_role: Database["public"]["Enums"]["user_role"] | null
+          user_status: Database["public"]["Enums"]["user_status"] | null
+          username: string | null
+          verification_status: Database["public"]["Enums"]["verification_status"] | null
+          website: string | null
         }
         Insert: {
-          id?: string
-          professional_id?: string | null
-          name: string
-          description?: string | null
-          price: number
-          duration_minutes: number
-          category?: Database["public"]["Enums"]["service_category"] | null
-          is_active?: boolean | null
-          created_at?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          id?: string
-          professional_id?: string | null
-          name?: string
-          description?: string | null
-          price?: number
-          duration_minutes?: number
-          category?: Database["public"]["Enums"]["service_category"] | null
-          is_active?: boolean | null
-          created_at?: string | null
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "services_professional_id_fkey"
-            columns: ["professional_id"]
-            referencedRelation: "professionals"
-            referencedColumns: ["id"]
-          }
-        ]
-      }
-      bookings: {
-        Row: {
+          address?: string | null
+          avatar_url?: string | null
+          city?: string | null
+          country?: string | null
+          full_name?: string | null
           id: string
-          client_id: string | null
-          professional_id: string | null
-          service_id: string | null
-          booking_start_time: string
-          booking_end_time: string
-          status: Database["public"]["Enums"]["booking_status"] | null
-          total_price: number
-          payment_status: Database["public"]["Enums"]["payment_status"] | null
-          notes: string | null
-          created_at: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          id?: string
-          client_id?: string | null
-          professional_id?: string | null
-          service_id?: string | null
-          booking_start_time: string
-          booking_end_time: string
-          status?: Database["public"]["Enums"]["booking_status"] | null
-          total_price: number
-          payment_status?: Database["public"]["Enums"]["payment_status"] | null
-          notes?: string | null
-          created_at?: string | null
+          phone_number?: string | null
           updated_at?: string | null
+          user_role?: Database["public"]["Enums"]["user_role"] | null
+          user_status?: Database["public"]["Enums"]["user_status"] | null
+          username?: string | null
+          verification_status?: Database["public"]["Enums"]["verification_status"] | null
+          website?: string | null
         }
         Update: {
+          address?: string | null
+          avatar_url?: string | null
+          city?: string | null
+          country?: string | null
+          full_name?: string | null
           id?: string
-          client_id?: string | null
-          professional_id?: string | null
-          service_id?: string | null
-          booking_start_time?: string
-          booking_end_time?: string
-          status?: Database["public"]["Enums"]["booking_status"] | null
-          total_price?: number
-          payment_status?: Database["public"]["Enums"]["payment_status"] | null
-          notes?: string | null
-          created_at?: string | null
+          phone_number?: string | null
           updated_at?: string | null
+          user_role?: Database["public"]["Enums"]["user_role"] | null
+          user_status?: Database["public"]["Enums"]["user_status"] | null
+          username?: string | null
+          verification_status?: Database["public"]["Enums"]["verification_status"] | null
+          website?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "bookings_client_id_fkey"
-            columns: ["client_id"]
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "bookings_professional_id_fkey"
-            columns: ["professional_id"]
-            referencedRelation: "professionals"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "bookings_service_id_fkey"
-            columns: ["service_id"]
-            referencedRelation: "services"
-            referencedColumns: ["id"]
-          }
-        ]
+        Relationships: []
       }
       reviews: {
         Row: {
-          id: string
           booking_id: string | null
-          reviewer_id: string | null
-          professional_id: string | null
-          rating: number
           comment: string | null
+          created_at: string | null
+          id: string
           is_public: boolean | null
           moderation_status: Database["public"]["Enums"]["moderation_status"] | null
-          created_at: string | null
+          professional_id: string | null
+          rating: number
+          reviewer_id: string | null
           updated_at: string | null
         }
         Insert: {
-          id?: string
           booking_id?: string | null
-          reviewer_id?: string | null
-          professional_id?: string | null
-          rating: number
           comment?: string | null
+          created_at?: string | null
+          id?: string
           is_public?: boolean | null
           moderation_status?: Database["public"]["Enums"]["moderation_status"] | null
-          created_at?: string | null
+          professional_id?: string | null
+          rating: number
+          reviewer_id?: string | null
           updated_at?: string | null
         }
         Update: {
-          id?: string
           booking_id?: string | null
-          reviewer_id?: string | null
-          professional_id?: string | null
-          rating?: number
           comment?: string | null
+          created_at?: string | null
+          id?: string
           is_public?: boolean | null
           moderation_status?: Database["public"]["Enums"]["moderation_status"] | null
-          created_at?: string | null
+          professional_id?: string | null
+          rating?: number
+          reviewer_id?: string | null
           updated_at?: string | null
         }
         Relationships: [
           {
             foreignKeyName: "reviews_booking_id_fkey"
             columns: ["booking_id"]
+            isOneToOne: false
             referencedRelation: "bookings"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "reviews_professional_id_fkey"
             columns: ["professional_id"]
+            isOneToOne: false
             referencedRelation: "professionals"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "reviews_reviewer_id_fkey"
             columns: ["reviewer_id"]
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          }
-        ]
-      }
-      favorites: {
-        Row: {
-          id: string
-          user_id: string | null
-          professional_id: string | null
-          created_at: string | null
-        }
-        Insert: {
-          id?: string
-          user_id?: string | null
-          professional_id?: string | null
-          created_at?: string | null
-        }
-        Update: {
-          id?: string
-          user_id?: string | null
-          professional_id?: string | null
-          created_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "favorites_user_id_fkey"
-            columns: ["user_id"]
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "favorites_professional_id_fkey"
-            columns: ["professional_id"]
-            referencedRelation: "professionals"
-            referencedColumns: ["id"]
-          }
         ]
       }
-      availability_schedules: {
+      services: {
         Row: {
-          id: string
-          professional_id: string | null
-          day_of_week: number
-          start_time: string
-          end_time: string
-          is_active: boolean | null
+          category: Database["public"]["Enums"]["service_category"] | null
           created_at: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          id?: string
-          professional_id?: string | null
-          day_of_week: number
-          start_time: string
-          end_time: string
-          is_active?: boolean | null
-          created_at?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          id?: string
-          professional_id?: string | null
-          day_of_week?: number
-          start_time?: string
-          end_time?: string
-          is_active?: boolean | null
-          created_at?: string | null
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "availability_schedules_professional_id_fkey"
-            columns: ["professional_id"]
-            referencedRelation: "professionals"
-            referencedColumns: ["id"]
-          }
-        ]
-      }
-      availability_exceptions: {
-        Row: {
-          id: string
-          professional_id: string | null
-          date: string
-          type: string
-          start_time: string | null
-          end_time: string | null
-          reason: string | null
-          created_at: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          id?: string
-          professional_id?: string | null
-          date: string
-          type: string
-          start_time?: string | null
-          end_time?: string | null
-          reason?: string | null
-          created_at?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          id?: string
-          professional_id?: string | null
-          date?: string
-          type?: string
-          start_time?: string | null
-          end_time?: string | null
-          reason?: string | null
-          created_at?: string | null
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "availability_exceptions_professional_id_fkey"
-            columns: ["professional_id"]
-            referencedRelation: "professionals"
-            referencedColumns: ["id"]
-          }
-        ]
-      }
-      portfolio_items: {
-        Row: {
-          id: string
-          professional_id: string | null
-          type: Database["public"]["Enums"]["media_type"]
-          url: string
-          thumbnail_url: string | null
-          caption: string | null
-          sort_order: number | null
-          created_at: string | null
-        }
-        Insert: {
-          id?: string
-          professional_id?: string | null
-          type: Database["public"]["Enums"]["media_type"]
-          url: string
-          thumbnail_url?: string | null
-          caption?: string | null
-          sort_order?: number | null
-          created_at?: string | null
-        }
-        Update: {
-          id?: string
-          professional_id?: string | null
-          type?: Database["public"]["Enums"]["media_type"]
-          url?: string
-          thumbnail_url?: string | null
-          caption?: string | null
-          sort_order?: number | null
-          created_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "portfolio_items_professional_id_fkey"
-            columns: ["professional_id"]
-            referencedRelation: "professionals"
-            referencedColumns: ["id"]
-          }
-        ]
-      }
-      conversations: {
-        Row: {
-          id: string
-          created_at: string | null
-          updated_at: string | null
-          last_message_at: string | null
-        }
-        Insert: {
-          id?: string
-          created_at?: string | null
-          updated_at?: string | null
-          last_message_at?: string | null
-        }
-        Update: {
-          id?: string
-          created_at?: string | null
-          updated_at?: string | null
-          last_message_at?: string | null
-        }
-        Relationships: []
-      }
-      conversation_members: {
-        Row: {
-          id: string
-          conversation_id: string
-          user_id: string
-          joined_at: string | null
-          last_read_at: string | null
-        }
-        Insert: {
-          id?: string
-          conversation_id: string
-          user_id: string
-          joined_at?: string | null
-          last_read_at?: string | null
-        }
-        Update: {
-          id?: string
-          conversation_id?: string
-          user_id?: string
-          joined_at?: string | null
-          last_read_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "conversation_members_conversation_id_fkey"
-            columns: ["conversation_id"]
-            referencedRelation: "conversations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "conversation_members_user_id_fkey"
-            columns: ["user_id"]
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          }
-        ]
-      }
-      messages: {
-        Row: {
-          id: string
-          conversation_id: string
-          sender_id: string
-          content: string
-          type: string | null
-          status: string | null
-          created_at: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          id?: string
-          conversation_id: string
-          sender_id: string
-          content: string
-          type?: string | null
-          status?: string | null
-          created_at?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          id?: string
-          conversation_id?: string
-          sender_id?: string
-          content?: string
-          type?: string | null
-          status?: string | null
-          created_at?: string | null
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "messages_conversation_id_fkey"
-            columns: ["conversation_id"]
-            referencedRelation: "conversations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "messages_sender_id_fkey"
-            columns: ["sender_id"]
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          }
-        ]
-      }
-      notifications: {
-        Row: {
-          id: string
-          user_id: string | null
-          type: string
-          title: string
-          message: string
-          read: boolean | null
-          metadata: Json | null
-          created_at: string | null
-        }
-        Insert: {
-          id?: string
-          user_id?: string | null
-          type: string
-          title: string
-          message: string
-          read?: boolean | null
-          metadata?: Json | null
-          created_at?: string | null
-        }
-        Update: {
-          id?: string
-          user_id?: string | null
-          type?: string
-          title?: string
-          message?: string
-          read?: boolean | null
-          metadata?: Json | null
-          created_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "notifications_user_id_fkey"
-            columns: ["user_id"]
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          }
-        ]
-      }
-      forum_categories: {
-        Row: {
-          id: string
-          name: string
-          slug: string
           description: string | null
-          icon: string | null
-          color: string | null
-          sort_order: number | null
-          created_at: string | null
-        }
-        Insert: {
-          id?: string
+          duration_minutes: number
+          id: string
+          is_active: boolean | null
           name: string
-          slug: string
-          description?: string | null
-          icon?: string | null
-          color?: string | null
-          sort_order?: number | null
+          price: number
+          professional_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          category?: Database["public"]["Enums"]["service_category"] | null
           created_at?: string | null
+          description?: string | null
+          duration_minutes: number
+          id?: string
+          is_active?: boolean | null
+          name: string
+          price: number
+          professional_id?: string | null
+          updated_at?: string | null
         }
         Update: {
+          category?: Database["public"]["Enums"]["service_category"] | null
+          created_at?: string | null
+          description?: string | null
+          duration_minutes?: number
           id?: string
+          is_active?: boolean | null
           name?: string
-          slug?: string
-          description?: string | null
-          icon?: string | null
-          color?: string | null
-          sort_order?: number | null
-          created_at?: string | null
-        }
-        Relationships: []
-      }
-      forum_posts: {
-        Row: {
-          id: string
-          category_id: string | null
-          author_id: string
-          title: string
-          content: string
-          image_url: string | null
-          type: string | null
-          likes_count: number | null
-          comments_count: number | null
-          views_count: number | null
-          is_pinned: boolean | null
-          is_locked: boolean | null
-          created_at: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          id?: string
-          category_id?: string | null
-          author_id: string
-          title: string
-          content: string
-          image_url?: string | null
-          type?: string | null
-          likes_count?: number | null
-          comments_count?: number | null
-          views_count?: number | null
-          is_pinned?: boolean | null
-          is_locked?: boolean | null
-          created_at?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          id?: string
-          category_id?: string | null
-          author_id?: string
-          title?: string
-          content?: string
-          image_url?: string | null
-          type?: string | null
-          likes_count?: number | null
-          comments_count?: number | null
-          views_count?: number | null
-          is_pinned?: boolean | null
-          is_locked?: boolean | null
-          created_at?: string | null
+          price?: number
+          professional_id?: string | null
           updated_at?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "forum_posts_author_id_fkey"
-            columns: ["author_id"]
-            referencedRelation: "profiles"
+            foreignKeyName: "services_professional_id_fkey"
+            columns: ["professional_id"]
+            isOneToOne: false
+            referencedRelation: "professionals"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "forum_posts_category_id_fkey"
-            columns: ["category_id"]
-            referencedRelation: "forum_categories"
-            referencedColumns: ["id"]
-          }
-        ]
-      }
-      forum_comments: {
-        Row: {
-          id: string
-          post_id: string
-          author_id: string
-          content: string
-          parent_id: string | null
-          likes_count: number | null
-          created_at: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          id?: string
-          post_id: string
-          author_id: string
-          content: string
-          parent_id?: string | null
-          likes_count?: number | null
-          created_at?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          id?: string
-          post_id?: string
-          author_id?: string
-          content?: string
-          parent_id?: string | null
-          likes_count?: number | null
-          created_at?: string | null
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "forum_comments_author_id_fkey"
-            columns: ["author_id"]
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "forum_comments_post_id_fkey"
-            columns: ["post_id"]
-            referencedRelation: "forum_posts"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "forum_comments_parent_id_fkey"
-            columns: ["parent_id"]
-            referencedRelation: "forum_comments"
-            referencedColumns: ["id"]
-          }
-        ]
-      }
-      forum_likes: {
-        Row: {
-          id: string
-          user_id: string
-          post_id: string | null
-          comment_id: string | null
-          created_at: string | null
-        }
-        Insert: {
-          id?: string
-          user_id: string
-          post_id?: string | null
-          comment_id?: string | null
-          created_at?: string | null
-        }
-        Update: {
-          id?: string
-          user_id?: string
-          post_id?: string | null
-          comment_id?: string | null
-          created_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "forum_likes_user_id_fkey"
-            columns: ["user_id"]
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "forum_likes_post_id_fkey"
-            columns: ["post_id"]
-            referencedRelation: "forum_posts"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "forum_likes_comment_id_fkey"
-            columns: ["comment_id"]
-            referencedRelation: "forum_comments"
-            referencedColumns: ["id"]
-          }
-        ]
-      }
-      forum_reports: {
-        Row: {
-          id: string
-          reporter_id: string
-          post_id: string | null
-          comment_id: string | null
-          reason: string
-          status: string | null
-          created_at: string | null
-        }
-        Insert: {
-          id?: string
-          reporter_id: string
-          post_id?: string | null
-          comment_id?: string | null
-          reason: string
-          status?: string | null
-          created_at?: string | null
-        }
-        Update: {
-          id?: string
-          reporter_id?: string
-          post_id?: string | null
-          comment_id?: string | null
-          reason?: string
-          status?: string | null
-          created_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "forum_reports_reporter_id_fkey"
-            columns: ["reporter_id"]
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "forum_reports_post_id_fkey"
-            columns: ["post_id"]
-            referencedRelation: "forum_posts"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "forum_reports_comment_id_fkey"
-            columns: ["comment_id"]
-            referencedRelation: "forum_comments"
-            referencedColumns: ["id"]
-          }
         ]
       }
     }
@@ -842,14 +863,30 @@ export type Database = {
       }
     }
     Enums: {
-      booking_status: ["pending", "confirmed", "in_progress", "completed", "cancelled", "no_show"]
-      media_type: ["image", "video"]
-      moderation_status: ["pending", "approved", "rejected"]
-      payment_status: ["pending", "paid", "refunded", "failed"]
-      service_category: ["haircut", "beard", "shave", "hair_treatment", "facial", "coloring", "styling", "package"]
-      user_role: ["client", "barber", "specialist", "admin", "moderator"]
-      user_status: ["active", "inactive", "suspended", "pending"]
-      verification_status: ["unverified", "pending", "verified", "premium"]
+      booking_status: [
+        "pending",
+        "confirmed",
+        "in_progress",
+        "completed",
+        "cancelled",
+        "no_show",
+      ]
+      media_type: "image" | "video"
+      moderation_status: "pending" | "approved" | "rejected"
+      payment_status: "pending" | "paid" | "refunded" | "failed"
+      service_category: [
+        "haircut",
+        "beard",
+        "shave",
+        "hair_treatment",
+        "facial",
+        "coloring",
+        "styling",
+        "package",
+      ]
+      user_role: "client" | "barber" | "specialist" | "admin" | "moderator"
+      user_status: "active" | "inactive" | "suspended" | "pending"
+      verification_status: "unverified" | "pending" | "verified" | "premium"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -857,67 +894,36 @@ export type Database = {
   }
 }
 
-// ====== CONVENIENCE TYPES ======
+// ====== CONVENIENCE EXPORTS ======
 
-export type Tables<T extends keyof Database["public"]["Tables"]> = Database["public"]["Tables"][T]["Row"]
-export type TablesInsert<T extends keyof Database["public"]["Tables"]> = Database["public"]["Tables"][T]["Insert"]
-export type TablesUpdate<T extends keyof Database["public"]["Tables"]> = Database["public"]["Tables"][T]["Update"]
-export type Enums<T extends keyof Database["public"]["Enums"]> = Database["public"]["Enums"][T]
+export type Profile = Database["public"]["Tables"]["profiles"]["Row"]
+export type Professional = Database["public"]["Tables"]["professionals"]["Row"]
+export type Service = Database["public"]["Tables"]["services"]["Row"]
+export type Booking = Database["public"]["Tables"]["bookings"]["Row"]
+export type Review = Database["public"]["Tables"]["reviews"]["Row"]
+export type Favorite = Database["public"]["Tables"]["favorites"]["Row"]
+export type AvailabilitySchedule = Database["public"]["Tables"]["availability_schedules"]["Row"]
+export type AvailabilityException = Database["public"]["Tables"]["availability_exceptions"]["Row"]
+export type PortfolioItem = Database["public"]["Tables"]["portfolio_items"]["Row"]
+export type Conversation = Database["public"]["Tables"]["conversations"]["Row"]
+export type ConversationMember = Database["public"]["Tables"]["conversation_members"]["Row"]
+export type Message = Database["public"]["Tables"]["messages"]["Row"]
+export type Notification = Database["public"]["Tables"]["notifications"]["Row"]
+export type ForumCategory = Database["public"]["Tables"]["forum_categories"]["Row"]
+export type ForumPost = Database["public"]["Tables"]["forum_posts"]["Row"]
+export type ForumComment = Database["public"]["Tables"]["forum_comments"]["Row"]
+export type ForumLike = Database["public"]["Tables"]["forum_likes"]["Row"]
+export type ForumReport = Database["public"]["Tables"]["forum_reports"]["Row"]
 
-// ====== ENTITY TYPES ======
+export type UserRole = Database["public"]["Enums"]["user_role"]
+export type UserStatus = Database["public"]["Enums"]["user_status"]
+export type VerificationStatus = Database["public"]["Enums"]["verification_status"]
+export type BookingStatus = Database["public"]["Enums"]["booking_status"]
+export type PaymentStatus = Database["public"]["Enums"]["payment_status"]
+export type ServiceCategory = Database["public"]["Enums"]["service_category"]
+export type ModerationStatus = Database["public"]["Enums"]["moderation_status"]
+export type MediaType = Database["public"]["Enums"]["media_type"]
 
-export type Profile = Tables<"profiles">
-export type Professional = Tables<"professionals">
-export type Service = Tables<"services">
-export type Booking = Tables<"bookings">
-export type Review = Tables<"reviews">
-export type Favorite = Tables<"favorites">
-export type AvailabilitySchedule = Tables<"availability_schedules">
-export type AvailabilityException = Tables<"availability_exceptions">
-export type PortfolioItem = Tables<"portfolio_items">
-export type Conversation = Tables<"conversations">
-export type ConversationMember = Tables<"conversation_members">
-export type Message = Tables<"messages">
-export type Notification = Tables<"notifications">
-export type ForumCategory = Tables<"forum_categories">
-export type ForumPost = Tables<"forum_posts">
-export type ForumComment = Tables<"forum_comments">
-export type ForumLike = Tables<"forum_likes">
-export type ForumReport = Tables<"forum_reports">
-
-// ====== ENUM TYPES ======
-
-export type UserRole = Enums<"user_role">
-export type UserStatus = Enums<"user_status">
-export type VerificationStatus = Enums<"verification_status">
-export type BookingStatus = Enums<"booking_status">
-export type PaymentStatus = Enums<"payment_status">
-export type ServiceCategory = Enums<"service_category">
-export type ModerationStatus = Enums<"moderation_status">
-export type MediaType = Enums<"media_type">
-
-// ====== API RESPONSE TYPES ======
-
-export interface ApiResponse<T> {
-  success: boolean
-  data?: T
-  error?: string
-  message?: string
-  timestamp: string
-}
-
-export interface PaginatedResponse<T> {
-  items: T[]
-  total: number
-  page: number
-  perPage: number
-  hasNext: boolean
-  hasPrev: boolean
-}
-
-export interface AppError {
-  code: string
-  message: string
-  timestamp: string
-  context?: Record<string, unknown>
-}
+// Backwards-compatible alias (deprecated — use Profile)
+/** @deprecated Use Profile instead */
+export type AppUser = Profile
