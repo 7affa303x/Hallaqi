@@ -8,6 +8,8 @@ import {
 } from 'lucide-react';
 import { createBooking, getProfessionalBookings, sendNotification } from '@/supabase/database';
 import { usePayment } from '@/hooks/usePayment';
+import { useCCPPayment } from '@/hooks/useCCPPayment';
+import { ReceiptUpload } from '@/components/payment/ReceiptUpload';
 import type { Service, BookingStatus, PaymentStatus } from '@/types';
 import type { Database } from '@/types/supabase';
 
@@ -85,6 +87,10 @@ export default function BookingFlowPage() {
   const [selectedTime, setSelectedTime] = useState<string>('');
   const [paymentMethod, setPaymentMethod] = useState<'ccp' | 'baridi-mob' | 'cash' | 'card'>('cash');
   const { initiatePayment, isProcessing: isPaymentProcessing, error: paymentError } = usePayment();
+  const { createCCPPayment, uploadReceiptAndSubmit, isProcessing: isCCPProcessing, uploadProgress, error: ccpError } = useCCPPayment();
+  const [showReceiptUpload, setShowReceiptUpload] = useState(false);
+  const [ccpPaymentId, setCcpPaymentId] = useState<string | null>(null);
+  const [savedBookingId, setSavedBookingId] = useState<string | null>(null);
   const [note, setNote] = useState('');
   const [isMobileService, setIsMobileService] = useState(false);
   const [address, setAddress] = useState('');
@@ -267,6 +273,29 @@ export default function BookingFlowPage() {
           return;
         }
 
+        // For CCP/BaridiMob, create a payment record and show receipt upload
+        if (paymentMethod === 'ccp' || paymentMethod === 'baridi-mob') {
+          const paymentId = await createCCPPayment({
+            bookingId: saved.id,
+            clientId: appUser.id,
+            professionalId: barber.id,
+            amount: totalPrice,
+            currency: 'dzd',
+            metadata: {
+              barber_name: barber.name,
+              booking_date: selectedDate,
+              booking_time: selectedTime,
+              payment_method: paymentMethod,
+            },
+          });
+          if (paymentId) {
+            setCcpPaymentId(paymentId);
+            setSavedBookingId(saved.id);
+            setShowReceiptUpload(true);
+            setIsSaving(false);
+            return;
+          }
+        }
         // For non-card payments, proceed as before
         // Notify the barber that they received a new booking
         try {
@@ -327,6 +356,46 @@ export default function BookingFlowPage() {
     }
   };
 
+  // Show receipt upload screen for CCP/BaridiMob
+  if (showReceiptUpload && ccpPaymentId && savedBookingId) {
+    const barber = barbers.find(b => b.id === screenParams?.barberId);
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="h-screen flex flex-col p-4 overflow-y-auto"
+        style={{ backgroundColor: themeConfig.colors.background }}
+      >
+        <div className="flex items-center gap-3 mb-6">
+          <button onClick={() => { setShowReceiptUpload(false); setConfirmed(true); }} className="w-9 h-9 rounded-full flex items-center justify-center" style={{ backgroundColor: themeConfig.colors.surface }}>
+            <X size={18} style={{ color: themeConfig.colors.text }} />
+          </button>
+          <h1 className="text-lg font-bold" style={{ color: themeConfig.colors.text }}>رفع إيصال الدفع</h1>
+        </div>
+        <ReceiptUpload
+          paymentMethod={paymentMethod as 'ccp' | 'baridi-mob'}
+          isUploading={isCCPProcessing}
+          uploadProgress={uploadProgress}
+          error={ccpError}
+          onUpload={async (file, ref) => {
+            const success = await uploadReceiptAndSubmit({
+              file,
+              clientId: appUser?.id || '',
+              paymentId: ccpPaymentId,
+              transactionReference: ref,
+              bookingId: savedBookingId,
+              professionalId: barber?.id || '',
+              clientName: appUser?.full_name || 'عميل',
+            });
+            if (success) {
+              setTimeout(() => { setShowReceiptUpload(false); setConfirmed(true); }, 1500);
+            }
+            return success;
+          }}
+        />
+      </motion.div>
+    );
+  }
   if (confirmed) {
     return (
       <motion.div
@@ -554,17 +623,17 @@ export default function BookingFlowPage() {
             <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="أي ملاحظات خاصة..." rows={2} className="w-full p-3 rounded-xl border text-xs resize-none" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border, color: themeConfig.colors.text }} />
           </div>
 
-          {(saveError || paymentError) && (
+          {(saveError || paymentError || ccpError) && (
             <div className="flex items-center gap-2 p-3 rounded-xl" style={{ backgroundColor: themeConfig.colors.error + '15' }}>
               <AlertTriangle size={16} style={{ color: themeConfig.colors.error }} />
-              <p className="text-xs" style={{ color: themeConfig.colors.error }}>{saveError || paymentError}</p>
+              <p className="text-xs" style={{ color: themeConfig.colors.error }}>{saveError || paymentError || ccpError}</p>
             </div>
           )}
 
-          <button onClick={handleConfirm} disabled={isSaving || isPaymentProcessing}
+          <button onClick={handleConfirm} disabled={isSaving || isPaymentProcessing || isCCPProcessing}
             className="w-full h-12 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 transition-all disabled:opacity-50"
             style={{ backgroundColor: themeConfig.colors.primary }}>
-            {(isSaving || isPaymentProcessing) ? <><div className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin" /> {paymentMethod === 'card' ? 'جاري التوجيه للدفع...' : 'جاري الحفظ...'}</> : <>{paymentMethod === 'card' ? `الدفع بالبطاقة - ${totalPrice} دج` : `تأكيد الحجز - ${totalPrice} دج`}</>}
+            {(isSaving || isPaymentProcessing || isCCPProcessing) ? <><div className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin" /> {paymentMethod === 'card' ? 'جاري التوجيه للدفع...' : 'جاري الحفظ...'}</> : <>{paymentMethod === 'card' ? `الدفع بالبطاقة - ${totalPrice} دج` : `تأكيد الحجز - ${totalPrice} دج`}</>}
           </button>
         </div>
       )}

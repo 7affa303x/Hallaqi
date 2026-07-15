@@ -7,8 +7,8 @@
  * Usage:
  *   import { paymentManager } from '@/lib/payment';
  *   const result = await paymentManager.createCheckoutSession('stripe', params);
+ *   const result = await paymentManager.createCheckoutSession('ccp', params);
  */
-
 import type {
   PaymentProvider,
   PaymentProviderType,
@@ -17,6 +17,7 @@ import type {
   PaymentVerificationResult,
 } from './types';
 import { stripeProvider, StripeProvider } from './stripe-provider';
+import { ccpProvider } from './ccp-provider';
 
 class PaymentManager {
   private providers: Map<PaymentProviderType, PaymentProvider> = new Map();
@@ -24,6 +25,7 @@ class PaymentManager {
   constructor() {
     // Register default providers
     this.registerProvider(stripeProvider);
+    this.registerProvider(ccpProvider);
   }
 
   /** Register a new payment provider */
