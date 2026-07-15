@@ -8,7 +8,7 @@ import type {
   ForumPost, ForumComment, ForumCategory
 } from '@/types/supabase';
 import type { Json } from '@/types/supabase';
-import type { BookingStatus, Barber } from '@/types';
+import type { BookingStatus } from '@/types';
 import { transformToBarber } from '@/lib/utils'; // Import app-level BookingStatus
 
 function guard(): void {
