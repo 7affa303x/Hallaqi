@@ -1,5 +1,5 @@
 import { supabase, isSupabaseConfigured } from './client';
-import type { AppUser } from '@/types/supabase';
+import type { Profile } from '@/types/supabase';
 
 function getAuthErrorMessage(err: { message?: string; code?: string; status?: number }): string {
   const msg = err.message || '';
@@ -18,24 +18,23 @@ function getAuthErrorMessage(err: { message?: string; code?: string; status?: nu
 }
 
 /* ========== SIGN UP ========== */
-export async function signUp(email: string, password: string, displayName: string) {
+export async function signUp(email: string, password: string, fullName: string) {
   if (!isSupabaseConfigured()) throw new Error('Supabase غير مُعد');
 
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    options: { data: { display_name: displayName } },
+    options: { data: { full_name: fullName } },
   });
   if (error) throw new Error(getAuthErrorMessage(error));
 
+  // Profile auto-created by handle_new_user trigger
+  // But we update with additional data if needed
   if (data.user) {
-    await supabase.from('users').upsert({
-      id: data.user.id,
-      email: email,
-      display_name: displayName,
-      role: 'user',
-      created_at: new Date().toISOString(),
-    });
+    await supabase.from('profiles').update({
+      full_name: fullName,
+      updated_at: new Date().toISOString(),
+    }).eq('id', data.user.id);
   }
   return data;
 }
@@ -48,7 +47,9 @@ export async function signIn(email: string, password: string) {
   if (error) throw new Error(getAuthErrorMessage(error));
 
   if (data.user) {
-    await supabase.from(\'users\').update({ updated_at: new Date().toISOString() } as Record<string, unknown>).eq(\'id\', data.user.id);
+    await supabase.from('profiles').update({
+      updated_at: new Date().toISOString(),
+    }).eq('id', data.user.id);
   }
   return data;
 }
@@ -71,12 +72,44 @@ export async function resetPassword(email: string) {
 }
 
 /* ========== USER PROFILE ========== */
-export async function fetchUserProfile(userId: string): Promise<AppUser | null> {
+export async function fetchUserProfile(userId: string): Promise<Profile | null> {
   if (!isSupabaseConfigured()) return null;
 
-  const { data, error } = await supabase.from(\'users\').select(\'*\').eq(\'id\', userId).single();
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', userId)
+    .single();
   if (error || !data) return null;
-  return data as unknown as AppUser;
+  return data;
+}
+
+/* ========== UPDATE PROFILE ========== */
+export async function updateUserProfile(userId: string, updates: Partial<Profile>) {
+  if (!isSupabaseConfigured()) throw new Error('Supabase غير مُعد');
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq('id', userId)
+    .select()
+    .single();
+  if (error) throw new Error(getAuthErrorMessage(error));
+  return data;
+}
+
+/* ========== GOOGLE OAUTH ========== */
+export async function signInWithGoogle() {
+  if (!isSupabaseConfigured()) throw new Error('Supabase غير مُعد');
+
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo: `${window.location.origin}/auth/callback`,
+    },
+  });
+  if (error) throw new Error(getAuthErrorMessage(error));
+  return data;
 }
 
 export { supabase };
