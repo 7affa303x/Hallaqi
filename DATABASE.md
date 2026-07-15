@@ -1,166 +1,299 @@
 # Hallaqi Database
 
-## Schema
+**Source of Truth:** Live Database `npkmqlupkvijhumkldpm`
+**Last Updated:** 2026-07-15
 
-All tables use UUID primary keys, `created_at` timestamps, and Row Level Security (RLS).
+## Custom ENUM Types
 
-### Tables
+| Type | Values |
+|------|--------|
+| `user_role` | client, barber, specialist, admin, moderator |
+| `user_status` | active, inactive, suspended, pending |
+| `verification_status` | unverified, pending, verified, premium |
+| `booking_status` | pending, confirmed, in_progress, completed, cancelled, no_show |
+| `payment_status` | pending, paid, refunded, failed |
+| `service_category` | haircut, beard, shave, hair_treatment, facial, coloring, styling, package |
+| `moderation_status` | pending, approved, rejected |
+| `media_type` | image, video |
 
-#### `users` (profiles)
-Linked to `auth.users` via `id` FK.
+## Tables
 
+### `profiles` (extends auth.users)
 | Column | Type | Notes |
 |--------|------|-------|
 | id | UUID PK | = auth.users.id |
-| email | TEXT | NOT NULL |
-| display_name | TEXT | |
-| photo_url | TEXT | Storage URL |
-| phone | TEXT | |
-| role | TEXT | user / barber / admin |
-| is_verified | BOOLEAN | DEFAULT false |
-| is_id_verified | BOOLEAN | DEFAULT false |
-| bio, location, wilaya | TEXT | |
-| theme | TEXT | DEFAULT 'hallaqi' |
-| language | TEXT | ar / fr / en |
-| followers, following | INT | DEFAULT 0 |
-| stats | JSONB | Flexible stats |
-| created_at, last_login_at | TIMESTAMPTZ | |
+| updated_at | TIMESTAMPTZ | auto |
+| username | TEXT | unique |
+| full_name | TEXT | |
+| avatar_url | TEXT | Storage URL |
+| website | TEXT | |
+| phone_number | TEXT | |
+| address | TEXT | |
+| city | TEXT | |
+| country | TEXT | |
+| user_role | USER_ROLE | default: client |
+| user_status | USER_STATUS | default: active |
+| verification_status | VERIFICATION_STATUS | default: unverified |
 
-#### `barbers`
+### `professionals` (extends profiles)
 | Column | Type | Notes |
 |--------|------|-------|
-| id | UUID PK | auto-generate |
-| user_id | UUID FK | → users |
-| name, bio, email, phone | TEXT | |
-| location, wilaya | TEXT | Algerian cities |
-| is_active, is_verified, is_mobile | BOOLEAN | |
-| uses_scissors, is_subscribed | BOOLEAN | |
-| subscription_plan | TEXT | |
-| years_of_experience | INT | |
-| rating | DECIMAL(3,2) | 0-5 |
-| review_count | INT | |
-| followers, likes | INT | |
-| tags | TEXT[] | Array of tags |
-| services | JSONB[] | Service objects |
-| working_hours | JSONB | Weekly schedule |
-| portfolio | TEXT[] | Image URLs |
-| created_at, updated_at | TIMESTAMPTZ | |
+| id | UUID PK | = profiles.id (1:1) |
+| bio | TEXT | |
+| average_rating | NUMERIC | default 0.0 |
+| review_count | INTEGER | default 0 |
+| latitude | NUMERIC | for maps |
+| longitude | NUMERIC | for maps |
+| business_name | TEXT | |
+| business_address | TEXT | |
+| business_phone | TEXT | |
+| business_email | TEXT | |
+| website_url | TEXT | |
 
-#### `bookings`
+### `services`
 | Column | Type | Notes |
 |--------|------|-------|
-| id | UUID PK | |
-| user_id, barber_id | UUID FK | |
-| services | JSONB[] | Booked services |
-| date, time | TEXT | Appointment |
-| status | TEXT | pending/confirmed/completed/cancelled/no-show |
-| total_price | INT | DZD |
-| is_mobile_service | BOOLEAN | |
-| payment_method | TEXT | |
-| payment_status | TEXT | pending/paid/refunded/failed |
-| reviewed, rating, review_text | | Review data |
-| created_at, updated_at | TIMESTAMPTZ | |
+| id | UUID PK | auto |
+| professional_id | UUID FK | -> professionals |
+| name | TEXT | NOT NULL |
+| description | TEXT | |
+| price | NUMERIC | NOT NULL (DZD) |
+| duration_minutes | INTEGER | NOT NULL |
+| category | SERVICE_CATEGORY | |
+| is_active | BOOLEAN | default true |
+| created_at | TIMESTAMPTZ | auto |
+| updated_at | TIMESTAMPTZ | auto |
 
-#### `forum_posts`
+### `bookings`
 | Column | Type | Notes |
 |--------|------|-------|
-| id | UUID PK | |
-| author_id | UUID FK | → users |
-| author_name, author_avatar | TEXT | Denormalized |
-| title, content | TEXT | |
-| category | TEXT | general/tips/reviews/competitions |
-| tags | TEXT[] | |
-| likes, liked_by | INT / UUID[] | |
-| views | INT | |
-| is_pinned, is_announcement | BOOLEAN | |
-| created_at, updated_at | TIMESTAMPTZ | |
+| id | UUID PK | auto |
+| client_id | UUID FK | -> profiles |
+| professional_id | UUID FK | -> professionals |
+| service_id | UUID FK | -> services |
+| booking_start_time | TIMESTAMPTZ | |
+| booking_end_time | TIMESTAMPTZ | |
+| status | BOOKING_STATUS | default: pending |
+| total_price | NUMERIC | |
+| payment_status | PAYMENT_STATUS | default: pending |
+| notes | TEXT | |
+| created_at | TIMESTAMPTZ | auto |
+| updated_at | TIMESTAMPTZ | auto |
 
-#### `forum_comments`
+### `reviews`
 | Column | Type | Notes |
 |--------|------|-------|
-| id | UUID PK | |
-| post_id | UUID FK | → forum_posts |
-| author_id | UUID FK | → users |
-| content | TEXT | |
-| likes | INT | |
-| parent_id | UUID | Self-referencing (replies) |
-| created_at | TIMESTAMPTZ | |
-
-#### `favorites`
-| Column | Type | Notes |
-|--------|------|-------|
-| id | UUID PK | |
-| user_id, barber_id | UUID FK | UNIQUE together |
-| created_at | TIMESTAMPTZ | |
-
-#### `notifications`
-| Column | Type | Notes |
-|--------|------|-------|
-| id | UUID PK | |
-| user_id | UUID FK | |
-| title, message | TEXT | |
-| type | TEXT | booking/message/forum/promo/system |
-| read | BOOLEAN | |
-| action_url, image | TEXT | |
-| created_at | TIMESTAMPTZ | |
-
-#### `reviews`
-| Column | Type | Notes |
-|--------|------|-------|
-| id | UUID PK | |
-| booking_id, barber_id, user_id | UUID FK | |
-| rating | INT | 1-5 |
+| id | UUID PK | auto |
+| booking_id | UUID FK | -> bookings |
+| reviewer_id | UUID FK | -> profiles |
+| professional_id | UUID FK | -> professionals |
+| rating | INTEGER | 1-5 CHECK |
 | comment | TEXT | |
-| images | TEXT[] | |
-| created_at | TIMESTAMPTZ | |
+| is_public | BOOLEAN | default true |
+| moderation_status | MODERATION_STATUS | default: pending |
+| created_at | TIMESTAMPTZ | auto |
+| updated_at | TIMESTAMPTZ | auto |
 
-#### `reports`
+### `favorites`
 | Column | Type | Notes |
 |--------|------|-------|
-| id | UUID PK | |
-| reporter_id | UUID FK | |
-| target_type | TEXT | barber/user/post/comment |
-| target_id | UUID | |
+| id | UUID PK | auto |
+| user_id | UUID FK | -> profiles |
+| professional_id | UUID FK | -> professionals |
+| created_at | TIMESTAMPTZ | auto |
+| UNIQUE | | (user_id, professional_id) |
+
+### `availability_schedules`
+| Column | Type | Notes |
+|--------|------|-------|
+| id | UUID PK | auto |
+| professional_id | UUID FK | -> professionals |
+| day_of_week | INTEGER | 0-6 CHECK |
+| start_time | TIME | |
+| end_time | TIME | |
+| is_active | BOOLEAN | default true |
+| created_at | TIMESTAMPTZ | auto |
+| updated_at | TIMESTAMPTZ | auto |
+
+### `availability_exceptions`
+| Column | Type | Notes |
+|--------|------|-------|
+| id | UUID PK | auto |
+| professional_id | UUID FK | -> professionals |
+| date | DATE | |
+| type | TEXT | e.g. 'closed', 'vacation' |
+| start_time | TIME | nullable |
+| end_time | TIME | nullable |
 | reason | TEXT | |
-| status | TEXT | open/resolved/dismissed |
-| created_at | TIMESTAMPTZ | |
+| created_at | TIMESTAMPTZ | auto |
+| updated_at | TIMESTAMPTZ | auto |
 
-## Indexes
+### `portfolio_items`
+| Column | Type | Notes |
+|--------|------|-------|
+| id | UUID PK | auto |
+| professional_id | UUID FK | -> professionals |
+| type | MEDIA_TYPE | image/video |
+| url | TEXT | NOT NULL |
+| thumbnail_url | TEXT | |
+| caption | TEXT | |
+| sort_order | INTEGER | default 0 |
+| created_at | TIMESTAMPTZ | auto |
 
-- `users`: role, wilaya
-- `barbers`: wilaya, rating DESC, tags (gin), is_active
-- `bookings`: user_id, barber_id, status
-- `forum_posts`: category, is_pinned DESC, author_id
-- `forum_comments`: post_id, parent_id
-- `favorites`: user_id (unique on user_id+barber_id)
-- `notifications`: user_id, (user_id, read)
-- `reviews`: barber_id
+### `conversations`
+| Column | Type | Notes |
+|--------|------|-------|
+| id | UUID PK | auto |
+| created_at | TIMESTAMPTZ | auto |
+| updated_at | TIMESTAMPTZ | auto |
+| last_message_at | TIMESTAMPTZ | |
 
-## RLS Policies
+### `conversation_members`
+| Column | Type | Notes |
+|--------|------|-------|
+| id | UUID PK | auto |
+| conversation_id | UUID FK | -> conversations |
+| user_id | UUID FK | -> profiles |
+| joined_at | TIMESTAMPTZ | auto |
+| last_read_at | TIMESTAMPTZ | |
+| UNIQUE | | (conversation_id, user_id) |
 
-All tables have RLS enabled. Key policies:
+### `messages`
+| Column | Type | Notes |
+|--------|------|-------|
+| id | UUID PK | auto |
+| conversation_id | UUID FK | -> conversations |
+| sender_id | UUID FK | -> profiles |
+| content | TEXT | NOT NULL |
+| type | TEXT | default: text |
+| status | TEXT | default: sent |
+| created_at | TIMESTAMPTZ | auto |
+| updated_at | TIMESTAMPTZ | auto |
 
-- **Users**: Public read, own profile update
-- **Barbers**: Public read, own update
-- **Bookings**: Own only (read/write)
-- **Forum**: Public read, own write
-- **Favorites**: Own only
-- **Notifications**: Own only
+### `notifications`
+| Column | Type | Notes |
+|--------|------|-------|
+| id | UUID PK | auto |
+| user_id | UUID FK | -> profiles |
+| type | TEXT | e.g. 'booking', 'message' |
+| title | TEXT | |
+| message | TEXT | |
+| read | BOOLEAN | default false |
+| created_at | TIMESTAMPTZ | auto |
+| metadata | JSONB | flexible data |
 
-## Migrations
+### `forum_categories`
+| Column | Type | Notes |
+|--------|------|-------|
+| id | UUID PK | auto |
+| name | TEXT | NOT NULL |
+| slug | TEXT | UNIQUE |
+| description | TEXT | |
+| icon | TEXT | |
+| color | TEXT | |
+| sort_order | INTEGER | default 0 |
+| created_at | TIMESTAMPTZ | auto |
 
-| File | Description |
-|------|-------------|
-| `001_initial_schema.sql` | Creates all tables, indexes, RLS policies |
-| `002_seed_data.sql` | Seeds 4 sample barbers |
+### `forum_posts`
+| Column | Type | Notes |
+|--------|------|-------|
+| id | UUID PK | auto |
+| category_id | UUID FK | -> forum_categories |
+| author_id | UUID FK | -> profiles |
+| title | TEXT | NOT NULL |
+| content | TEXT | NOT NULL |
+| image_url | TEXT | |
+| type | TEXT | default: discussion |
+| likes_count | INTEGER | default 0 |
+| comments_count | INTEGER | default 0 |
+| views_count | INTEGER | default 0 |
+| is_pinned | BOOLEAN | default false |
+| is_locked | BOOLEAN | default false |
+| created_at | TIMESTAMPTZ | auto |
+| updated_at | TIMESTAMPTZ | auto |
 
-Run order: 001 first, then 002.
+### `forum_comments`
+| Column | Type | Notes |
+|--------|------|-------|
+| id | UUID PK | auto |
+| post_id | UUID FK | -> forum_posts |
+| author_id | UUID FK | -> profiles |
+| content | TEXT | NOT NULL |
+| parent_id | UUID FK | -> forum_comments (replies) |
+| likes_count | INTEGER | default 0 |
+| created_at | TIMESTAMPTZ | auto |
+| updated_at | TIMESTAMPTZ | auto |
+
+### `forum_likes`
+| Column | Type | Notes |
+|--------|------|-------|
+| id | UUID PK | auto |
+| user_id | UUID FK | -> profiles |
+| post_id | UUID FK | -> forum_posts |
+| comment_id | UUID FK | -> forum_comments |
+| created_at | TIMESTAMPTZ | auto |
+
+### `forum_reports`
+| Column | Type | Notes |
+|--------|------|-------|
+| id | UUID PK | auto |
+| reporter_id | UUID FK | -> profiles |
+| post_id | UUID FK | -> forum_posts |
+| comment_id | UUID FK | -> forum_comments |
+| reason | TEXT | NOT NULL |
+| status | TEXT | default: pending |
+| created_at | TIMESTAMPTZ | auto |
+
+## Functions
+
+| Function | Type | Purpose |
+|----------|------|---------|
+| `handle_new_user()` | TRIGGER | Auto-create profile on auth signup |
+| `get_or_create_conversation(u1, u2)` | RPC | Find or create 1:1 chat |
+| `update_conversation_last_message()` | TRIGGER | Update conv timestamp |
+| `mark_conversation_messages_as_read()` | RPC | Mark messages read |
+| `update_professional_rating()` | TRIGGER | Recalculate avg rating |
+| `update_forum_post_counts()` | TRIGGER | Update like/comment counts |
+
+## Triggers
+
+| Table | Trigger | Event | Function |
+|-------|---------|-------|----------|
+| auth.users | on_auth_user_created | AFTER INSERT | handle_new_user |
+| messages | on_new_message | AFTER INSERT | update_conversation_last_message |
+| reviews | update_professional_rating_trigger | AFTER INSERT/UPDATE | update_professional_rating |
+| forum_comments | on_forum_comment_change | AFTER INSERT/DELETE | update_forum_post_counts |
+| forum_likes | on_forum_like_change | AFTER INSERT/DELETE | update_forum_post_counts |
 
 ## Storage Buckets
 
-| Bucket | Public | Purpose |
-|--------|--------|---------|
-| avatars | Yes | Profile photos |
-| portfolio | Yes | Barber gallery |
-| id-cards | No | ID verification |
-| review-images | Yes | Review photos |
+| Bucket | Public | Size Limit | MIME Types |
+|--------|--------|------------|------------|
+| avatars | true | 5MB | jpeg, png, webp |
+| covers | true | 5MB | jpeg, png, webp |
+| portfolio | true | 10MB | jpeg, png, webp |
+| reviews | true | 5MB | jpeg, png, webp |
+
+## Key Indexes
+
+| Table | Index | Columns |
+|-------|-------|---------|
+| profiles | username_key | username (UNIQUE) |
+| professionals | pkey | id |
+| services | idx_services_professional | professional_id (WHERE is_active) |
+| bookings | idx_bookings_time_range | professional_id, booking_start_time, booking_end_time |
+| bookings | idx_bookings_no_double_booking | professional_id, booking_start_time (WHERE status NOT cancelled/no_show) |
+| favorites | user_id_professional_id_key | user_id, professional_id (UNIQUE) |
+| conversation_members | conversation_id_user_id_key | conversation_id, user_id (UNIQUE) |
+| forum_categories | slug_key | slug (UNIQUE) |
+| forum_likes | user_id_post_id_key | user_id, post_id (UNIQUE) |
+| forum_likes | user_id_comment_id_key | user_id, comment_id (UNIQUE) |
+| reviews | idx_reviews_professional | professional_id (WHERE is_public AND approved) |
+
+## RLS Policies
+
+All 18 tables have RLS enabled with 48 total policies. Key patterns:
+- **Public read:** professionals, services, availability, portfolio, forum posts/comments/likes/categories
+- **Own only:** profiles (update), favorites, notifications, bookings, forum reports
+- **Member-only:** conversations, conversation_members, messages
+- **Author:** forum posts/comments (update/delete)
