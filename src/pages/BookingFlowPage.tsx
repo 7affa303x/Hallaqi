@@ -6,7 +6,7 @@ import {
   ArrowLeft, Check, Clock, MapPin, Car, CreditCard,
   Wallet, Banknote, Calendar, X, AlertTriangle
 } from 'lucide-react';
-import { createBooking, getBarberBookings, checkSlotAgainstBookings, filterSlotsByWorkingHours } from '@/supabase/database';
+import { createBooking, getBarberBookings, checkSlotAgainstBookings } from '@/supabase/database';
 import type { Service } from '@/types';
 
 const ALL_TIME_SLOTS = [
@@ -171,7 +171,7 @@ export default function BookingFlowPage() {
 
     try {
       // Validate: check slot is still available
-      const available = await checkSlotAgainstBookings(
+      const available = checkSlotAgainstBookings(
         selectedTime, totalDuration, existingBookings
       );
       if (!available) {
