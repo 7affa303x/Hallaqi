@@ -5,12 +5,6 @@ function guard(): void {
 }
 
 /* ========== BARBERS ========== */
-/**
- * Fetches a list of barbers from the Supabase 'barbers' table.
- * Services for each barber are embedded as a JSONB array within the 'services' column.
- * @param filters - Optional filters for tag, wilaya, or search query.
- * @returns A promise that resolves to an array of barber records.
- */
 export async function getBarbers(filters?: { tag?: string; wilaya?: string; search?: string }) {
   guard();
   let query = supabase.from('barbers').select('*').order('rating', { ascending: false });
@@ -73,6 +67,69 @@ export async function updateBookingStatus(bookingId: string, status: string) {
   guard();
   const { error } = await supabase.from('bookings').update({ status, updated_at: new Date().toISOString() } as Record<string, unknown>).eq('id', bookingId);
   if (error) throw new Error(error.message);
+}
+
+/** Get existing non-cancelled bookings for a barber on a specific date */
+export async function getBarberBookings(barberId: string, date: string) {
+  guard();
+  const { data, error } = await supabase
+    .from('bookings')
+    .select('time, services, status, totalPrice')
+    .eq('barberId', barberId)
+    .eq('date', date)
+    .not('status', 'eq', 'cancelled');
+  if (error) throw new Error(error.message);
+  return (data || []) as Array<{
+    time: string;
+    services: Array<{ duration?: number }>;
+    status: string;
+    totalPrice: number;
+  }>;
+}
+
+/** Check if a time slot is available (no overlap with existing bookings) */
+export async function isSlotAvailable(
+  barberId: string,
+  date: string,
+  time: string,
+  durationMinutes: number
+): Promise<boolean> {
+  const bookings = await getBarberBookings(barberId, date);
+  return checkSlotAgainstBookings(time, durationMinutes, bookings);
+}
+
+/** Pure function: check slot against existing bookings list */
+export function checkSlotAgainstBookings(
+  time: string,
+  durationMinutes: number,
+  bookings: Array<{ time: string; services: Array<{ duration?: number }> }>
+): boolean {
+  const [sh, sm] = time.split(':').map(Number);
+  const slotStart = sh * 60 + sm;
+  const slotEnd = slotStart + durationMinutes;
+
+  for (const b of bookings) {
+    const [bh, bm] = b.time.split(':').map(Number);
+    const bookStart = bh * 60 + bm;
+    const bookServices = b.services || [];
+    const bookDuration = bookServices.reduce((sum, s) => sum + (s.duration || 30), 0);
+    const bookEnd = bookStart + bookDuration;
+    // Overlap: existing_start < new_end AND existing_end > new_start
+    if (bookStart < slotEnd && bookEnd > slotStart) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/** Filter slots by working hours for a given day */
+export function filterSlotsByWorkingHours(
+  slots: string[],
+  dayHours: { open: string; close: string } | null
+): string[] {
+  if (!dayHours) return slots;
+  if (dayHours.open === 'closed' || dayHours.close === 'closed') return [];
+  return slots.filter(slot => slot >= dayHours.open && slot < dayHours.close);
 }
 
 /* ========== FAVORITES ========== */
@@ -147,89 +204,39 @@ export async function markNotificationRead(notificationId: string) {
   if (error) throw new Error(error.message);
 }
 
-/* ========== AVAILABILITY ========== */
+/* ========== AVAILABILITY (uses barber.workingHours JSONB — schedules table does not exist) ========== */
 
-export async function getBarberAvailability(barberId: string) {
-  guard();
-  const { data, error } = await supabase
-    .from('availability_schedules')
-    .select('*')
-    .eq('professional_id', barberId)
-    .order('day_of_week', { ascending: true });
-  if (error) throw new Error(error.message);
-  return (data || []) as Record<string, unknown>[];
+export async function getBarberAvailability(_barberId: string) {
+  // DEPRECATED: availability_schedules table does not exist.
+  // Use barber.workingHours JSONB field instead.
+  return [] as Record<string, unknown>[];
+}
+
+export async function getBarberExceptions(_barberId: string) {
+  // DEPRECATED: availability_exceptions table does not exist.
+  return [] as Record<string, unknown>[];
 }
 
 export async function updateBarberAvailability(
-  barberId: string,
-  schedules: Array<{ day_of_week: number; start_time: string; end_time: string; is_active: boolean }>
+  _barberId: string,
+  _schedules: Array<{ day_of_week: number; start_time: string; end_time: string; is_active: boolean }>
 ) {
-  guard();
-  // Delete existing schedules for this barber
-  const { error: deleteError } = await supabase
-    .from('availability_schedules')
-    .delete()
-    .eq('professional_id', barberId);
-  if (deleteError) throw new Error(deleteError.message);
-
-  // Insert new schedules
-  if (schedules.length > 0) {
-    const rows = schedules.map(s => ({
-      professional_id: barberId,
-      day_of_week: s.day_of_week,
-      start_time: s.start_time,
-      end_time: s.end_time,
-      is_active: s.is_active,
-      updated_at: new Date().toISOString(),
-    }));
-    const { error: insertError } = await supabase
-      .from('availability_schedules')
-      .insert(rows as Record<string, unknown>[]);
-    if (insertError) throw new Error(insertError.message);
-  }
-}
-
-export async function getBarberExceptions(barberId: string) {
-  guard();
-  const { data, error } = await supabase
-    .from('availability_exceptions')
-    .select('*')
-    .eq('professional_id', barberId)
-    .order('date', { ascending: true });
-  if (error) throw new Error(error.message);
-  return (data || []) as Record<string, unknown>[];
+  // DEPRECATED: availability_schedules table does not exist.
+  // Update barber.workingHours via updateBarberProfile instead.
+  throw new Error('Use updateBarberProfile to modify workingHours');
 }
 
 export async function addBarberException(
-  barberId: string,
-  exception: { date: string; type: string; reason: string; start_time?: string; end_time?: string }
+  _barberId: string,
+  _exception: { date: string; type: string; reason: string; start_time?: string; end_time?: string }
 ) {
-  guard();
-  const row = {
-    professional_id: barberId,
-    date: exception.date,
-    type: exception.type,
-    reason: exception.reason,
-    start_time: exception.start_time || null,
-    end_time: exception.end_time || null,
-    updated_at: new Date().toISOString(),
-  };
-  const { data, error } = await supabase
-    .from('availability_exceptions')
-    .insert(row as Record<string, unknown>)
-    .select()
-    .single();
-  if (error) throw new Error(error.message);
-  return data;
+  // DEPRECATED: availability_exceptions table does not exist.
+  throw new Error('availability_exceptions table does not exist');
 }
 
-export async function deleteBarberException(exceptionId: string) {
-  guard();
-  const { error } = await supabase
-    .from('availability_exceptions')
-    .delete()
-    .eq('id', exceptionId);
-  if (error) throw new Error(error.message);
+export async function deleteBarberException(_exceptionId: string) {
+  // DEPRECATED: availability_exceptions table does not exist.
+  throw new Error('availability_exceptions table does not exist');
 }
 
 /* ========== REAL-TIME ========== */
