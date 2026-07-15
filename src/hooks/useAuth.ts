@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase, isDeveloperMode } from '@/supabase/client';
 import { signIn, signUp, signOut, resetPassword, fetchUserProfile } from '@/supabase/auth';
-import type { AppUser } from '@/types/supabase';
+import type { Profile } from '@/types/supabase';
 import type { Session, User } from '@supabase/supabase-js';
 
 function getErrMsg(err: unknown): string {
@@ -12,7 +12,7 @@ function getErrMsg(err: unknown): string {
 
 export interface AuthState {
   user: User | null;
-  appUser: AppUser | null;
+  appUser: Profile | null;
   isLoading: boolean;
   isAuthenticated: boolean;
   error: string | null;
@@ -28,6 +28,23 @@ const INITIAL_STATE: AuthState = {
   session: null,
 };
 
+// Dev mode mock profile aligned with Live DB schema
+const DEV_PROFILE: Profile = {
+  id: 'dev-user',
+  username: null,
+  full_name: 'Developer',
+  avatar_url: null,
+  website: null,
+  phone_number: null,
+  address: null,
+  city: null,
+  country: null,
+  user_role: 'client',
+  user_status: 'active',
+  verification_status: 'unverified',
+  updated_at: new Date().toISOString(),
+};
+
 export function useAuth() {
   const [state, setState] = useState<AuthState>(INITIAL_STATE);
 
@@ -40,7 +57,7 @@ export function useAuth() {
         setState(s => ({
           ...s,
           user: { id: 'dev-user', email: 'developer@example.com', aud: 'authenticated', role: 'authenticated' } as User,
-          appUser: { id: 'dev-user', email: 'developer@example.com', display_name: 'Developer', photo_url: null, phone: null, role: 'user', is_verified: true, is_id_verified: true, bio: null, location: null, wilaya: null, theme: 'light', language: 'en', followers: 0, following: 0, stats: null, created_at: new Date().toISOString(), last_login_at: new Date().toISOString() },
+          appUser: DEV_PROFILE,
           isLoading: false,
           isAuthenticated: true,
           error: null,
@@ -107,7 +124,7 @@ export function useAuth() {
   const login = useCallback(async (email: string, password: string) => {
     setState(s => ({ ...s, isLoading: true, error: null }));
     if (isDeveloperMode) {
-      setState(s => ({ ...s, isLoading: false, isAuthenticated: true, user: { id: 'dev-user' } as User, appUser: { id: 'dev-user', email: 'developer@example.com', display_name: 'Developer', photo_url: null, phone: null, role: 'user', is_verified: true, is_id_verified: true, bio: null, location: null, wilaya: null, theme: 'light', language: 'en', followers: 0, following: 0, stats: null, created_at: new Date().toISOString(), last_login_at: new Date().toISOString() } }));
+      setState(s => ({ ...s, isLoading: false, isAuthenticated: true, user: { id: 'dev-user' } as User, appUser: DEV_PROFILE }));
       return;
     }
     try {
@@ -131,7 +148,7 @@ export function useAuth() {
   const register = useCallback(async (email: string, password: string, displayName: string) => {
     setState(s => ({ ...s, isLoading: true, error: null }));
     if (isDeveloperMode) {
-      setState(s => ({ ...s, isLoading: false, isAuthenticated: true, user: { id: 'dev-user' } as User, appUser: { id: 'dev-user', email: 'developer@example.com', display_name: 'Developer', photo_url: null, phone: null, role: 'user', is_verified: true, is_id_verified: true, bio: null, location: null, wilaya: null, theme: 'light', language: 'en', followers: 0, following: 0, stats: null, created_at: new Date().toISOString(), last_login_at: new Date().toISOString() } }));
+      setState(s => ({ ...s, isLoading: false, isAuthenticated: true, user: { id: 'dev-user' } as User, appUser: { ...DEV_PROFILE, full_name: displayName } }));
       return { user: { id: 'dev-user' } as User };
     }
     try {
@@ -148,7 +165,7 @@ export function useAuth() {
   const googleSignIn = useCallback(async () => {
     setState(s => ({ ...s, isLoading: true, error: null }));
     if (isDeveloperMode) {
-      setState(s => ({ ...s, isLoading: false, isAuthenticated: true, user: { id: 'dev-user' } as User, appUser: { id: 'dev-user', email: 'developer@example.com', display_name: 'Developer', photo_url: null, phone: null, role: 'user', is_verified: true, is_id_verified: true, bio: null, location: null, wilaya: null, theme: 'light', language: 'en', followers: 0, following: 0, stats: null, created_at: new Date().toISOString(), last_login_at: new Date().toISOString() } }));
+      setState(s => ({ ...s, isLoading: false, isAuthenticated: true, user: { id: 'dev-user' } as User, appUser: DEV_PROFILE }));
       return { data: { url: window.location.origin }, error: null };
     }
     try {
