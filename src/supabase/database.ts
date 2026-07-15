@@ -8,7 +8,8 @@ import type {
   ForumPost, ForumComment, ForumCategory
 } from '@/types/supabase';
 import type { Json } from '@/types/supabase';
-import type { BookingStatus } from '@/types'; // Import app-level BookingStatus
+import type { BookingStatus, Barber } from '@/types';
+import { transformToBarber } from '@/lib/utils'; // Import app-level BookingStatus
 
 function guard(): void {
   if (!isSupabaseConfigured()) throw new Error('Supabase غير مُعد');
@@ -50,7 +51,7 @@ export async function getProfessionals(filters?: { city?: string; search?: strin
 
   const { data, error } = await query;
   if (error) throw new Error(error.message);
-  return (data || []) as (Professional & { profiles?: Profile; services?: Service[] })[];
+  return (data || []).map(transformToBarber);
 }
 
 export async function getProfessionalById(id: string) {
@@ -61,7 +62,7 @@ export async function getProfessionalById(id: string) {
     .eq('id', id)
     .single();
   if (error) return null;
-  return data as Professional & { profiles?: Profile; services?: Service[]; portfolio_items?: PortfolioItem[] };
+  return data ? transformToBarber(data) : null;
 }
 
 export async function updateProfessionalProfile(proId: string, updates: Partial<Professional>) {

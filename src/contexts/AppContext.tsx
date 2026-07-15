@@ -177,7 +177,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     try {
       const barbersData = await getProfessionals();
-      if (barbersData && barbersData.length > 0) setBarbers(barbersData as unknown as Barber[]);
+      if (barbersData && barbersData.length > 0) setBarbers(barbersData);
     } catch (err) { console.warn('[AppContext] professionals fetch failed:', err); }
     finally { setIsLoading(p => ({ ...p, barbers: false })); }
 
