@@ -1,7 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useApp } from '@/contexts/useApp';
-import { getBarberExceptions, addBarberException, deleteBarberException } from '@/supabase/database';
-import { CalendarOff, Plus, Trash2, AlertCircle, CheckCircle } from 'lucide-react';
+import { CalendarOff, Plus, AlertCircle, CheckCircle, Info } from 'lucide-react';
 
 interface ExceptionItem {
   id: string;
@@ -22,8 +21,7 @@ const EXCEPTION_TYPES = [
 
 export default function AvailabilityExceptions({ barberId }: AvailabilityExceptionsProps) {
   const { themeConfig } = useApp();
-  const [exceptions, setExceptions] = useState<ExceptionItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [exceptions] = useState<ExceptionItem[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -34,27 +32,6 @@ export default function AvailabilityExceptions({ barberId }: AvailabilityExcepti
   const [newReason, setNewReason] = useState('');
   const [isAdding, setIsAdding] = useState(false);
 
-  useEffect(() => {
-    const fetchExceptions = async () => {
-      try {
-        const data = await getBarberExceptions(barberId);
-        setExceptions(
-          data.map(e => ({
-            id: e.id as string,
-            date: e.date as string,
-            type: e.type as string,
-            reason: e.reason as string,
-          }))
-        );
-      } catch (err) {
-        console.error('Failed to fetch exceptions:', err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    if (barberId) fetchExceptions();
-  }, [barberId]);
-
   const handleAdd = async () => {
     if (!newDate) {
       setError('يرجى اختيار التاريخ');
@@ -63,37 +40,13 @@ export default function AvailabilityExceptions({ barberId }: AvailabilityExcepti
     setIsAdding(true);
     setError(null);
     try {
-      const result = await addBarberException(barberId, {
-        date: newDate,
-        type: newType,
-        reason: newReason || EXCEPTION_TYPES.find(t => t.key === newType)?.label || '',
-      });
-      setExceptions(prev => [...prev, {
-        id: (result as Record<string, unknown>).id as string,
-        date: newDate,
-        type: newType,
-        reason: newReason || EXCEPTION_TYPES.find(t => t.key === newType)?.label || '',
-      }]);
-      setNewDate('');
-      setNewReason('');
+      // availability_exceptions table does not exist — show informational message
+      setError('ميزة إدارة الاستثناءات غير متاحة حالياً. يرجى تحديث ساعات العمل من إعدادات البروفايل.');
       setShowForm(false);
-      setSuccess('تمت إضافة الاستثناء بنجاح');
-      setTimeout(() => setSuccess(null), 3000);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'فشل إضافة الاستثناء');
     } finally {
       setIsAdding(false);
-    }
-  };
-
-  const handleDelete = async (exceptionId: string) => {
-    try {
-      await deleteBarberException(exceptionId);
-      setExceptions(prev => prev.filter(e => e.id !== exceptionId));
-      setSuccess('تم حذف الاستثناء');
-      setTimeout(() => setSuccess(null), 3000);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'فشل حذف الاستثناء');
     }
   };
 
@@ -112,18 +65,16 @@ export default function AvailabilityExceptions({ barberId }: AvailabilityExcepti
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="space-y-2">
-        {[...Array(3)].map((_, i) => (
-          <div key={i} className="h-10 rounded-xl animate-pulse" style={{ backgroundColor: themeConfig.colors.surface }} />
-        ))}
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-3">
+      {/* Info Banner */}
+      <div className="flex items-center gap-2 p-3 rounded-xl" style={{ backgroundColor: themeConfig.colors.info + '10', border: `1px solid ${themeConfig.colors.info}25` }}>
+        <Info size={16} style={{ color: themeConfig.colors.info }} />
+        <p className="text-xs flex-1" style={{ color: themeConfig.colors.info }}>
+          إدارة الاستثناءات متاحة عبر تحديث حقل workingHours في جدول الحلاقين
+        </p>
+      </div>
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -262,13 +213,6 @@ export default function AvailabilityExceptions({ barberId }: AvailabilityExcepti
               >
                 {getTypeLabel(exception.type)}
               </span>
-              <button
-                type="button"
-                onClick={() => handleDelete(exception.id)}
-                className="w-7 h-7 rounded-lg flex items-center justify-center transition-all hover:bg-red-50"
-              >
-                <Trash2 size={14} style={{ color: themeConfig.colors.error }} />
-              </button>
             </div>
           </div>
         ))}
