@@ -22,7 +22,7 @@ export const supabase = isSupabaseConfigured()
     });
 
 export const TABLES = {
-  USERS: 'profiles',
+  USERS: 'users',
   BARBERS: 'barbers',
   BOOKINGS: 'bookings',
   CHATS: 'chats',

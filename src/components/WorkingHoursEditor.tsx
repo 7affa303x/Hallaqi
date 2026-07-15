@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useApp } from '@/contexts/useApp';
-import { getBarberAvailability, updateBarberAvailability } from '@/supabase/database';
+import { supabase } from '@/supabase/client';
+import { updateBarberProfile } from '@/supabase/database';
 import { Clock, Save, AlertCircle, CheckCircle } from 'lucide-react';
 
 interface DaySchedule {
@@ -43,19 +44,19 @@ export default function WorkingHoursEditor({ barberId }: WorkingHoursEditorProps
   useEffect(() => {
     const fetchSchedule = async () => {
       try {
-        const data = await getBarberAvailability(barberId);
-        if (data.length > 0) {
+        const { data } = await supabase.from('barbers').select('working_hours').eq('id', barberId).single();
+        if (data?.working_hours) {
+          const wh = data.working_hours as Record<string, { open: string; close: string; isOpen?: boolean }>;
+          const dayMap: Record<string, number> = { saturday: 0, sunday: 1, monday: 2, tuesday: 3, wednesday: 4, thursday: 5, friday: 6 };
           const mapped = DAYS.map(d => {
-            const existing = data.find(s => (s.day_of_week as number) === d.key);
-            if (existing) {
-              return {
-                day_of_week: d.key,
-                start_time: (existing.start_time as string) || '09:00',
-                end_time: (existing.end_time as string) || '18:00',
-                is_active: (existing.is_active as boolean) ?? true,
-              };
-            }
-            return { day_of_week: d.key, start_time: '09:00', end_time: '18:00', is_active: false };
+            const dayName = Object.keys(dayMap).find(k => dayMap[k] === d.key) || '';
+            const hours = wh[dayName];
+            return {
+              day_of_week: d.key,
+              start_time: hours?.open || '09:00',
+              end_time: hours?.close || '18:00',
+              is_active: hours ? (hours.isOpen !== false && hours.open !== 'closed') : false,
+            };
           });
           setSchedules(mapped);
         }
@@ -89,7 +90,16 @@ export default function WorkingHoursEditor({ barberId }: WorkingHoursEditorProps
     setError(null);
     setSuccess(false);
     try {
-      await updateBarberAvailability(barberId, schedules);
+      const dayNames = ['saturday', 'sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
+      const workingHours: Record<string, { open: string; close: string; isOpen: boolean }> = {};
+      schedules.forEach(s => {
+        workingHours[dayNames[s.day_of_week]] = {
+          open: s.is_active ? s.start_time : 'closed',
+          close: s.is_active ? s.end_time : 'closed',
+          isOpen: s.is_active,
+        };
+      });
+      await updateBarberProfile(barberId, { working_hours: workingHours });
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
     } catch (err) {

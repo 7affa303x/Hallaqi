@@ -29,14 +29,13 @@ export async function signUp(email: string, password: string, displayName: strin
   if (error) throw new Error(getAuthErrorMessage(error));
 
   if (data.user) {
-    await supabase.from('profiles').upsert({
+    await supabase.from('users').upsert({
       id: data.user.id,
-      full_name: displayName,
-      user_role: 'client',
-      user_status: 'active',
-      verification_status: 'unverified',
-      updated_at: new Date().toISOString(),
-    } as Record<string, unknown>);
+      email: email,
+      display_name: displayName,
+      role: 'user',
+      created_at: new Date().toISOString(),
+    });
   }
   return data;
 }
@@ -49,7 +48,7 @@ export async function signIn(email: string, password: string) {
   if (error) throw new Error(getAuthErrorMessage(error));
 
   if (data.user) {
-    await supabase.from('profiles').update({ updated_at: new Date().toISOString() } as Record<string, unknown>).eq('id', data.user.id);
+    await supabase.from(\'users\').update({ updated_at: new Date().toISOString() } as Record<string, unknown>).eq(\'id\', data.user.id);
   }
   return data;
 }
@@ -75,7 +74,7 @@ export async function resetPassword(email: string) {
 export async function fetchUserProfile(userId: string): Promise<AppUser | null> {
   if (!isSupabaseConfigured()) return null;
 
-  const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
+  const { data, error } = await supabase.from(\'users\').select(\'*\').eq(\'id\', userId).single();
   if (error || !data) return null;
   return data as unknown as AppUser;
 }

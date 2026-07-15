@@ -74,8 +74,8 @@ export async function getBarberBookings(barberId: string, date: string) {
   guard();
   const { data, error } = await supabase
     .from('bookings')
-    .select('time, services, status, totalPrice')
-    .eq('barberId', barberId)
+    .select(\'time, services, status, total_price\')
+    .eq(\'barber_id\', barberId)
     .eq('date', date)
     .not('status', 'eq', 'cancelled');
   if (error) throw new Error(error.message);
@@ -83,7 +83,7 @@ export async function getBarberBookings(barberId: string, date: string) {
     time: string;
     services: Array<{ duration?: number }>;
     status: string;
-    totalPrice: number;
+    total_price: number;
   }>;
 }
 
