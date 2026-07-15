@@ -6,7 +6,7 @@ import {
   ArrowLeft, Check, Clock, MapPin, Car, CreditCard,
   Wallet, Banknote, Calendar, X, AlertTriangle
 } from 'lucide-react';
-import { createBooking, getBarberBookings, checkSlotAgainstBookings } from '@/supabase/database';
+import { createBooking, getProfessionalBookings } from '@/supabase/database';
 import type { Service } from '@/types';
 
 const ALL_TIME_SLOTS = [
@@ -31,6 +31,31 @@ function generateTimeSlotsForRange(start: string, end: string): string[] {
     }
   }
   return slots;
+}
+
+/** Check if a time slot overlaps with existing bookings */
+function isSlotOverlapping(
+  slotTime: string,
+  durationMinutes: number,
+  existingBookings: Array<{ booking_start_time: string | null; booking_end_time: string | null; status: string | null }>,
+  selectedDate: string
+): boolean {
+  const slotStart = new Date(`${selectedDate}T${slotTime}`);
+  const slotEnd = new Date(slotStart.getTime() + durationMinutes * 60000);
+
+  for (const booking of existingBookings) {
+    if (!booking.booking_start_time || !booking.booking_end_time) continue;
+    if (booking.status === 'cancelled' || booking.status === 'no_show') continue;
+
+    const bookStart = new Date(booking.booking_start_time);
+    const bookEnd = new Date(booking.booking_end_time);
+
+    // Overlap check: [slotStart, slotEnd) overlaps with [bookStart, bookEnd)
+    if (slotStart < bookEnd && slotEnd > bookStart) {
+      return true; // overlapping
+    }
+  }
+  return false; // no overlap = available
 }
 
 const generateDates = () => {
@@ -61,7 +86,11 @@ export default function BookingFlowPage() {
   const [isMobileService, setIsMobileService] = useState(false);
   const [address, setAddress] = useState('');
   const [confirmed, setConfirmed] = useState(false);
-  const [existingBookings, setExistingBookings] = useState<Array<{ time: string; services: Array<{ duration?: number }> }>>([]);
+  const [existingBookings, setExistingBookings] = useState<Array<{
+    booking_start_time: string | null;
+    booking_end_time: string | null;
+    status: string | null;
+  }>>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [isLoadingSlots, setIsLoadingSlots] = useState(false);
@@ -69,7 +98,7 @@ export default function BookingFlowPage() {
   const barber = barbers.find(b => b.id === screenParams?.barberId);
   const dates = generateDates();
 
-  /** Fetch existing bookings when date changes */
+  /** Fetch existing bookings for this professional */
   useEffect(() => {
     if (!barber?.id || !selectedDate) {
       setExistingBookings([]);
@@ -79,8 +108,8 @@ export default function BookingFlowPage() {
     const fetch = async () => {
       setIsLoadingSlots(true);
       try {
-        const bookings = await getBarberBookings(barber.id, selectedDate);
-        if (!cancelled) setExistingBookings(bookings);
+        const bookings = await getProfessionalBookings(barber.id);
+        if (!cancelled) setExistingBookings(bookings || []);
       } catch (err) {
         console.error('Failed to fetch existing bookings:', err);
         if (!cancelled) setExistingBookings([]);
@@ -123,7 +152,7 @@ export default function BookingFlowPage() {
       ) || [];
       const totalDuration = selectedServicesData.reduce((sum: number, s: Service) => sum + s.duration, 0) || 30;
       slots = slots.filter(slot =>
-        checkSlotAgainstBookings(slot, totalDuration, existingBookings)
+        !isSlotOverlapping(slot, totalDuration, existingBookings, dateStr)
       );
     }
 
@@ -139,7 +168,7 @@ export default function BookingFlowPage() {
   if (!barber) {
     return (
       <div className="flex flex-col items-center justify-center h-screen">
-        <p>الحلاق غير موجود</p>
+        <p>المختص غير موجود</p>
         <button onClick={goBack}>رجوع</button>
       </div>
     );
@@ -156,6 +185,13 @@ export default function BookingFlowPage() {
   const totalPrice = selectedServicesData.reduce((sum: number, s: Service) => sum + s.price, 0);
   const totalDuration = selectedServicesData.reduce((sum: number, s: Service) => sum + s.duration, 0);
 
+  /** Compute end time from start time + duration */
+  const computeEndTime = (dateStr: string, timeStr: string, durationMin: number): string => {
+    const start = new Date(`${dateStr}T${timeStr}`);
+    const end = new Date(start.getTime() + durationMin * 60000);
+    return end.toISOString();
+  };
+
   const handleConfirm = async () => {
     if (!appUser) {
       setSaveError('يجب تسجيل الدخول لإتمام الحجز');
@@ -171,30 +207,27 @@ export default function BookingFlowPage() {
 
     try {
       // Validate: check slot is still available
-      const available = checkSlotAgainstBookings(
-        selectedTime, totalDuration, existingBookings
-      );
-      if (!available) {
+      const overlaps = isSlotOverlapping(selectedTime, totalDuration, existingBookings, selectedDate);
+      if (overlaps) {
         setSaveError('هذا الوقت لم يعد متاحاً. يرجى اختيار وقت آخر.');
         setIsSaving(false);
         return;
       }
 
-      // Build Supabase booking row
+      const bookingStartTime = `${selectedDate}T${selectedTime}`;
+      const bookingEndTime = computeEndTime(selectedDate, selectedTime, totalDuration);
+
+      // Build Supabase booking row with Live DB column names
       const bookingRow = {
-        user_id: appUser.id,
-        barber_id: barber.id,
-        services: selectedServicesData as unknown as Service[],
-        date: selectedDate,
-        time: selectedTime,
+        client_id: appUser.id,
+        professional_id: barber.id,
+        service_id: selectedServicesData[0]?.id || null,
+        booking_start_time: bookingStartTime,
+        booking_end_time: bookingEndTime,
         status: 'pending' as const,
         total_price: totalPrice,
-        note: note || null,
-        is_mobile_service: isMobileService,
-        payment_method: paymentMethod,
+        notes: note || null,
         payment_status: 'pending' as const,
-        reviewed: false,
-        address: isMobileService ? address || null : null,
       };
 
       const saved = await createBooking(bookingRow);
@@ -202,23 +235,25 @@ export default function BookingFlowPage() {
       if (saved) {
         // Add to local state for immediate UI update
         const newBooking = {
-          id: (saved as Record<string, unknown>).id as string,
-          barber_id: barber.id,
+          id: saved.id,
+          barberId: barber.id,
+          barberName: barber.name,
+          barberAvatar: barber.avatar,
           services: selectedServicesData,
           date: selectedDate,
           time: selectedTime,
           status: 'pending' as const,
-          total_price: totalPrice,
+          totalPrice: totalPrice,
           note: note || undefined,
           createdAt: new Date().toISOString(),
-
-          is_mobile_service: isMobileService,
-          payment_method: paymentMethod,
-          payment_status: 'pending' as const,
+          location: barber.location,
+          isMobileService: isMobileService,
+          paymentMethod: paymentMethod,
+          paymentStatus: 'pending' as const,
           reviewed: false,
           address: isMobileService ? address : undefined,
         };
-        addBooking(newBooking);
+        addBooking(newBooking as unknown as Parameters<typeof addBooking>[0]);
 
         // Refresh from server to ensure consistency
         await refreshData();
@@ -277,7 +312,7 @@ export default function BookingFlowPage() {
             className="flex-1 h-12 rounded-xl text-sm font-bold border"
             style={{ borderColor: themeConfig.colors.border, color: themeConfig.colors.text }}
           >
-            تفاصيل الحلاق
+            تفاصيل المختص
           </button>
           <button
             onClick={() => { setConfirmed(false); goBack(); }}
@@ -307,340 +342,173 @@ export default function BookingFlowPage() {
         <button onClick={step > 1 ? () => setStep((prev: number) => (prev - 1) as 1 | 2 | 3) : goBack} className="w-10 h-10 rounded-xl flex items-center justify-center">
           {step > 1 ? <ArrowLeft size={22} style={{ color: themeConfig.colors.text }} /> : <X size={22} style={{ color: themeConfig.colors.text }} />}
         </button>
-        <h1 className="text-base font-bold flex-1" style={{ color: themeConfig.colors.text }}>
-          {step === 1 && 'اختر الخدمات'}
-          {step === 2 && 'اختر الموعد'}
-          {step === 3 && 'تأكيد الحجز'}
-        </h1>
-        <div className="flex gap-1">
-          {[1, 2, 3].map(s => (
-            <div key={s} className="w-6 h-1.5 rounded-full" style={{ backgroundColor: s <= step ? themeConfig.colors.primary : themeConfig.colors.border }} />
-          ))}
+        <div className="flex-1">
+          <h1 className="text-sm font-bold" style={{ color: themeConfig.colors.text }}>
+            {step === 1 ? 'اختيار الخدمات' : step === 2 ? 'اختيار الموعد' : 'تأكيد الحجز'}
+          </h1>
+          <div className="flex gap-1 mt-1">
+            {[1, 2, 3].map(s => (
+              <div key={s} className="h-1 flex-1 rounded-full" style={{ backgroundColor: s <= step ? themeConfig.colors.primary : themeConfig.colors.border }} />
+            ))}
+          </div>
+        </div>
+        <div className="text-right">
+          <p className="text-xs font-bold" style={{ color: themeConfig.colors.primary }}>{totalPrice} دج</p>
+          <p className="text-[10px]" style={{ color: themeConfig.colors.textMuted }}>{totalDuration} دقيقة</p>
         </div>
       </div>
 
-      {/* Error Banner */}
-      {saveError && (
-        <div className="mx-4 mt-3 p-3 rounded-xl flex items-center gap-2" style={{ backgroundColor: themeConfig.colors.error + '15', border: `1px solid ${themeConfig.colors.error}30` }}>
-          <AlertTriangle size={16} style={{ color: themeConfig.colors.error }} />
-          <p className="text-xs flex-1" style={{ color: themeConfig.colors.error }}>{saveError}</p>
-          <button onClick={() => setSaveError(null)} className="text-xs font-bold px-2" style={{ color: themeConfig.colors.error }}>×</button>
-        </div>
-      )}
-
-      {/* Step 1: Services */}
+      {/* === STEP 1: SERVICES === */}
       {step === 1 && (
-        <div className="p-4">
-          {/* Barber Info */}
-          <div className="flex items-center gap-3 mb-4 p-3 rounded-xl border" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
-            <img src={barber.avatar} alt={barber.name} className="w-12 h-12 rounded-xl object-cover" />
-            <div>
-              <p className="text-sm font-bold" style={{ color: themeConfig.colors.text }}>{barber.name}</p>
-              <p className="text-xs" style={{ color: themeConfig.colors.textMuted }}>{barber.location}</p>
-            </div>
+        <div className="px-4 mt-4">
+          <div className="flex items-center gap-2 mb-3">
+            <img src={barber.avatar} alt={barber.name} className="w-8 h-8 rounded-lg object-cover" />
+            <div><p className="text-xs font-bold" style={{ color: themeConfig.colors.text }}>{barber.name}</p><p className="text-[10px]" style={{ color: themeConfig.colors.textMuted }}>اختر الخدمات المطلوبة</p></div>
           </div>
 
-          {/* Mobile Service Toggle */}
-          {barber.isMobile && (
-            <div className="flex items-center justify-between p-3 rounded-xl border mb-4" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
-              <div className="flex items-center gap-2">
-                <Car size={18} style={{ color: themeConfig.colors.info }} />
-                <div>
-                  <p className="text-sm font-bold" style={{ color: themeConfig.colors.text }}>خدمة متنقلة</p>
-                  <p className="text-[10px]" style={{ color: themeConfig.colors.textMuted }}>سيأتي الحلاق إلى عنوانك</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setIsMobileService(!isMobileService)}
-                className="w-12 h-7 rounded-full transition-all relative"
-                style={{ backgroundColor: isMobileService ? themeConfig.colors.primary : themeConfig.colors.border }}
-              >
-                <div className="absolute top-0.5 w-6 h-6 rounded-full bg-white shadow-sm transition-all"
-                  style={{ right: isMobileService ? '2px' : 'auto', left: isMobileService ? 'auto' : '2px' }}
-                />
-              </button>
-            </div>
-          )}
-
-          {isMobileService && (
-            <div className="mb-4">
-              <input
-                type="text"
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                placeholder="أدخل عنوانك..."
-                className="w-full h-11 px-4 text-sm rounded-xl outline-none border"
-                style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border, color: themeConfig.colors.text }}
-              />
-            </div>
-          )}
-
-          {/* Services */}
-          <h3 className="text-sm font-bold mb-2" style={{ color: themeConfig.colors.text }}>الخدمات المتاحة</h3>
           <div className="space-y-2">
             {barber.services.map((svc: Service) => {
               const isSelected = selectedServices.includes(svc.id);
               return (
-                <button
-                  key={svc.id}
-                  onClick={() => toggleService(svc.id)}
-                  className="w-full text-right p-3 rounded-xl border flex items-center justify-between transition-all"
-                  style={{
-                    backgroundColor: isSelected ? themeConfig.colors.primary + '08' : themeConfig.colors.surface,
-                    borderColor: isSelected ? themeConfig.colors.primary : themeConfig.colors.border,
-                  }}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0"
-                      style={{ borderColor: isSelected ? themeConfig.colors.primary : themeConfig.colors.border }}
-                    >
-                      {isSelected && <Check size={14} style={{ color: themeConfig.colors.primary }} />}
-                    </div>
-                    <div>
-                      <p className="text-sm font-bold" style={{ color: themeConfig.colors.text }}>{svc.name}</p>
-                      <p className="text-[10px] flex items-center gap-1" style={{ color: themeConfig.colors.textMuted }}>
-                        <Clock size={10} /> {svc.duration} دقيقة
-                      </p>
-                    </div>
+                <button key={svc.id} onClick={() => toggleService(svc.id)}
+                  className="w-full flex items-center gap-3 p-3 rounded-2xl border transition-all text-right"
+                  style={{ backgroundColor: isSelected ? themeConfig.colors.primary + '08' : themeConfig.colors.surface, borderColor: isSelected ? themeConfig.colors.primary : themeConfig.colors.border }}>
+                  <div className="w-5 h-5 rounded-lg border-2 flex items-center justify-center flex-shrink-0" style={{ borderColor: isSelected ? themeConfig.colors.primary : themeConfig.colors.border, backgroundColor: isSelected ? themeConfig.colors.primary : 'transparent' }}>
+                    {isSelected && <Check size={12} className="text-white" />}
                   </div>
-                  <span className="text-sm font-bold" style={{ color: themeConfig.colors.primary }}>{svc.price} دج</span>
+                  <div className="flex-1"><p className="text-sm font-bold" style={{ color: themeConfig.colors.text }}>{svc.name}</p><p className="text-[10px]" style={{ color: themeConfig.colors.textMuted }}>{svc.duration} دقيقة</p></div>
+                  <p className="text-sm font-bold" style={{ color: themeConfig.colors.primary }}>{svc.price} دج</p>
                 </button>
               );
             })}
           </div>
 
-          {/* Summary */}
-          {selectedServices.length > 0 && (
-            <div className="mt-4 p-3 rounded-xl border" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
-              <div className="flex justify-between mb-1">
-                <span className="text-xs" style={{ color: themeConfig.colors.textMuted }}>المدة الإجمالية</span>
-                <span className="text-xs font-bold" style={{ color: themeConfig.colors.text }}>{totalDuration} دقيقة</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm font-bold" style={{ color: themeConfig.colors.text }}>الإجمالي</span>
-                <span className="text-sm font-bold" style={{ color: themeConfig.colors.primary }}>{totalPrice} دج</span>
-              </div>
-            </div>
-          )}
+          <button onClick={() => selectedServices.length > 0 ? setStep(2) : setSaveError('اختر خدمة واحدة على الأقل')} className="w-full h-12 rounded-xl text-sm font-bold text-white mt-4" style={{ backgroundColor: themeConfig.colors.primary }}>متابعة</button>
         </div>
       )}
 
-      {/* Step 2: Date & Time */}
+      {/* === STEP 2: DATE & TIME === */}
       {step === 2 && (
-        <div className="p-4">
-          {/* Date Selection */}
-          <h3 className="text-sm font-bold mb-2" style={{ color: themeConfig.colors.text }}>اختر التاريخ</h3>
-          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide mb-4">
-            {dates.map(d => {
-              const available = isDateAvailable(d.full);
-              return (
-                <button
-                  key={d.full}
-                  onClick={() => available && (setSelectedDate(d.full), setSelectedTime(''))}
-                  disabled={!available}
-                  className="flex flex-col items-center justify-center min-w-[60px] h-16 rounded-xl border transition-all relative"
-                  style={{
-                    backgroundColor: !available ? themeConfig.colors.surface : selectedDate === d.full ? themeConfig.colors.primary : themeConfig.colors.surface,
-                    borderColor: !available ? themeConfig.colors.border : selectedDate === d.full ? themeConfig.colors.primary : themeConfig.colors.border,
-                    color: !available ? themeConfig.colors.textMuted : selectedDate === d.full ? '#fff' : themeConfig.colors.text,
-                    opacity: available ? 1 : 0.4,
-                  }}
-                >
-                  <span className="text-[10px]">{d.day}</span>
-                  <span className="text-lg font-bold">{d.date}</span>
-                  <span className="text-[9px]">{d.month}</span>
-                  {!available && <div className="absolute inset-0 flex items-center justify-center"><X size={20} className="opacity-30" style={{ color: themeConfig.colors.error }} /></div>}
-                </button>
-              );
-            })}
+        <div className="px-4 mt-4">
+          {/* Date selector */}
+          <div className="mb-4">
+            <div className="flex items-center gap-2 mb-3"><Calendar size={16} style={{ color: themeConfig.colors.primary }} /><p className="text-xs font-bold" style={{ color: themeConfig.colors.text }}>اختر التاريخ</p></div>
+            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+              {dates.map(d => {
+                const isAvailable = isDateAvailable(d.full);
+                const isSelected = selectedDate === d.full;
+                return (
+                  <button key={d.full} onClick={() => { if (isAvailable) { setSelectedDate(d.full); setSelectedTime(''); } }}
+                    disabled={!isAvailable}
+                    className="flex-shrink-0 w-16 h-20 rounded-2xl border flex flex-col items-center justify-center gap-1 transition-all disabled:opacity-40"
+                    style={{ backgroundColor: isSelected ? themeConfig.colors.primary : themeConfig.colors.surface, borderColor: isSelected ? themeConfig.colors.primary : themeConfig.colors.border }}>
+                    <span className="text-[10px] font-medium" style={{ color: isSelected ? '#fff' : themeConfig.colors.textMuted }}>{d.day}</span>
+                    <span className="text-lg font-bold" style={{ color: isSelected ? '#fff' : themeConfig.colors.text }}>{d.date}</span>
+                    <span className="text-[9px]" style={{ color: isSelected ? '#fff' : themeConfig.colors.textMuted }}>{d.month}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
-          {/* Time Selection */}
-          <h3 className="text-sm font-bold mb-2" style={{ color: themeConfig.colors.text }}>اختر الوقت</h3>
-          {isLoadingSlots ? (
-            <div className="text-center py-6 rounded-xl border" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
-              <div className="w-6 h-6 rounded-full border-2 border-t-transparent animate-spin mx-auto mb-2" style={{ borderColor: themeConfig.colors.primary, borderTopColor: 'transparent' }} />
-              <p className="text-xs" style={{ color: themeConfig.colors.textMuted }}>جاري تحميل الأوقات المتاحة...</p>
-            </div>
-          ) : timeSlots.length === 0 && selectedDate ? (
-            <div className="text-center py-6 rounded-xl border" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
-              <Clock size={24} className="mx-auto mb-2 opacity-40" style={{ color: themeConfig.colors.textMuted }} />
-              <p className="text-xs" style={{ color: themeConfig.colors.textMuted }}>لا توجد أوقات متاحة في هذا اليوم</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-4 gap-2">
-              {timeSlots.map(t => (
-                <button
-                  key={t}
-                  onClick={() => setSelectedTime(t)}
-                  className="py-2.5 rounded-xl border text-xs font-bold transition-all"
-                  style={{
-                    backgroundColor: selectedTime === t ? themeConfig.colors.primary : themeConfig.colors.surface,
-                    borderColor: selectedTime === t ? themeConfig.colors.primary : themeConfig.colors.border,
-                    color: selectedTime === t ? '#fff' : themeConfig.colors.text,
-                  }}
-                >
-                  {t}
-                </button>
-              ))}
+          {/* Time slots */}
+          {selectedDate && (
+            <div>
+              <div className="flex items-center gap-2 mb-3"><Clock size={16} style={{ color: themeConfig.colors.primary }} /><p className="text-xs font-bold" style={{ color: themeConfig.colors.text }}>اختر الوقت</p></div>
+              {isLoadingSlots ? (
+                <div className="flex items-center justify-center py-8"><div className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: themeConfig.colors.primary }} /></div>
+              ) : (
+                <div className="grid grid-cols-3 gap-2">
+                  {timeSlots.map(slot => {
+                    const isSelected = selectedTime === slot;
+                    return (
+                      <button key={slot} onClick={() => setSelectedTime(slot)}
+                        className="h-10 rounded-xl text-xs font-bold border transition-all"
+                        style={{ backgroundColor: isSelected ? themeConfig.colors.primary : themeConfig.colors.surface, borderColor: isSelected ? themeConfig.colors.primary : themeConfig.colors.border, color: isSelected ? '#fff' : themeConfig.colors.text }}>
+                        {slot}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
 
-          {/* Info about filtered slots */}
-          {selectedDate && existingBookings.length > 0 && timeSlots.length > 0 && (
-            <p className="text-[10px] mt-3 text-center" style={{ color: themeConfig.colors.textMuted }}>
-              تم إخفاء الأوقات المحجوزة ({existingBookings.length} حجز موجود)
-            </p>
-          )}
+          <button onClick={() => selectedTime ? setStep(3) : setSaveError('اختر الوقت')} className="w-full h-12 rounded-xl text-sm font-bold text-white mt-4" style={{ backgroundColor: themeConfig.colors.primary }}>متابعة</button>
         </div>
       )}
-      
-      {/* Step 3: Confirm */}
-      {step === 3 && (
-        <div className="p-4 space-y-3">
-          {/* Summary Card */}
-          <div className="p-4 rounded-2xl border" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
-            <h3 className="text-sm font-bold mb-3" style={{ color: themeConfig.colors.text }}>ملخص الحجز</h3>
-            
-            <div className="flex items-center gap-3 mb-3 pb-3 border-b" style={{ borderColor: themeConfig.colors.border }}>
-              <img src={barber.avatar} alt={barber.name} className="w-10 h-10 rounded-xl object-cover" />
-              <div>
-                <p className="text-sm font-bold" style={{ color: themeConfig.colors.text }}>{barber.name}</p>
-                <p className="text-[10px]" style={{ color: themeConfig.colors.textMuted }}>{barber.location}</p>
-              </div>
-            </div>
 
-            <div className="space-y-2 mb-3 pb-3 border-b" style={{ borderColor: themeConfig.colors.border }}>
-              {selectedServicesData.map((svc: Service) => (
-                <div key={svc.id} className="flex justify-between">
-                  <span className="text-xs" style={{ color: themeConfig.colors.textMuted }}>{svc.name} ({svc.duration}د)</span>
-                  <span className="text-xs font-bold" style={{ color: themeConfig.colors.text }}>{svc.price} دج</span>
-                </div>
+      {/* === STEP 3: CONFIRM === */}
+      {step === 3 && (
+        <div className="px-4 mt-4 space-y-4">
+          {/* Booking summary */}
+          <div className="rounded-2xl border p-4" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
+            <div className="flex items-center gap-2 mb-3"><img src={barber.avatar} alt={barber.name} className="w-8 h-8 rounded-lg object-cover" /><p className="text-sm font-bold" style={{ color: themeConfig.colors.text }}>{barber.name}</p></div>
+            <div className="space-y-2">
+              {selectedServicesData.map(svc => (
+                <div key={svc.id} className="flex justify-between"><span className="text-xs" style={{ color: themeConfig.colors.textMuted }}>{svc.name}</span><span className="text-xs font-bold" style={{ color: themeConfig.colors.text }}>{svc.price} دج</span></div>
               ))}
             </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <Calendar size={14} style={{ color: themeConfig.colors.textMuted }} />
-                <span className="text-xs" style={{ color: themeConfig.colors.textMuted }}>التاريخ: {selectedDate}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Clock size={14} style={{ color: themeConfig.colors.textMuted }} />
-                <span className="text-xs" style={{ color: themeConfig.colors.textMuted }}>الوقت: {selectedTime}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <MapPin size={14} style={{ color: themeConfig.colors.textMuted }} />
-                <span className="text-xs" style={{ color: themeConfig.colors.textMuted }}>{isMobileService ? (address || 'المنزل') : barber.location}</span>
-              </div>
-            </div>
-
-            <div className="flex justify-between pt-3 mt-3 border-t" style={{ borderColor: themeConfig.colors.border }}>
+            <div className="flex justify-between mt-3 pt-3 border-t" style={{ borderColor: themeConfig.colors.border }}>
               <span className="text-sm font-bold" style={{ color: themeConfig.colors.text }}>الإجمالي</span>
-              <span className="text-lg font-bold" style={{ color: themeConfig.colors.primary }}>{totalPrice} دج</span>
+              <span className="text-sm font-bold" style={{ color: themeConfig.colors.primary }}>{totalPrice} دج</span>
             </div>
           </div>
 
-          {/* Payment Method */}
+          {/* Payment method */}
           <div>
-            <h3 className="text-sm font-bold mb-2" style={{ color: themeConfig.colors.text }}>طريقة الدفع</h3>
-            <div className="space-y-2">
-              {[
-                { key: 'cash' as const, label: 'نقدي', desc: 'الدفع عند الزيارة', icon: Banknote },
-                { key: 'ccp' as const, label: 'CCP', desc: 'الحساب البريدي الجزائري', icon: CreditCard },
-                { key: 'baridi-mob' as const, label: 'بريدي موب', desc: 'قريباً', icon: Wallet },
-              ].map(pm => (
-                <button
-                  key={pm.key}
-                  onClick={() => pm.key !== 'baridi-mob' && setPaymentMethod(pm.key)}
-                  className="w-full text-right p-3 rounded-xl border flex items-center justify-between"
-                  style={{
-                    backgroundColor: paymentMethod === pm.key ? themeConfig.colors.primary + '08' : themeConfig.colors.surface,
-                    borderColor: paymentMethod === pm.key ? themeConfig.colors.primary : themeConfig.colors.border,
-                    opacity: pm.key === 'baridi-mob' ? 0.5 : 1,
-                  }}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: themeConfig.colors.background }}>
-                      <pm.icon size={20} style={{ color: themeConfig.colors.primary }} />
-                    </div>
-                    <div>
-                      <p className="text-sm font-bold" style={{ color: themeConfig.colors.text }}>{pm.label}</p>
-                      <p className="text-[10px]" style={{ color: themeConfig.colors.textMuted }}>{pm.desc}</p>
-                    </div>
-                  </div>
-                  {pm.key !== 'baridi-mob' && (
-                    <div className="w-5 h-5 rounded-full border-2 flex items-center justify-center"
-                      style={{ borderColor: paymentMethod === pm.key ? themeConfig.colors.primary : themeConfig.colors.border }}
-                    >
-                      {paymentMethod === pm.key && <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: themeConfig.colors.primary }} />}
-                    </div>
-                  )}
+            <p className="text-xs font-bold mb-2" style={{ color: themeConfig.colors.text }}>طريقة الدفع</p>
+            <div className="grid grid-cols-3 gap-2">
+              {[{ key: 'cash' as const, label: 'نقداً', icon: Banknote }, { key: 'ccp' as const, label: 'CCP', icon: CreditCard }, { key: 'baridi-mob' as const, label: 'بريدي موب', icon: Wallet }].map(pm => (
+                <button key={pm.key} onClick={() => setPaymentMethod(pm.key)}
+                  className="flex flex-col items-center gap-1 p-3 rounded-xl border transition-all"
+                  style={{ backgroundColor: paymentMethod === pm.key ? themeConfig.colors.primary + '08' : themeConfig.colors.surface, borderColor: paymentMethod === pm.key ? themeConfig.colors.primary : themeConfig.colors.border }}>
+                  <pm.icon size={20} style={{ color: paymentMethod === pm.key ? themeConfig.colors.primary : themeConfig.colors.textMuted }} />
+                  <span className="text-[10px] font-bold" style={{ color: paymentMethod === pm.key ? themeConfig.colors.primary : themeConfig.colors.textMuted }}>{pm.label}</span>
                 </button>
               ))}
             </div>
           </div>
+
+          {/* Mobile service */}
+          <div className="flex items-center justify-between p-3 rounded-xl border" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
+            <div className="flex items-center gap-2"><Car size={18} style={{ color: themeConfig.colors.primary }} /><span className="text-xs font-bold" style={{ color: themeConfig.colors.text }}>خدمة متنقلة (يأتي لعندك)</span></div>
+            <button onClick={() => setIsMobileService(!isMobileService)} className="w-12 h-6 rounded-full relative transition-all" style={{ backgroundColor: isMobileService ? themeConfig.colors.primary : themeConfig.colors.border }}>
+              <div className="w-5 h-5 rounded-full bg-white absolute top-0.5 transition-all" style={{ right: isMobileService ? '2px' : 'auto', left: isMobileService ? 'auto' : '2px' }} />
+            </button>
+          </div>
+
+          {/* Address for mobile */}
+          {isMobileService && (
+            <div>
+              <p className="text-xs font-bold mb-2" style={{ color: themeConfig.colors.text }}>العنوان</p>
+              <div className="flex items-center gap-2 p-3 rounded-xl border" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
+                <MapPin size={16} style={{ color: themeConfig.colors.primary }} />
+                <input type="text" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="أدخل عنوانك" className="flex-1 bg-transparent text-xs outline-none" style={{ color: themeConfig.colors.text }} />
+              </div>
+            </div>
+          )}
 
           {/* Note */}
           <div>
-            <h3 className="text-sm font-bold mb-2" style={{ color: themeConfig.colors.text }}>ملاحظات (اختياري)</h3>
-            <textarea
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder="أي ملاحظات خاصة..."
-              className="w-full h-20 p-3 text-sm rounded-xl outline-none border resize-none"
-              style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border, color: themeConfig.colors.text }}
-            />
+            <p className="text-xs font-bold mb-2" style={{ color: themeConfig.colors.text }}>ملاحظات (اختياري)</p>
+            <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="أي ملاحظات خاصة..." rows={2} className="w-full p-3 rounded-xl border text-xs resize-none" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border, color: themeConfig.colors.text }} />
           </div>
+
+          {saveError && (
+            <div className="flex items-center gap-2 p-3 rounded-xl" style={{ backgroundColor: themeConfig.colors.error + '15' }}>
+              <AlertTriangle size={16} style={{ color: themeConfig.colors.error }} />
+              <p className="text-xs" style={{ color: themeConfig.colors.error }}>{saveError}</p>
+            </div>
+          )}
+
+          <button onClick={handleConfirm} disabled={isSaving}
+            className="w-full h-12 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+            style={{ backgroundColor: themeConfig.colors.primary }}>
+            {isSaving ? <><div className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin" /> جاري الحفظ...</> : <>تأكيد الحجز - {totalPrice} دج</>}
+          </button>
         </div>
       )}
-
-      {/* Bottom Action */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 border-t backdrop-blur-lg z-30"
-        style={{ backgroundColor: `${themeConfig.colors.surface}ee`, borderColor: themeConfig.colors.border }}
-      >
-        <div className="max-w-lg mx-auto">
-          {step === 1 && (
-            <button
-              onClick={() => selectedServices.length > 0 && setStep(2)}
-              disabled={selectedServices.length === 0}
-              className="w-full h-12 rounded-xl text-sm font-bold text-white transition-all disabled:opacity-40"
-              style={{ backgroundColor: themeConfig.colors.primary }}
-            >
-              التالي ({selectedServices.length} خدمة - {totalPrice} دج)
-            </button>
-          )}
-          {step === 2 && (
-            <button
-              onClick={() => selectedDate && selectedTime && setStep(3)}
-              disabled={!selectedDate || !selectedTime}
-              className="w-full h-12 rounded-xl text-sm font-bold text-white transition-all disabled:opacity-40"
-              style={{ backgroundColor: themeConfig.colors.primary }}
-            >
-              التالي
-            </button>
-          )}
-          {step === 3 && (
-            <button
-              onClick={handleConfirm}
-              disabled={isSaving}
-              className="w-full h-12 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 transition-all disabled:opacity-60"
-              style={{ backgroundColor: themeConfig.colors.primary }}
-            >
-              {isSaving ? (
-                <>
-                  <div className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: '#fff', borderTopColor: 'transparent' }} />
-                  جاري الحفظ...
-                </>
-              ) : (
-                <>
-                  <Check size={18} />
-                  تأكيد الحجز - {totalPrice} دج
-                </>
-              )}
-            </button>
-          )}
-        </div>
-      </div>
     </motion.div>
   );
 }
