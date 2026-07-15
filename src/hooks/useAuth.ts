@@ -90,7 +90,7 @@ export function useAuth() {
               user_status: 'active' as const,
               verification_status: 'unverified' as const,
             };
-            supabase.from('profiles').insert(newProfile).select().single().then(({ data }) => {
+            Promise.resolve(supabase.from('profiles').insert(newProfile).select().single()).then(({ data }) => {
               if (!mounted) return;
               setState({
                 user: session.user,
@@ -137,7 +137,7 @@ export function useAuth() {
               user_status: 'active' as const,
               verification_status: 'unverified' as const,
             };
-            supabase.from('profiles').insert(newProfile).select().single().then(({ data }) => {
+            Promise.resolve(supabase.from('profiles').insert(newProfile).select().single()).then(({ data }) => {
               if (!mounted) return;
               setState({
                 user: session.user,
