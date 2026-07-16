@@ -364,6 +364,7 @@ export default function RegisterScreen() {
             </button>
           )}
         />
+        <AnimatePresence>{renderFieldError('acceptedTerms')}</AnimatePresence>
 
         {/* Submit */}
         <motion.button
