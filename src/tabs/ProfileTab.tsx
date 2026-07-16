@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { LucideIcon } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useApp } from '@/contexts/useApp';
 import { settingsSections, subscriptionPlans } from '@/data/mockData';
@@ -33,7 +34,7 @@ interface UserBadge {
   color: string;
 }
 
-const iconMap: Record<string, any> = {
+const iconMap: Record<string, LucideIcon> = {
   Shield, BadgeCheck, Settings, Star, Calendar, MapPin, LinkIcon,
   LogOut, Bell, Eye, Palette, Globe, Type, Mail, MessageSquare, Trophy,
   UserPlus, Lock, Smartphone, CreditCard, Wallet, HelpCircle, Phone,
@@ -391,8 +392,7 @@ function PaymentMethods({ onBack }: { onBack: () => void }) {
 
 function IDVerification({ onBack }: { onBack: () => void }) {
   const { themeConfig } = useApp();
-  const { appUser: _appUser } = useAuth();
-  const isIdVerified = false; // Not in profiles table
+  const isIdVerified = false;
 
   return (
     <div className="pb-20">

@@ -48,7 +48,7 @@ export default function PaymentSuccessPage() {
     if (bookingId) {
       window.history.replaceState({}, '', window.location.pathname);
     }
-  }, []);
+  }, [verifyPayment]);
 
   return (
     <motion.div

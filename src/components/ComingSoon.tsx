@@ -52,12 +52,6 @@ export default function ComingSoon({ title, description, eta }: ComingSoonProps)
           <Bell size={16} />
           {notify ? 'تم تفعيل التنبيه' : 'نبهني عند الإطلاق'}
         </button>
-
-        {/* TODO Badge */}
-        <div className="mt-4 px-3 py-1 rounded-lg text-[10px] font-mono"
-          style={{ backgroundColor: themeConfig.colors.textMuted + '10', color: themeConfig.colors.textMuted }}>
-          TODO: Backend integration required
-        </div>
       </div>
     </div>
   );

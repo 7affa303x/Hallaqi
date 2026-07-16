@@ -61,21 +61,7 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [, setActiveSection] = useState<'home' | 'users' | 'bookings' | 'payments' | 'reviews'>('home');
 
-  // Admin guard
-  if (!appUser || appUser.user_role !== 'admin') {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-4" style={{ backgroundColor: themeConfig.colors.background }}>
-        <div className="text-center p-8 rounded-2xl max-w-sm w-full" style={{ backgroundColor: themeConfig.colors.surface }}>
-          <Shield className="w-16 h-16 mx-auto mb-4" style={{ color: themeConfig.colors.error }} />
-          <h2 className="text-xl font-bold mb-2" style={{ color: themeConfig.colors.text }}>غير مصرح</h2>
-          <p className="text-sm mb-6" style={{ color: themeConfig.colors.textMuted }}>ليس لديك صلاحية الوصول إلى لوحة التحكم</p>
-          <button onClick={goBack} className="px-6 py-2 rounded-xl text-white font-medium" style={{ backgroundColor: themeConfig.colors.primary }}>
-            العودة
-          </button>
-        </div>
-      </div>
-    );
-  }
+  const isAdmin = !!appUser && appUser.user_role === 'admin';
 
   const fetchStats = useCallback(async () => {
     try {
@@ -92,14 +78,14 @@ export default function AdminDashboard() {
         supabase.from('profiles').select('*', { count: 'exact', head: true }),
         supabase.from('professionals').select('*', { count: 'exact', head: true }),
         supabase.from('bookings').select('*', { count: 'exact', head: true }),
-        (supabase as any).from('payments').select('*', { count: 'exact', head: true }),
-        (supabase as any).from('payments').select('id').eq('status', 'processing').in('payment_method', ['ccp', 'baridi-mob']),
-        (supabase as any).from('payments').select('id').eq('payment_method', 'stripe'),
+        supabase.from('payments').select('*', { count: 'exact', head: true }),
+        supabase.from('payments').select('id').eq('status', 'processing').in('provider', ['ccp', 'baridi-mob']),
+        supabase.from('payments').select('id').eq('provider', 'stripe'),
         supabase.from('reviews').select('*', { count: 'exact', head: true }).eq('moderation_status', 'pending'),
-        (supabase as any).from('payments').select('amount').eq('status', 'completed'),
+        supabase.from('payments').select('amount').eq('status', 'completed'),
       ]);
 
-      const totalRevenue = (revenueData as any[])?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
+      const totalRevenue = revenueData?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
 
       setStats({
         totalUsers: usersCount || 0,
@@ -142,17 +128,17 @@ export default function AdminDashboard() {
       }
 
       // Recent payments
-      const { data: paymentsData } = await (supabase as any)
+      const { data: paymentsData } = await supabase
         .from('payments')
-        .select('id, amount, payment_method, status, created_at')
+        .select('id, amount, provider, status, created_at')
         .order('created_at', { ascending: false })
         .limit(5);
 
       if (paymentsData) {
-        setRecentPayments((paymentsData as any[]).map(p => ({
+        setRecentPayments(paymentsData.map(p => ({
           id: p.id,
           amount: p.amount || 0,
-          method: p.payment_method || 'unknown',
+          method: p.provider || 'unknown',
           status: p.status || 'pending',
           created_at: p.created_at || new Date().toISOString(),
         })));
@@ -214,13 +200,17 @@ export default function AdminDashboard() {
   }, []);
 
   useEffect(() => {
+    if (!isAdmin) {
+      setLoading(false);
+      return;
+    }
     const loadAll = async () => {
       setLoading(true);
       await Promise.all([fetchStats(), fetchRecentData(), fetchChartData()]);
       setLoading(false);
     };
     loadAll();
-  }, [fetchStats, fetchRecentData, fetchChartData]);
+  }, [isAdmin, fetchStats, fetchRecentData, fetchChartData]);
 
   const formatDate = (dateStr: string) => {
     if (!dateStr) return '';
@@ -252,6 +242,21 @@ export default function AdminDashboard() {
     };
     return labels[role] || role;
   };
+
+  if (!isAdmin) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4" style={{ backgroundColor: themeConfig.colors.background }}>
+        <div className="text-center p-8 rounded-2xl max-w-sm w-full" style={{ backgroundColor: themeConfig.colors.surface }}>
+          <Shield className="w-16 h-16 mx-auto mb-4" style={{ color: themeConfig.colors.error }} />
+          <h2 className="text-xl font-bold mb-2" style={{ color: themeConfig.colors.text }}>غير مصرح</h2>
+          <p className="text-sm mb-6" style={{ color: themeConfig.colors.textMuted }}>ليس لديك صلاحية الوصول إلى لوحة التحكم</p>
+          <button onClick={goBack} className="px-6 py-2 rounded-xl text-white font-medium" style={{ backgroundColor: themeConfig.colors.primary }}>
+            العودة
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (

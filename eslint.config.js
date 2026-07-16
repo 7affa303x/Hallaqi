@@ -21,11 +21,19 @@ export default defineConfig([
     },
     rules: {
       '@typescript-eslint/no-explicit-any': 'error',
-      // Disable experimental React Compiler rules that are too strict
+      '@typescript-eslint/no-unused-vars': ['error', {
+        argsIgnorePattern: '^_',
+        varsIgnorePattern: '^_',
+        caughtErrorsIgnorePattern: '^_',
+      }],
+      // Disable experimental React Compiler rules that are too strict.
+      // `incompatible-library` is a known false positive for react-hook-form's
+      // `watch()`/`setValue()` API, which is intentionally non-memoizable.
       'react-hooks/set-state-in-effect': 'off',
       'react-hooks/purity': 'off',
       'react-hooks/preserve-manual-memoization': 'off',
       'react-hooks/immutability': 'off',
+      'react-hooks/incompatible-library': 'off',
     },
   },
 ]);

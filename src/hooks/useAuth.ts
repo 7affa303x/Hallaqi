@@ -28,6 +28,25 @@ const INITIAL_STATE: AuthState = {
   session: null,
 };
 
+/** Build a complete default client profile for a freshly-authenticated user. */
+function createDefaultProfile(user: User): Profile {
+  return {
+    id: user.id,
+    username: null,
+    full_name: user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0] || 'مستخدم',
+    avatar_url: null,
+    website: null,
+    phone_number: null,
+    address: null,
+    city: null,
+    country: null,
+    user_role: 'client',
+    user_status: 'active',
+    verification_status: 'unverified',
+    updated_at: new Date().toISOString(),
+  };
+}
+
 // Dev mode mock profile aligned with Live DB schema
 const DEV_PROFILE: Profile = {
   id: 'dev-user',
@@ -83,18 +102,12 @@ export function useAuth() {
             });
           } else {
             // Profile doesn't exist - create it
-            const newProfile = {
-              id: session.user.id,
-              full_name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'مستخدم',
-              user_role: 'client' as const,
-              user_status: 'active' as const,
-              verification_status: 'unverified' as const,
-            };
+            const newProfile = createDefaultProfile(session.user);
             Promise.resolve(supabase.from('profiles').insert(newProfile).select().single()).then(({ data }) => {
               if (!mounted) return;
               setState({
                 user: session.user,
-                appUser: data || newProfile as any,
+                appUser: data || newProfile,
                 isLoading: false,
                 isAuthenticated: true,
                 error: null,
@@ -130,18 +143,12 @@ export function useAuth() {
             });
           } else {
             // Profile doesn't exist - create it
-            const newProfile = {
-              id: session.user.id,
-              full_name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'مستخدم',
-              user_role: 'client' as const,
-              user_status: 'active' as const,
-              verification_status: 'unverified' as const,
-            };
+            const newProfile = createDefaultProfile(session.user);
             Promise.resolve(supabase.from('profiles').insert(newProfile).select().single()).then(({ data }) => {
               if (!mounted) return;
               setState({
                 user: session.user,
-                appUser: data || newProfile as any,
+                appUser: data || newProfile,
                 isLoading: false,
                 isAuthenticated: true,
                 error: null,

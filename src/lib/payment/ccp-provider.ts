@@ -39,12 +39,8 @@ const ALLOWED_MIME_TYPES = [
 /** Storage bucket name for payment receipts */
 const RECEIPTS_BUCKET = 'payment-receipts';
 
-/**
- * Helper to access the payments table (not in generated DB types yet).
- * Uses untyped access to avoid TS errors until types are regenerated.
- */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const paymentsTable = () => (supabase as any).from('payments');
+/** Helper to access the typed payments table. */
+const paymentsTable = () => supabase.from('payments');
 
 export interface CCPPaymentParams {
   bookingId: string;
@@ -384,8 +380,7 @@ export class CCPProvider implements PaymentProvider {
 
     if (error || !data) return [];
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (data as any[]).map((d) => {
+    return data.map((d) => {
       const meta = (d.metadata as Record<string, string>) || {};
       return {
         id: d.id,

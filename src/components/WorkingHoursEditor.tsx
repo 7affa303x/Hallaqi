@@ -93,7 +93,7 @@ export default function WorkingHoursEditor({ barberId }: WorkingHoursEditorProps
       }
     };
     if (barberId) fetchSchedule();
-  }, [barberId]);
+  }, [barberId, setFormValue]);
 
   const toggleDay = (dayIndex: number) => {
     const currentActive = watch(`days.${dayIndex}.is_active`);

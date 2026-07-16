@@ -83,7 +83,7 @@ export default function EditBarberProfile({ onBack, userRole: _userRole }: EditB
     } else {
       setIsFetching(false);
     }
-  }, [appUser]);
+  }, [appUser, setValue]);
 
   const loadPortfolioItems = async (proId: string) => {
     try {

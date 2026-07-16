@@ -61,7 +61,7 @@ export default function ServicesManagement({ onBack }: { onBack: () => void }) {
       })
       .catch(() => setError('فشل تحميل الخدمات'))
       .finally(() => setIsLoading(false));
-  }, [appUser?.id]);
+  }, [appUser?.id, setValue]);
 
   const addService = () => {
     append({ name: '', description: '', price: 0, duration: 30, category: 'haircut' });

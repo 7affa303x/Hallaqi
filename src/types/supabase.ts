@@ -601,6 +601,56 @@ export type Database = {
           },
         ]
       }
+      payments: {
+        Row: {
+          amount: number
+          booking_id: string | null
+          created_at: string | null
+          currency: string
+          id: string
+          metadata: Json | null
+          provider: string
+          session_id: string
+          status: string
+          transaction_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          amount?: number
+          booking_id?: string | null
+          created_at?: string | null
+          currency?: string
+          id?: string
+          metadata?: Json | null
+          provider?: string
+          session_id: string
+          status?: string
+          transaction_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          amount?: number
+          booking_id?: string | null
+          created_at?: string | null
+          currency?: string
+          id?: string
+          metadata?: Json | null
+          provider?: string
+          session_id?: string
+          status?: string
+          transaction_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       portfolio_items: {
         Row: {
           caption: string | null

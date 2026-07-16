@@ -5,22 +5,73 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-import type { Barber, WorkingHours, BarberTag, Service } from '@/types';
+import type { Barber, WorkingHours, BarberTag, Service, ServiceCategory } from '@/types';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function transformToBarber(professional: any): Barber {
-  const profile = professional.profiles;
+type SubscriptionPlan = NonNullable<Barber['subscriptionPlan']>;
+
+interface RawService {
+  id?: string | null;
+  name?: string | null;
+  price?: number | null;
+  duration_minutes?: number | null;
+  duration?: number | null;
+  description?: string | null;
+  category?: string | string[] | null;
+  image?: string | null;
+}
+
+type RawPortfolioItem = string | { url?: string | null };
+
+interface RawProfile {
+  full_name?: string | null;
+  avatar_url?: string | null;
+  city?: string | null;
+  phone_number?: string | null;
+  verification_status?: string | null;
+}
+
+/** Loosely-typed professional row joined with related profile/services/portfolio data. */
+export interface RawProfessional {
+  id: string;
+  business_name?: string | null;
+  cover_image_url?: string | null;
+  average_rating?: number | null;
+  review_count?: number | null;
+  business_address?: string | null;
+  business_phone?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  is_active?: boolean | null;
+  verification_status?: string | null;
+  is_mobile?: boolean | null;
+  uses_scissors?: boolean | null;
+  years_of_experience?: number | null;
+  bio?: string | null;
+  has_id_card?: boolean | null;
+  id_card_verified?: boolean | null;
+  is_subscribed?: boolean | null;
+  subscription_plan?: string | null;
+  followers_count?: number | null;
+  following_count?: number | null;
+  likes_count?: number | null;
+  profiles?: RawProfile | RawProfile[] | null;
+  services?: RawService[] | null;
+  portfolio_items?: RawPortfolioItem[] | null;
+}
+
+export function transformToBarber(professional: RawProfessional): Barber {
+  const profile = (Array.isArray(professional.profiles) ? professional.profiles[0] : professional.profiles) ?? undefined;
   const rawServices = professional.services || [];
   const portfolio = professional.portfolio_items || [];
 
   // Map raw DB services to app Service type
-  const services: Service[] = rawServices.map((s: any) => ({
+  const services: Service[] = rawServices.map((s: RawService) => ({
     id: s.id || '',
     name: s.name || '',
     price: s.price || 0,
     duration: s.duration_minutes || s.duration || 30,
     description: s.description || undefined,
-    category: s.category || 'haircut',
+    category: (typeof s.category === 'string' ? s.category : 'haircut') as ServiceCategory,
     image: s.image || undefined,
   }));
 
@@ -76,12 +127,12 @@ export function transformToBarber(professional: any): Barber {
     usesScissors: professional.uses_scissors || false,
     yearsOfExperience: professional.years_of_experience || 0,
     bio: professional.bio || 'No bio provided.',
-    portfolio: portfolio.map((item: any) => item.url || item),
+    portfolio: portfolio.map((item: RawPortfolioItem) => (typeof item === 'string' ? item : item.url || '')).filter(Boolean),
     phone: professional.business_phone || profile?.phone_number || undefined,
     hasIdCard: professional.has_id_card || false,
     idCardVerified: professional.id_card_verified || false,
     isSubscribed: professional.is_subscribed || false,
-    subscriptionPlan: professional.subscription_plan || undefined,
+    subscriptionPlan: (professional.subscription_plan as SubscriptionPlan | null) || undefined,
     followers: professional.followers_count || 0,
     following: professional.following_count || 0,
     likes: professional.likes_count || 0,

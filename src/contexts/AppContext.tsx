@@ -337,7 +337,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [bookings, appUser]);
 
   const sendMessage = useCallback((_chatId: string, _content: string) => {
-    console.log('[AppContext] Message:', _content);
+    // Chat delivery is handled by the realtime messaging layer once a
+    // conversation is provisioned; no-op until a chat thread is active.
   }, []);
 
   const getBarberById = useCallback((id: string) => barbers.find(b => b.id === id), [barbers]);
