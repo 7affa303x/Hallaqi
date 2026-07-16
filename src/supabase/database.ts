@@ -712,6 +712,31 @@ export async function createSubscriptionRequest(userId: string, planId: string) 
   return data;
 }
 
+export async function getLoyaltyDashboard(userId: string) {
+  guard();
+  const [account, transactions, rewards, redemptions] = await Promise.all([
+    supabase.from('loyalty_accounts').select('*').eq('user_id', userId).maybeSingle(),
+    supabase.from('loyalty_transactions').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(20),
+    supabase.from('loyalty_rewards').select('*').eq('is_active', true).order('points_cost'),
+    supabase.from('loyalty_redemptions').select('*, loyalty_rewards(*)').eq('user_id', userId).order('created_at', { ascending: false }),
+  ]);
+  const error = [account, transactions, rewards, redemptions].find(result => result.error)?.error;
+  if (error) throw new Error(error.message);
+  return {
+    account: account.data,
+    transactions: transactions.data || [],
+    rewards: rewards.data || [],
+    redemptions: redemptions.data || [],
+  };
+}
+
+export async function redeemLoyaltyReward(rewardId: string): Promise<string> {
+  guard();
+  const { data, error } = await supabase.rpc('redeem_loyalty_reward', { reward: rewardId });
+  if (error) throw new Error(error.message);
+  return data;
+}
+
 /* ========== FORUM ========== */
 
 export async function getForumCategories(): Promise<ForumCategory[]> {

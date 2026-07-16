@@ -584,6 +584,152 @@ export type Database = {
           },
         ]
       }
+      loyalty_accounts: {
+        Row: {
+          lifetime_points: number
+          points: number
+          tier: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          lifetime_points?: number
+          points?: number
+          tier?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          lifetime_points?: number
+          points?: number
+          tier?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "loyalty_accounts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      loyalty_redemptions: {
+        Row: {
+          created_at: string
+          expires_at: string
+          id: string
+          reward_id: string
+          status: string
+          user_id: string
+          voucher_code: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          reward_id: string
+          status?: string
+          user_id: string
+          voucher_code?: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          reward_id?: string
+          status?: string
+          user_id?: string
+          voucher_code?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "loyalty_redemptions_reward_id_fkey"
+            columns: ["reward_id"]
+            isOneToOne: false
+            referencedRelation: "loyalty_rewards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "loyalty_redemptions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      loyalty_rewards: {
+        Row: {
+          discount_percent: number
+          id: string
+          is_active: boolean
+          points_cost: number
+          title_ar: string
+        }
+        Insert: {
+          discount_percent: number
+          id: string
+          is_active?: boolean
+          points_cost: number
+          title_ar: string
+        }
+        Update: {
+          discount_percent?: number
+          id?: string
+          is_active?: boolean
+          points_cost?: number
+          title_ar?: string
+        }
+        Relationships: []
+      }
+      loyalty_transactions: {
+        Row: {
+          booking_id: string | null
+          created_at: string
+          description: string
+          id: string
+          points_delta: number
+          type: string
+          user_id: string
+        }
+        Insert: {
+          booking_id?: string | null
+          created_at?: string
+          description: string
+          id?: string
+          points_delta: number
+          type: string
+          user_id: string
+        }
+        Update: {
+          booking_id?: string | null
+          created_at?: string
+          description?: string
+          id?: string
+          points_delta?: number
+          type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "loyalty_transactions_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "loyalty_transactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       messages: {
         Row: {
           content: string
@@ -1212,10 +1358,12 @@ export type Database = {
         Returns: string
       }
       is_admin: { Args: never; Returns: boolean }
+      loyalty_tier: { Args: { total_points: number }; Returns: string }
       mark_conversation_messages_as_read: {
         Args: { p_conversation_id: string; p_user_id: string }
         Returns: undefined
       }
+      redeem_loyalty_reward: { Args: { reward: string }; Returns: string }
       review_id_verification: {
         Args: { approve: boolean; reason?: string; request_id: string }
         Returns: undefined

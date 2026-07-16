@@ -24,3 +24,7 @@ export type IdVerificationRequest = Database['public']['Tables']['id_verificatio
 export type ProfessionalReport = Database['public']['Tables']['professional_reports']['Row'];
 export type SubscriptionPlan = Database['public']['Tables']['subscription_plans']['Row'];
 export type SubscriptionRequest = Database['public']['Tables']['subscription_requests']['Row'];
+export type LoyaltyAccount = Database['public']['Tables']['loyalty_accounts']['Row'];
+export type LoyaltyTransaction = Database['public']['Tables']['loyalty_transactions']['Row'];
+export type LoyaltyReward = Database['public']['Tables']['loyalty_rewards']['Row'];
+export type LoyaltyRedemption = Database['public']['Tables']['loyalty_redemptions']['Row'];

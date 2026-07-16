@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useApp } from '@/contexts/useApp';
@@ -14,7 +14,7 @@ import {
   Phone, Bug, Lightbulb, Info, FileText, FileCode,
   Trash2, Download, AlertTriangle, Check, X, Sparkles,
   Scissors, Clock, TrendingUp, Award, Zap, Crown as CrownIcon,
-  ArrowLeft, LogIn, UserPlus as UserPlusIcon
+  ArrowLeft, LogIn, UserPlus as UserPlusIcon, Gift
 } from 'lucide-react';
 import EditBarberProfile from '@/components/EditBarberProfile';
 import ServicesManagement from '@/components/ServicesManagement';
@@ -26,6 +26,8 @@ import {
   createSubscriptionRequest,
   deleteCurrentAccount,
   exportUserData,
+  getLoyaltyDashboard,
+  redeemLoyaltyReward,
 } from '@/supabase/database';
 import { uploadIdCard } from '@/supabase/storage';
 import type { SubscriptionPlan } from '@/types/supabase-aliases';
@@ -50,13 +52,13 @@ const iconMap: Record<string, LucideIcon> = {
   LogOut, Bell, Eye, Palette, Globe, Type, Mail, MessageSquare, Trophy,
   UserPlus, Lock, Smartphone, CreditCard, Wallet, HelpCircle, Phone,
   Bug, Lightbulb, Info, FileText, FileCode, Trash2, Download, AlertTriangle,
-  Check, X, Sparkles, Scissors, Clock, TrendingUp, Award, Zap,
+  Check, X, Sparkles, Scissors, Clock, TrendingUp, Award, Zap, Gift,
   Crown: CrownIcon,
 };
 
 type ProfileSubPage = 'main' | 'theme' | 'animation' | 'language' | 'notifications' |
   'privacy' | 'account' | 'subscription' | 'payment' | 'id-verification' |
-  'linked-accounts' | 'help' | 'about' | 'badges' | 'stats' | 'edit-profile' | 'services';
+  'linked-accounts' | 'help' | 'about' | 'badges' | 'stats' | 'edit-profile' | 'services' | 'loyalty';
 
 export default function ProfileTab() {
   const { themeConfig, navigate, unreadCount } = useApp();
@@ -121,6 +123,7 @@ export default function ProfileTab() {
   if (subPage === 'stats') return <StatsPage onBack={() => setSubPage('main')} />;
   if (subPage === 'help') return <InformationPage onBack={() => setSubPage('main')} kind="help" />;
   if (subPage === 'about') return <InformationPage onBack={() => setSubPage('main')} kind="about" />;
+  if (subPage === 'loyalty') return <LoyaltyPage onBack={() => setSubPage('main')} />;
   if (subPage === 'edit-profile') return <EditBarberProfile onBack={() => setSubPage('main')} userRole={userRole} />;
   if (subPage === 'services') return <ServicesManagement onBack={() => setSubPage('main')} />;
 
@@ -200,6 +203,24 @@ export default function ProfileTab() {
         </div>
       )}
 
+      <div className="px-4 mt-4">
+        <button
+          type="button"
+          onClick={() => setSubPage('loyalty')}
+          className="w-full flex items-center gap-3 p-4 rounded-2xl border text-right"
+          style={{ backgroundColor: themeConfig.colors.accent + '0D', borderColor: themeConfig.colors.accent + '40' }}
+        >
+          <div className="w-11 h-11 rounded-xl flex items-center justify-center" style={{ backgroundColor: themeConfig.colors.accent + '18' }}>
+            <Gift size={21} style={{ color: themeConfig.colors.accent }} />
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-bold" style={{ color: themeConfig.colors.text }}>برنامج ولاء حلاقي</p>
+            <p className="text-[11px]" style={{ color: themeConfig.colors.textMuted }}>اكسب نقاطاً من الحجوزات واستبدلها بمكافآت</p>
+          </div>
+          <ChevronLeft size={17} style={{ color: themeConfig.colors.textMuted }} />
+        </button>
+      </div>
+
       {actionError && (
         <p role="alert" className="mx-4 mt-4 p-3 rounded-xl text-xs" style={{ backgroundColor: themeConfig.colors.error + '10', color: themeConfig.colors.error }}>
           {actionError}
@@ -278,6 +299,96 @@ export default function ProfileTab() {
 }
 
 // ====== SUB PAGE COMPONENTS ======
+
+type LoyaltyData = Awaited<ReturnType<typeof getLoyaltyDashboard>>;
+
+function LoyaltyPage({ onBack }: { onBack: () => void }) {
+  const { themeConfig } = useApp();
+  const { appUser } = useAuth();
+  const [data, setData] = useState<LoyaltyData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [busyReward, setBusyReward] = useState('');
+  const [error, setError] = useState('');
+
+  const load = useCallback(async () => {
+    if (!appUser) return;
+    setLoading(true);
+    try {
+      setData(await getLoyaltyDashboard(appUser.id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'تعذر تحميل نقاط الولاء');
+    } finally {
+      setLoading(false);
+    }
+  }, [appUser]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const redeem = async (rewardId: string) => {
+    setBusyReward(rewardId);
+    setError('');
+    try {
+      await redeemLoyaltyReward(rewardId);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error && err.message.includes('Insufficient')
+        ? 'نقاطك غير كافية لهذه المكافأة'
+        : err instanceof Error ? err.message : 'تعذر استبدال المكافأة');
+    } finally {
+      setBusyReward('');
+    }
+  };
+
+  const points = data?.account?.points || 0;
+  const tier = data?.account?.tier || 'bronze';
+  const tierLabel: Record<string, string> = {
+    bronze: 'برونزي', silver: 'فضي', gold: 'ذهبي', platinum: 'بلاتيني',
+  };
+
+  return (
+    <div className="pb-20">
+      <div className="sticky top-0 z-30 flex items-center gap-3 px-4 py-3 border-b" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
+        <button onClick={onBack} aria-label="رجوع" className="w-9 h-9 rounded-xl flex items-center justify-center"><ArrowLeft size={20} style={{ color: themeConfig.colors.text }} /></button>
+        <h2 className="text-base font-bold" style={{ color: themeConfig.colors.text }}>برنامج الولاء</h2>
+      </div>
+      <div className="p-4 space-y-4">
+        <div className="rounded-3xl p-5 text-white" style={{ background: `linear-gradient(135deg, ${themeConfig.colors.primary}, ${themeConfig.colors.accent})` }}>
+          <div className="flex items-center justify-between">
+            <div><p className="text-xs text-white/70">رصيدك</p><p className="text-3xl font-black mt-1">{loading ? '—' : points}</p><p className="text-xs text-white/80">نقطة</p></div>
+            <div className="text-center"><Gift size={34} className="mx-auto" /><p className="text-xs font-bold mt-1">{tierLabel[tier]}</p></div>
+          </div>
+          <p className="text-[11px] mt-4 text-white/80">تحصل على نقطة واحدة على الأقل لكل حجز مكتمل، وتزداد النقاط حسب قيمة الخدمة.</p>
+        </div>
+
+        <div>
+          <h3 className="text-sm font-bold mb-2" style={{ color: themeConfig.colors.text }}>المكافآت</h3>
+          <div className="space-y-2">
+            {(data?.rewards || []).map(reward => (
+              <div key={reward.id} className="p-3 rounded-2xl border flex items-center gap-3" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: themeConfig.colors.accent + '15' }}><Gift size={18} style={{ color: themeConfig.colors.accent }} /></div>
+                <div className="flex-1"><p className="text-xs font-bold" style={{ color: themeConfig.colors.text }}>{reward.title_ar}</p><p className="text-[10px]" style={{ color: themeConfig.colors.textMuted }}>{reward.points_cost} نقطة</p></div>
+                <button type="button" disabled={points < reward.points_cost || busyReward === reward.id} onClick={() => void redeem(reward.id)} className="px-3 h-8 rounded-lg text-[11px] font-bold text-white disabled:opacity-40" style={{ backgroundColor: themeConfig.colors.primary }}>استبدال</button>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {(data?.redemptions || []).length > 0 && (
+          <div>
+            <h3 className="text-sm font-bold mb-2" style={{ color: themeConfig.colors.text }}>قسائمك</h3>
+            {data?.redemptions.map(redemption => (
+              <div key={redemption.id} className="p-3 rounded-xl border mb-2" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
+                <p className="font-mono text-sm font-bold" style={{ color: themeConfig.colors.primary }}>{redemption.voucher_code}</p>
+                <p className="text-[10px]" style={{ color: themeConfig.colors.textMuted }}>صالح حتى {new Date(redemption.expires_at).toLocaleDateString('ar-DZ')}</p>
+              </div>
+            ))}
+          </div>
+        )}
+        {error && <p role="alert" className="text-xs p-3 rounded-xl" style={{ color: themeConfig.colors.error, backgroundColor: themeConfig.colors.error + '10' }}>{error}</p>}
+      </div>
+    </div>
+  );
+}
 
 function InformationPage({ onBack, kind }: { onBack: () => void; kind: 'help' | 'about' }) {
   const { themeConfig } = useApp();
