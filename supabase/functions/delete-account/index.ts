@@ -26,6 +26,34 @@ Deno.serve(async (req) => {
   const { data: { user }, error: authError } = await authClient.auth.getUser(token)
   if (authError || !user) return json({ error: 'Invalid session' }, 401)
 
+  const buckets = [
+    'avatars',
+    'covers',
+    'portfolio',
+    'forum-images',
+    'review-images',
+    'id-cards',
+    'payment-receipts',
+  ]
+  for (const bucket of buckets) {
+    const { data: files, error: listError } = await adminClient.storage
+      .from(bucket)
+      .list(user.id, { limit: 1000 })
+    if (listError) {
+      console.error(`Unable to list ${bucket} during account deletion`, listError)
+      return json({ error: 'Unable to remove account files' }, 500)
+    }
+    if (files && files.length > 0) {
+      const { error: removeError } = await adminClient.storage
+        .from(bucket)
+        .remove(files.map(file => `${user.id}/${file.name}`))
+      if (removeError) {
+        console.error(`Unable to clear ${bucket} during account deletion`, removeError)
+        return json({ error: 'Unable to remove account files' }, 500)
+      }
+    }
+  }
+
   const { error } = await adminClient.auth.admin.deleteUser(user.id)
   if (error) {
     console.error('delete-account failed', error)
