@@ -8,6 +8,9 @@
 - **Online Booking** — Book appointments with real-time availability
 - **Forum** — Community discussions, tips, and competitions
 - **QR Code** — Generate and scan barber QR codes
+- **Smart Matching** — Explainable barber recommendations and optimized appointment times
+- **Loyalty** — Booking points, tiers, rewards, and redemption vouchers
+- **AI Advisor** — Secure AI Gateway-ready grooming and hairstyle assistance
 - **Authentication** — Email/password and Google OAuth via Supabase Auth
 - **Real-time** — Live notifications and chat
 - **Arabic Interface** — Full RTL Arabic support
@@ -22,6 +25,8 @@
 | Animation | Framer Motion |
 | State | Zustand + React Context |
 | Backend | Supabase (Auth, Database, Storage, Realtime) |
+| Intelligence | Deterministic ranking + Vercel AI SDK / AI Gateway |
+| Observability | Vercel Web Analytics + Speed Insights |
 | Icons | Lucide React |
 
 ## Quick Start

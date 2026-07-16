@@ -22,6 +22,13 @@
   optimization, lazy tab loading, Vitest, and npm-only dependency management
 - Verified the official Supabase project `cdwzbtjwqybnahhbhldy`
 
+### Autonomous Product Evolution
+- Added explainable, deterministic professional recommendations
+- Added personalized time-slot optimization from booking history
+- Added authenticated Vercel AI Gateway endpoints and safe disabled capability UI
+- Added loyalty points, tiers, reward vouchers, and redemption controls
+- Added Vercel Web Analytics and Speed Insights
+
 ---
 
 ## v11.0.0 — Production Foundation
