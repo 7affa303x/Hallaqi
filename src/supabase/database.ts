@@ -656,3 +656,92 @@ export function subscribeToMessages(conversationId: string, callback: (messages:
     () => { getConversationMessages(conversationId).then(callback); }
   ).subscribe();
 }
+
+/* ========== ADMIN (requires admin RLS / is_admin()) ========== */
+type UserRole = Database['public']['Enums']['user_role'];
+type UserStatus = Database['public']['Enums']['user_status'];
+
+export interface AdminUserRow {
+  id: string;
+  full_name: string | null;
+  user_role: string | null;
+  user_status: string | null;
+  city: string | null;
+  updated_at: string | null;
+}
+
+export async function adminListProfiles(limit = 100): Promise<AdminUserRow[]> {
+  guard();
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, full_name, user_role, user_status, city, updated_at')
+    .order('updated_at', { ascending: false })
+    .limit(limit);
+  if (error) throw new Error(error.message);
+  return (data || []) as AdminUserRow[];
+}
+
+export async function adminUpdateUserRole(userId: string, role: string) {
+  guard();
+  const { error } = await supabase
+    .from('profiles')
+    .update({ user_role: role as unknown as UserRole, updated_at: new Date().toISOString() })
+    .eq('id', userId);
+  if (error) throw new Error(error.message);
+}
+
+export async function adminUpdateUserStatus(userId: string, status: string) {
+  guard();
+  const { error } = await supabase
+    .from('profiles')
+    .update({ user_status: status as unknown as UserStatus, updated_at: new Date().toISOString() })
+    .eq('id', userId);
+  if (error) throw new Error(error.message);
+}
+
+export interface AdminReviewRow {
+  id: string;
+  rating: number | null;
+  comment: string | null;
+  moderation_status: string | null;
+  created_at: string | null;
+  professional_id: string | null;
+}
+
+export async function adminListPendingReviews(): Promise<AdminReviewRow[]> {
+  guard();
+  const { data, error } = await supabase
+    .from('reviews')
+    .select('id, rating, comment, moderation_status, created_at, professional_id')
+    .eq('moderation_status', 'pending')
+    .order('created_at', { ascending: false })
+    .limit(50);
+  if (error) throw new Error(error.message);
+  return (data || []) as AdminReviewRow[];
+}
+
+export async function adminModerateReview(reviewId: string, approved: boolean) {
+  guard();
+  const status = approved ? 'approved' : 'rejected';
+  const { error } = await supabase
+    .from('reviews')
+    .update({
+      moderation_status: status as unknown as Database['public']['Enums']['moderation_status'],
+      is_public: approved,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', reviewId);
+  if (error) throw new Error(error.message);
+}
+
+export async function adminListPendingPayments() {
+  guard();
+  const { data, error } = await supabase
+    .from('payments')
+    .select('*')
+    .eq('status', 'processing')
+    .order('created_at', { ascending: false })
+    .limit(50);
+  if (error) throw new Error(error.message);
+  return data || [];
+}

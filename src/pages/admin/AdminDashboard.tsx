@@ -2,8 +2,14 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useApp } from '@/contexts/useApp';
 import { supabase } from '@/supabase/client';
+import {
+  adminListProfiles, adminUpdateUserRole, adminUpdateUserStatus,
+  adminListPendingReviews, adminModerateReview, adminListPendingPayments,
+  type AdminUserRow, type AdminReviewRow,
+} from '@/supabase/database';
+import { ccpProvider } from '@/lib/payment/ccp-provider';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
-import { Users, Scissors, Calendar, CreditCard, Clock, Star, DollarSign, TrendingUp, ChevronRight, Shield } from 'lucide-react';
+import { Users, Scissors, Calendar, CreditCard, Clock, Star, DollarSign, TrendingUp, ChevronRight, Shield, Check, X, ArrowRight } from 'lucide-react';
 
 interface DashboardStats {
   totalUsers: number;
@@ -59,7 +65,7 @@ export default function AdminDashboard() {
   const [recentUsers, setRecentUsers] = useState<RecentUser[]>([]);
   const [chartData, setChartData] = useState<ChartData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [, setActiveSection] = useState<'home' | 'users' | 'bookings' | 'payments' | 'reviews'>('home');
+  const [activeSection, setActiveSection] = useState<'home' | 'users' | 'bookings' | 'payments' | 'reviews'>('home');
 
   const isAdmin = !!appUser && appUser.user_role === 'admin';
 
@@ -269,6 +275,10 @@ export default function AdminDashboard() {
     );
   }
 
+  if (activeSection !== 'home' && appUser) {
+    return <AdminSection section={activeSection} adminId={appUser.id} onBack={() => setActiveSection('home')} />;
+  }
+
   const statCards = [
     { label: 'إجمالي المستخدمين', value: stats.totalUsers, icon: Users, color: '#3b82f6' },
     { label: 'المحترفين', value: stats.totalProfessionals, icon: Scissors, color: '#8b5cf6' },
@@ -422,6 +432,140 @@ export default function AdminDashboard() {
             )}
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/* ================= ADMIN MANAGEMENT SECTIONS (I2 / I3 / H3) ================= */
+const ROLE_OPTIONS = ['client', 'barber', 'specialist', 'moderator', 'admin'];
+const ROLE_LABELS: Record<string, string> = { client: 'عميل', barber: 'حلاق', specialist: 'متخصص', moderator: 'مشرف محتوى', admin: 'مدير' };
+
+interface PendingPaymentRow {
+  id: string;
+  amount: number | null;
+  provider: string | null;
+  created_at: string | null;
+  metadata: unknown;
+}
+
+function AdminSection({ section, adminId, onBack }: { section: 'users' | 'bookings' | 'payments' | 'reviews'; adminId: string; onBack: () => void }) {
+  const { themeConfig } = useApp();
+  const [users, setUsers] = useState<AdminUserRow[]>([]);
+  const [reviews, setReviews] = useState<AdminReviewRow[]>([]);
+  const [payments, setPayments] = useState<PendingPaymentRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      if (section === 'users') setUsers(await adminListProfiles());
+      else if (section === 'reviews') setReviews(await adminListPendingReviews());
+      else if (section === 'payments') setPayments((await adminListPendingPayments()) as unknown as PendingPaymentRow[]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'فشل التحميل');
+    } finally {
+      setLoading(false);
+    }
+  }, [section]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const titles: Record<string, string> = { users: 'إدارة المستخدمين', bookings: 'إدارة الحجوزات', payments: 'مراجعة المدفوعات', reviews: 'إدارة المراجعات' };
+
+  const changeRole = async (u: AdminUserRow, role: string) => {
+    setBusyId(u.id);
+    try { await adminUpdateUserRole(u.id, role); await load(); } catch (err) { setError(err instanceof Error ? err.message : 'فشل'); } finally { setBusyId(null); }
+  };
+  const toggleStatus = async (u: AdminUserRow) => {
+    setBusyId(u.id);
+    const next = u.user_status === 'suspended' ? 'active' : 'suspended';
+    try { await adminUpdateUserStatus(u.id, next); await load(); } catch (err) { setError(err instanceof Error ? err.message : 'فشل'); } finally { setBusyId(null); }
+  };
+  const moderate = async (r: AdminReviewRow, approved: boolean) => {
+    setBusyId(r.id);
+    try { await adminModerateReview(r.id, approved); await load(); } catch (err) { setError(err instanceof Error ? err.message : 'فشل'); } finally { setBusyId(null); }
+  };
+  const decidePayment = async (p: PendingPaymentRow, approve: boolean) => {
+    setBusyId(p.id);
+    try {
+      if (approve) await ccpProvider.approvePayment(p.id, adminId);
+      else await ccpProvider.rejectPayment(p.id, adminId, 'مرفوض من الإدارة');
+      await load();
+    } catch (err) { setError(err instanceof Error ? err.message : 'فشل'); } finally { setBusyId(null); }
+  };
+
+  return (
+    <div className="min-h-screen pb-6" style={{ backgroundColor: themeConfig.colors.background }}>
+      <div className="sticky top-0 z-50 px-4 py-3 flex items-center gap-3" style={{ backgroundColor: themeConfig.colors.surface, borderBottom: `1px solid ${themeConfig.colors.border}` }}>
+        <button onClick={onBack} className="p-2 rounded-xl" style={{ backgroundColor: themeConfig.colors.background }}>
+          <ArrowRight className="w-5 h-5" style={{ color: themeConfig.colors.text }} />
+        </button>
+        <h1 className="text-lg font-bold" style={{ color: themeConfig.colors.text }}>{titles[section]}</h1>
+      </div>
+
+      <div className="px-4 pt-4 space-y-3">
+        {error && <p className="text-xs p-2 rounded-lg" style={{ backgroundColor: themeConfig.colors.error + '15', color: themeConfig.colors.error }}>{error}</p>}
+        {loading && <p className="text-sm text-center py-6" style={{ color: themeConfig.colors.textMuted }}>جاري التحميل...</p>}
+
+        {!loading && section === 'users' && users.map(u => (
+          <div key={u.id} className="p-3 rounded-xl" style={{ backgroundColor: themeConfig.colors.surface, border: `1px solid ${themeConfig.colors.border}` }}>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm font-medium" style={{ color: themeConfig.colors.text }}>{u.full_name || 'مستخدم'}</p>
+              <button disabled={busyId === u.id} onClick={() => toggleStatus(u)} className="text-[11px] px-2 py-1 rounded-lg font-medium disabled:opacity-50"
+                style={{ backgroundColor: (u.user_status === 'suspended' ? themeConfig.colors.success : themeConfig.colors.error) + '15', color: u.user_status === 'suspended' ? themeConfig.colors.success : themeConfig.colors.error }}>
+                {u.user_status === 'suspended' ? 'تفعيل' : 'تعليق'}
+              </button>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px]" style={{ color: themeConfig.colors.textMuted }}>{u.city || '—'} · {u.user_status}</span>
+              <select value={u.user_role || 'client'} disabled={busyId === u.id} onChange={e => changeRole(u, e.target.value)}
+                className="mr-auto text-[11px] px-2 py-1 rounded-lg border bg-transparent" style={{ borderColor: themeConfig.colors.border, color: themeConfig.colors.text }}>
+                {ROLE_OPTIONS.map(r => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
+              </select>
+            </div>
+          </div>
+        ))}
+
+        {!loading && section === 'reviews' && (reviews.length === 0
+          ? <p className="text-sm text-center py-6" style={{ color: themeConfig.colors.textMuted }}>لا توجد مراجعات معلقة</p>
+          : reviews.map(r => (
+            <div key={r.id} className="p-3 rounded-xl" style={{ backgroundColor: themeConfig.colors.surface, border: `1px solid ${themeConfig.colors.border}` }}>
+              <div className="flex items-center gap-1 mb-1">
+                {Array.from({ length: 5 }).map((_, i) => <Star key={i} size={12} className={i < (r.rating || 0) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'} />)}
+              </div>
+              <p className="text-xs mb-2" style={{ color: themeConfig.colors.text }}>{r.comment || 'بدون تعليق'}</p>
+              <div className="flex gap-2">
+                <button disabled={busyId === r.id} onClick={() => moderate(r, true)} className="flex-1 flex items-center justify-center gap-1 h-8 rounded-lg text-xs font-bold disabled:opacity-50" style={{ backgroundColor: themeConfig.colors.success + '15', color: themeConfig.colors.success }}><Check size={13} /> نشر</button>
+                <button disabled={busyId === r.id} onClick={() => moderate(r, false)} className="flex-1 flex items-center justify-center gap-1 h-8 rounded-lg text-xs font-bold disabled:opacity-50" style={{ backgroundColor: themeConfig.colors.error + '15', color: themeConfig.colors.error }}><X size={13} /> رفض</button>
+              </div>
+            </div>
+          )))}
+
+        {!loading && section === 'payments' && (payments.length === 0
+          ? <p className="text-sm text-center py-6" style={{ color: themeConfig.colors.textMuted }}>لا توجد مدفوعات بانتظار المراجعة</p>
+          : payments.map(p => {
+            const meta = (p.metadata as Record<string, string>) || {};
+            return (
+              <div key={p.id} className="p-3 rounded-xl" style={{ backgroundColor: themeConfig.colors.surface, border: `1px solid ${themeConfig.colors.border}` }}>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm font-bold" style={{ color: themeConfig.colors.text }}>{p.amount ?? 0} دج · {p.provider}</p>
+                  {meta.receipt_url && <a href={meta.receipt_url} target="_blank" rel="noreferrer" className="text-[11px] underline" style={{ color: themeConfig.colors.primary }}>عرض الإيصال</a>}
+                </div>
+                <div className="flex gap-2">
+                  <button disabled={busyId === p.id} onClick={() => decidePayment(p, true)} className="flex-1 flex items-center justify-center gap-1 h-8 rounded-lg text-xs font-bold disabled:opacity-50" style={{ backgroundColor: themeConfig.colors.success + '15', color: themeConfig.colors.success }}><Check size={13} /> قبول الدفع</button>
+                  <button disabled={busyId === p.id} onClick={() => decidePayment(p, false)} className="flex-1 flex items-center justify-center gap-1 h-8 rounded-lg text-xs font-bold disabled:opacity-50" style={{ backgroundColor: themeConfig.colors.error + '15', color: themeConfig.colors.error }}><X size={13} /> رفض</button>
+                </div>
+              </div>
+            );
+          }))}
+
+        {!loading && section === 'bookings' && (
+          <p className="text-sm text-center py-6" style={{ color: themeConfig.colors.textMuted }}>تُدار الحجوزات من طرف الحلاقين من تبويب المواعيد.</p>
+        )}
       </div>
     </div>
   );
