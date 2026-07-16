@@ -4,7 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { motion } from 'framer-motion';
 import {
   ArrowLeft, Check, Clock, MapPin, Car, CreditCard,
-  Wallet, Banknote, Calendar, X, AlertTriangle
+  Wallet, Banknote, Calendar, X, AlertTriangle, Sparkles
 } from 'lucide-react';
 import {
   createBooking,
@@ -22,6 +22,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { bookingStep3Schema } from '@/lib/validation';
 import type { BookingStep3FormData } from '@/lib/validation';
+import { preferredBookingHour, rankAvailableSlots } from '@/lib/scheduling';
 
 const ALL_TIME_SLOTS = [
   '08:00', '08:30', '09:00', '09:30', '10:00', '10:30',
@@ -93,7 +94,7 @@ const generateDates = () => {
 };
 
 export default function BookingFlowPage() {
-  const { themeConfig, screenParams, barbers, addBooking, navigate, goBack, refreshData } = useApp();
+  const { themeConfig, screenParams, barbers, bookings: userBookings, addBooking, navigate, goBack, refreshData } = useApp();
   const { appUser } = useAuth();
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
@@ -231,6 +232,16 @@ export default function BookingFlowPage() {
     if (!selectedDate) return ALL_TIME_SLOTS;
     return getAvailableTimeSlots(selectedDate);
   }, [selectedDate, getAvailableTimeSlots]);
+  const preferredHour = useMemo(
+    () => preferredBookingHour(userBookings.map(booking => booking.time)),
+    [userBookings]
+  );
+  const optimizedSlots = useMemo(
+    () => selectedDate
+      ? rankAvailableSlots(timeSlots, selectedDate, existingBookings, preferredHour).slice(0, 3)
+      : [],
+    [existingBookings, preferredHour, selectedDate, timeSlots]
+  );
 
   if (!barber) {
     return (
@@ -613,6 +624,33 @@ export default function BookingFlowPage() {
               {isLoadingSlots ? (
                 <div className="flex items-center justify-center py-8"><div className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: themeConfig.colors.primary }} /></div>
               ) : (
+                <>
+                {optimizedSlots.length > 0 && (
+                  <div className="mb-4">
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <Sparkles size={14} style={{ color: themeConfig.colors.accent }} />
+                      <p className="text-[11px] font-bold" style={{ color: themeConfig.colors.text }}>أفضل الأوقات لك</p>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      {optimizedSlots.map(slot => (
+                        <button
+                          key={`optimized-${slot.time}`}
+                          type="button"
+                          onClick={() => setSelectedTime(slot.time)}
+                          className="rounded-xl border p-2 text-center"
+                          style={{
+                            backgroundColor: selectedTime === slot.time ? themeConfig.colors.accent : themeConfig.colors.accent + '10',
+                            borderColor: themeConfig.colors.accent,
+                            color: selectedTime === slot.time ? '#fff' : themeConfig.colors.text,
+                          }}
+                        >
+                          <span className="text-xs font-bold block">{slot.time}</span>
+                          <span className="text-[8px] block mt-1 truncate">{slot.reasons[0] || 'موعد مناسب'}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <div className="grid grid-cols-3 gap-2">
                   {timeSlots.map(slot => {
                     const isSelected = selectedTime === slot;
@@ -625,6 +663,7 @@ export default function BookingFlowPage() {
                     );
                   })}
                 </div>
+                </>
               )}
             </div>
           )}

@@ -5,11 +5,12 @@ import { barberTags, serviceCategories } from '@/data/mockData';
 import { SkeletonBarberCard } from '@/components/Skeleton';
 import EmptyState from '@/components/EmptyState';
 import { motion } from 'framer-motion';
-import type { BarberTag } from '@/types';
+import type { BarberTag, ServiceCategory } from '@/types';
+import { rankBarberRecommendations } from '@/lib/recommendations';
 import {
   Search, SlidersHorizontal, MapPin, Star, Clock, Car,
   Scissors, BadgeCheck, Zap, TrendingUp, ChevronLeft, X,
-  Filter, Navigation, Globe
+  Filter, Navigation, Globe, Sparkles
 } from 'lucide-react';
 
 const tagIcons: Record<string, typeof Zap> = {
@@ -28,7 +29,7 @@ function openInMaps(location: string, isMobile: boolean) {
 }
 
 export default function BookingTab() {
-  const { barbers, themeConfig, toggleFollow, navigate, isLoading } = useApp();
+  const { barbers, bookings, currentUser, themeConfig, toggleFollow, navigate, isLoading } = useApp();
   const { isAuthenticated } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTags, setSelectedTags] = useState<BarberTag[]>([]);
@@ -68,6 +69,15 @@ export default function BookingTab() {
     return filtered;
   }, [barbers, searchQuery, selectedTags, selectedCategory, sortBy]);
 
+  const recommendations = useMemo(() => {
+    const userLocation = currentUser as { city?: string; wilaya?: string } | null;
+    return rankBarberRecommendations(barbers, {
+      city: userLocation?.city || userLocation?.wilaya,
+      category: selectedCategory as ServiceCategory | null,
+      bookings,
+    }).slice(0, 3);
+  }, [barbers, bookings, currentUser, selectedCategory]);
+
   const toggleTag = (tag: BarberTag) => {
     setSelectedTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
   };
@@ -89,6 +99,15 @@ export default function BookingTab() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => navigate('ai-advisor')}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-all border"
+              style={{ backgroundColor: themeConfig.colors.accent + '12', borderColor: themeConfig.colors.accent + '40', color: themeConfig.colors.accent }}
+              title="مساعد حلاقي"
+            >
+              <Sparkles size={14} />
+              <span className="hidden sm:inline">المساعد</span>
+            </button>
             <button
               onClick={() => openInMaps('الجزائر العاصمة', false)}
               className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-all border"
@@ -209,6 +228,42 @@ export default function BookingTab() {
           </div>
         )}
       </div>
+
+      {isAuthenticated && !searchQuery && selectedTags.length === 0 && recommendations.length > 0 && (
+        <section className="px-4 mt-3" aria-labelledby="recommended-title">
+          <div className="flex items-center gap-2 mb-2">
+            <Sparkles size={16} style={{ color: themeConfig.colors.accent }} />
+            <div>
+              <h2 id="recommended-title" className="text-sm font-bold" style={{ color: themeConfig.colors.text }}>مقترح لك</h2>
+              <p className="text-[10px]" style={{ color: themeConfig.colors.textMuted }}>ترتيب ذكي وشفاف حسب احتياجاتك</p>
+            </div>
+          </div>
+          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+            {recommendations.map(recommendation => (
+              <button
+                key={recommendation.barber.id}
+                type="button"
+                onClick={() => navigate('barber-detail', { barberId: recommendation.barber.id })}
+                className="min-w-[220px] p-3 rounded-2xl border text-right"
+                style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.accent + '50' }}
+              >
+                <div className="flex items-center gap-2">
+                  <img src={recommendation.barber.avatar} alt="" className="w-10 h-10 rounded-xl object-cover" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-bold truncate" style={{ color: themeConfig.colors.text }}>{recommendation.barber.name}</p>
+                    <p className="text-[10px]" style={{ color: themeConfig.colors.accent }}>توافق {recommendation.score}%</p>
+                  </div>
+                </div>
+                <div className="flex gap-1 flex-wrap mt-2">
+                  {recommendation.reasons.map(reason => (
+                    <span key={reason} className="text-[9px] px-2 py-1 rounded-full" style={{ color: themeConfig.colors.primary, backgroundColor: themeConfig.colors.primary + '10' }}>{reason}</span>
+                  ))}
+                </div>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* === BARBERS LIST === */}
       <div className="px-4 space-y-3 mt-2">

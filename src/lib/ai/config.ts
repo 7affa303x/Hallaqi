@@ -2,8 +2,7 @@
  * AI configuration resolved from Vite environment variables.
  *
  * No secret keys live here. The browser only knows the URL of a server-side
- * proxy (Supabase Edge Function / Vercel Function) that performs the actual
- * authenticated call to the model vendor.
+ * Vercel Function that performs the authenticated AI Gateway call.
  */
 import type { AIProviderConfig, AIProviderName } from './types';
 
@@ -25,8 +24,9 @@ export function getAIConfig(): AIProviderConfig | null {
   const endpoint = readEnv('VITE_AI_ENDPOINT');
   if (!endpoint) return null;
 
-  const provider = (readEnv('VITE_AI_PROVIDER') || 'edge-function') as AIProviderName;
-  const defaultModel = readEnv('VITE_AI_MODEL') || 'gpt-4o-mini';
+  const provider = (readEnv('VITE_AI_PROVIDER') || 'gateway') as AIProviderName;
+  // Model selection is server-owned to prevent browser-controlled cost abuse.
+  const defaultModel = '';
 
   return { provider, endpoint, defaultModel };
 }

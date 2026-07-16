@@ -77,7 +77,7 @@ export class AIClient {
     return {
       model: params.model,
       temperature: params.temperature,
-      maxTokens: params.maxTokens,
+      maxOutputTokens: params.maxOutputTokens,
       tools: params.tools,
       signal: params.signal,
     };

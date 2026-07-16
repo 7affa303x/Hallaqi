@@ -386,6 +386,7 @@ export type ScreenName =
   | 'reset-password'
   | 'payment-success'
   | 'admin-dashboard'
+  | 'ai-advisor'
   | 'coming-soon';
 
 export interface ScreenParams {

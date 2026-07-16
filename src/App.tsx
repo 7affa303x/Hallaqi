@@ -27,6 +27,7 @@ const ForgotPassword = lazy(() => import('@/components/auth/ForgotPassword'));
 const ResetPassword = lazy(() => import('@/components/auth/ResetPassword'));
 const PaymentSuccessPage = lazy(() => import("@/pages/PaymentSuccessPage"));
 const AdminDashboard = lazy(() => import("@/pages/admin/AdminDashboard"));
+const AIAdvisorPage = lazy(() => import("@/pages/AIAdvisorPage"));
 
 function TabContent({ tab }: { tab: string }) {
   let content;
@@ -81,6 +82,8 @@ function ScreenRouter() {
       return <Suspense fallback={<LoadingFallback />}><PaymentSuccessPage /></Suspense>;
     case 'admin-dashboard':
       return <Suspense fallback={<LoadingFallback />}><AdminDashboard /></Suspense>;
+    case 'ai-advisor':
+      return <Suspense fallback={<LoadingFallback />}><AIAdvisorPage /></Suspense>;
     default: {
       const params = screenParams;
       if (params?.title) {

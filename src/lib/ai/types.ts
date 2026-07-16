@@ -38,7 +38,7 @@ export interface AIToolCall {
 export interface AICompletionOptions {
   model?: string;
   temperature?: number;
-  maxTokens?: number;
+  maxOutputTokens?: number;
   tools?: AITool[];
   signal?: AbortSignal;
 }
