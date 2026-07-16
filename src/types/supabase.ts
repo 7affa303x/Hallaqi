@@ -7,6 +7,8 @@ export type Json =
   | Json[]
 
 export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
@@ -104,9 +106,13 @@ export type Database = {
           client_id: string | null
           created_at: string | null
           id: string
+          is_mobile_service: boolean
           notes: string | null
+          payment_id: string | null
+          payment_method: string | null
           payment_status: Database["public"]["Enums"]["payment_status"] | null
           professional_id: string | null
+          service_address: string | null
           service_id: string | null
           status: Database["public"]["Enums"]["booking_status"] | null
           total_price: number
@@ -118,12 +124,16 @@ export type Database = {
           client_id?: string | null
           created_at?: string | null
           id?: string
+          is_mobile_service?: boolean
           notes?: string | null
+          payment_id?: string | null
+          payment_method?: string | null
           payment_status?: Database["public"]["Enums"]["payment_status"] | null
           professional_id?: string | null
+          service_address?: string | null
           service_id?: string | null
           status?: Database["public"]["Enums"]["booking_status"] | null
-          total_price: number
+          total_price?: number
           updated_at?: string | null
         }
         Update: {
@@ -132,9 +142,13 @@ export type Database = {
           client_id?: string | null
           created_at?: string | null
           id?: string
+          is_mobile_service?: boolean
           notes?: string | null
+          payment_id?: string | null
+          payment_method?: string | null
           payment_status?: Database["public"]["Enums"]["payment_status"] | null
           professional_id?: string | null
+          service_address?: string | null
           service_id?: string | null
           status?: Database["public"]["Enums"]["booking_status"] | null
           total_price?: number
@@ -146,6 +160,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bookings_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments"
             referencedColumns: ["id"]
           },
           {
@@ -166,25 +187,25 @@ export type Database = {
       }
       conversation_members: {
         Row: {
-          conversation_id: string
+          conversation_id: string | null
           id: string
           joined_at: string | null
           last_read_at: string | null
-          user_id: string
+          user_id: string | null
         }
         Insert: {
-          conversation_id: string
+          conversation_id?: string | null
           id?: string
           joined_at?: string | null
           last_read_at?: string | null
-          user_id: string
+          user_id?: string | null
         }
         Update: {
-          conversation_id?: string
+          conversation_id?: string | null
           id?: string
           joined_at?: string | null
           last_read_at?: string | null
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -515,30 +536,30 @@ export type Database = {
       messages: {
         Row: {
           content: string
-          conversation_id: string
+          conversation_id: string | null
           created_at: string | null
           id: string
-          sender_id: string
+          sender_id: string | null
           status: string | null
           type: string | null
           updated_at: string | null
         }
         Insert: {
           content: string
-          conversation_id: string
+          conversation_id?: string | null
           created_at?: string | null
           id?: string
-          sender_id: string
+          sender_id?: string | null
           status?: string | null
           type?: string | null
           updated_at?: string | null
         }
         Update: {
           content?: string
-          conversation_id?: string
+          conversation_id?: string | null
           created_at?: string | null
           id?: string
-          sender_id?: string
+          sender_id?: string | null
           status?: string | null
           type?: string | null
           updated_at?: string | null
@@ -568,7 +589,7 @@ export type Database = {
           metadata: Json | null
           read: boolean | null
           title: string
-          type: string
+          type: string | null
           user_id: string | null
         }
         Insert: {
@@ -578,7 +599,7 @@ export type Database = {
           metadata?: Json | null
           read?: boolean | null
           title: string
-          type: string
+          type?: string | null
           user_id?: string | null
         }
         Update: {
@@ -588,7 +609,7 @@ export type Database = {
           metadata?: Json | null
           read?: boolean | null
           title?: string
-          type?: string
+          type?: string | null
           user_id?: string | null
         }
         Relationships: [
@@ -610,6 +631,7 @@ export type Database = {
           id: string
           metadata: Json | null
           provider: string
+          receipt_url: string | null
           session_id: string
           status: string
           transaction_id: string | null
@@ -623,6 +645,7 @@ export type Database = {
           id?: string
           metadata?: Json | null
           provider?: string
+          receipt_url?: string | null
           session_id: string
           status?: string
           transaction_id?: string | null
@@ -636,6 +659,7 @@ export type Database = {
           id?: string
           metadata?: Json | null
           provider?: string
+          receipt_url?: string | null
           session_id?: string
           status?: string
           transaction_id?: string | null
@@ -659,7 +683,7 @@ export type Database = {
           professional_id: string | null
           sort_order: number | null
           thumbnail_url: string | null
-          type: Database["public"]["Enums"]["media_type"]
+          type: Database["public"]["Enums"]["media_type"] | null
           url: string
         }
         Insert: {
@@ -669,7 +693,7 @@ export type Database = {
           professional_id?: string | null
           sort_order?: number | null
           thumbnail_url?: string | null
-          type: Database["public"]["Enums"]["media_type"]
+          type?: Database["public"]["Enums"]["media_type"] | null
           url: string
         }
         Update: {
@@ -679,7 +703,7 @@ export type Database = {
           professional_id?: string | null
           sort_order?: number | null
           thumbnail_url?: string | null
-          type?: Database["public"]["Enums"]["media_type"]
+          type?: Database["public"]["Enums"]["media_type"] | null
           url?: string
         }
         Relationships: [
@@ -700,11 +724,25 @@ export type Database = {
           business_email: string | null
           business_name: string | null
           business_phone: string | null
+          cover_image_url: string | null
+          created_at: string | null
+          followers_count: number
+          following_count: number
+          has_id_card: boolean
           id: string
+          id_card_verified: boolean
+          is_active: boolean
+          is_mobile: boolean
+          is_subscribed: boolean
           latitude: number | null
+          likes_count: number
           longitude: number | null
           review_count: number | null
+          subscription_plan: string | null
+          updated_at: string | null
+          uses_scissors: boolean
           website_url: string | null
+          years_of_experience: number
         }
         Insert: {
           average_rating?: number | null
@@ -713,11 +751,25 @@ export type Database = {
           business_email?: string | null
           business_name?: string | null
           business_phone?: string | null
+          cover_image_url?: string | null
+          created_at?: string | null
+          followers_count?: number
+          following_count?: number
+          has_id_card?: boolean
           id: string
+          id_card_verified?: boolean
+          is_active?: boolean
+          is_mobile?: boolean
+          is_subscribed?: boolean
           latitude?: number | null
+          likes_count?: number
           longitude?: number | null
           review_count?: number | null
+          subscription_plan?: string | null
+          updated_at?: string | null
+          uses_scissors?: boolean
           website_url?: string | null
+          years_of_experience?: number
         }
         Update: {
           average_rating?: number | null
@@ -726,11 +778,25 @@ export type Database = {
           business_email?: string | null
           business_name?: string | null
           business_phone?: string | null
+          cover_image_url?: string | null
+          created_at?: string | null
+          followers_count?: number
+          following_count?: number
+          has_id_card?: boolean
           id?: string
+          id_card_verified?: boolean
+          is_active?: boolean
+          is_mobile?: boolean
+          is_subscribed?: boolean
           latitude?: number | null
+          likes_count?: number
           longitude?: number | null
           review_count?: number | null
+          subscription_plan?: string | null
+          updated_at?: string | null
+          uses_scissors?: boolean
           website_url?: string | null
+          years_of_experience?: number
         }
         Relationships: [
           {
@@ -755,7 +821,9 @@ export type Database = {
           user_role: Database["public"]["Enums"]["user_role"] | null
           user_status: Database["public"]["Enums"]["user_status"] | null
           username: string | null
-          verification_status: Database["public"]["Enums"]["verification_status"] | null
+          verification_status:
+            | Database["public"]["Enums"]["verification_status"]
+            | null
           website: string | null
         }
         Insert: {
@@ -770,7 +838,9 @@ export type Database = {
           user_role?: Database["public"]["Enums"]["user_role"] | null
           user_status?: Database["public"]["Enums"]["user_status"] | null
           username?: string | null
-          verification_status?: Database["public"]["Enums"]["verification_status"] | null
+          verification_status?:
+            | Database["public"]["Enums"]["verification_status"]
+            | null
           website?: string | null
         }
         Update: {
@@ -785,7 +855,9 @@ export type Database = {
           user_role?: Database["public"]["Enums"]["user_role"] | null
           user_status?: Database["public"]["Enums"]["user_status"] | null
           username?: string | null
-          verification_status?: Database["public"]["Enums"]["verification_status"] | null
+          verification_status?:
+            | Database["public"]["Enums"]["verification_status"]
+            | null
           website?: string | null
         }
         Relationships: []
@@ -797,7 +869,9 @@ export type Database = {
           created_at: string | null
           id: string
           is_public: boolean | null
-          moderation_status: Database["public"]["Enums"]["moderation_status"] | null
+          moderation_status:
+            | Database["public"]["Enums"]["moderation_status"]
+            | null
           professional_id: string | null
           rating: number
           reviewer_id: string | null
@@ -809,7 +883,9 @@ export type Database = {
           created_at?: string | null
           id?: string
           is_public?: boolean | null
-          moderation_status?: Database["public"]["Enums"]["moderation_status"] | null
+          moderation_status?:
+            | Database["public"]["Enums"]["moderation_status"]
+            | null
           professional_id?: string | null
           rating: number
           reviewer_id?: string | null
@@ -821,7 +897,9 @@ export type Database = {
           created_at?: string | null
           id?: string
           is_public?: boolean | null
-          moderation_status?: Database["public"]["Enums"]["moderation_status"] | null
+          moderation_status?:
+            | Database["public"]["Enums"]["moderation_status"]
+            | null
           professional_id?: string | null
           rating?: number
           reviewer_id?: string | null
@@ -868,11 +946,11 @@ export type Database = {
           category?: Database["public"]["Enums"]["service_category"] | null
           created_at?: string | null
           description?: string | null
-          duration_minutes: number
+          duration_minutes?: number
           id?: string
           is_active?: boolean | null
           name: string
-          price: number
+          price?: number
           professional_id?: string | null
           updated_at?: string | null
         }
@@ -898,42 +976,74 @@ export type Database = {
           },
         ]
       }
+      user_settings: {
+        Row: {
+          accessibility_preferences: Json
+          notification_preferences: Json
+          privacy_preferences: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          accessibility_preferences?: Json
+          notification_preferences?: Json
+          privacy_preferences?: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          accessibility_preferences?: Json
+          notification_preferences?: Json
+          privacy_preferences?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_settings_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      complete_barber_onboarding: { Args: never; Returns: undefined }
       get_or_create_conversation: {
         Args: { user1_id: string; user2_id: string }
         Returns: string
       }
+      is_admin: { Args: never; Returns: boolean }
       mark_conversation_messages_as_read: {
         Args: { p_conversation_id: string; p_user_id: string }
         Returns: undefined
       }
     }
     Enums: {
-      booking_status: [
-        "pending",
-        "confirmed",
-        "in_progress",
-        "completed",
-        "cancelled",
-        "no_show",
-      ]
+      booking_status:
+        | "pending"
+        | "confirmed"
+        | "in_progress"
+        | "completed"
+        | "cancelled"
+        | "no_show"
       media_type: "image" | "video"
       moderation_status: "pending" | "approved" | "rejected"
       payment_status: "pending" | "paid" | "refunded" | "failed"
-      service_category: [
-        "haircut",
-        "beard",
-        "shave",
-        "hair_treatment",
-        "facial",
-        "coloring",
-        "styling",
-        "package",
-      ]
+      service_category:
+        | "haircut"
+        | "beard"
+        | "shave"
+        | "hair_treatment"
+        | "facial"
+        | "coloring"
+        | "styling"
+        | "package"
       user_role: "client" | "barber" | "specialist" | "admin" | "moderator"
       user_status: "active" | "inactive" | "suspended" | "pending"
       verification_status: "unverified" | "pending" | "verified" | "premium"
@@ -944,36 +1054,150 @@ export type Database = {
   }
 }
 
-// ====== CONVENIENCE EXPORTS ======
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
 
-export type Profile = Database["public"]["Tables"]["profiles"]["Row"]
-export type Professional = Database["public"]["Tables"]["professionals"]["Row"]
-export type Service = Database["public"]["Tables"]["services"]["Row"]
-export type Booking = Database["public"]["Tables"]["bookings"]["Row"]
-export type Review = Database["public"]["Tables"]["reviews"]["Row"]
-export type Favorite = Database["public"]["Tables"]["favorites"]["Row"]
-export type AvailabilitySchedule = Database["public"]["Tables"]["availability_schedules"]["Row"]
-export type AvailabilityException = Database["public"]["Tables"]["availability_exceptions"]["Row"]
-export type PortfolioItem = Database["public"]["Tables"]["portfolio_items"]["Row"]
-export type Conversation = Database["public"]["Tables"]["conversations"]["Row"]
-export type ConversationMember = Database["public"]["Tables"]["conversation_members"]["Row"]
-export type Message = Database["public"]["Tables"]["messages"]["Row"]
-export type Notification = Database["public"]["Tables"]["notifications"]["Row"]
-export type ForumCategory = Database["public"]["Tables"]["forum_categories"]["Row"]
-export type ForumPost = Database["public"]["Tables"]["forum_posts"]["Row"]
-export type ForumComment = Database["public"]["Tables"]["forum_comments"]["Row"]
-export type ForumLike = Database["public"]["Tables"]["forum_likes"]["Row"]
-export type ForumReport = Database["public"]["Tables"]["forum_reports"]["Row"]
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
 
-export type UserRole = Database["public"]["Enums"]["user_role"]
-export type UserStatus = Database["public"]["Enums"]["user_status"]
-export type VerificationStatus = Database["public"]["Enums"]["verification_status"]
-export type BookingStatus = Database["public"]["Enums"]["booking_status"]
-export type PaymentStatus = Database["public"]["Enums"]["payment_status"]
-export type ServiceCategory = Database["public"]["Enums"]["service_category"]
-export type ModerationStatus = Database["public"]["Enums"]["moderation_status"]
-export type MediaType = Database["public"]["Enums"]["media_type"]
+export type Tables<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+      Row: infer R
+    }
+    ? R
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R
+      }
+      ? R
+      : never
+    : never
 
-// Backwards-compatible alias (deprecated — use Profile)
-/** @deprecated Use Profile instead */
-export type AppUser = Profile
+export type TablesInsert<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Insert: infer I
+    }
+    ? I
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I
+      }
+      ? I
+      : never
+    : never
+
+export type TablesUpdate<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Update: infer U
+    }
+    ? U
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U
+      }
+      ? U
+      : never
+    : never
+
+export type Enums<
+  DefaultSchemaEnumNameOrOptions extends
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never = never,
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+    : never
+
+export type CompositeTypes<
+  PublicCompositeTypeNameOrOptions extends
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
+  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never = never,
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
+
+export const Constants = {
+  public: {
+    Enums: {
+      booking_status: [
+        "pending",
+        "confirmed",
+        "in_progress",
+        "completed",
+        "cancelled",
+        "no_show",
+      ],
+      media_type: ["image", "video"],
+      moderation_status: ["pending", "approved", "rejected"],
+      payment_status: ["pending", "paid", "refunded", "failed"],
+      service_category: [
+        "haircut",
+        "beard",
+        "shave",
+        "hair_treatment",
+        "facial",
+        "coloring",
+        "styling",
+        "package",
+      ],
+      user_role: ["client", "barber", "specialist", "admin", "moderator"],
+      user_status: ["active", "inactive", "suspended", "pending"],
+      verification_status: ["unverified", "pending", "verified", "premium"],
+    },
+  },
+} as const
