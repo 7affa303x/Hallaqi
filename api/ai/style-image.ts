@@ -1,6 +1,6 @@
 import { APICallError, generateText } from 'ai';
 import { z } from 'zod';
-import { authenticateSupabaseRequest } from '../_lib/auth';
+import { authenticateSupabaseRequest } from '../_lib/auth.js';
 
 const requestSchema = z.object({
   description: z.string().trim().min(10).max(600),
