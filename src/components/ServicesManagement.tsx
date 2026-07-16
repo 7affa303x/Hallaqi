@@ -5,6 +5,10 @@ import { getProfessionalServices, createService, updateService, deleteService } 
 import type { Service as AppService } from '@/types';
 import type { Database } from '@/types/supabase';
 import { ArrowLeft, Plus, Trash2, Save, AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
+import { useFieldArray, useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { servicesArraySchema } from '@/lib/validation';
+import type { ServiceFormData } from '@/lib/validation';
 
 const SERVICE_CATEGORIES: AppService['category'][] = ['haircut', 'beard', 'shave', 'hair_treatment', 'facial', 'coloring', 'styling', 'package'];
 
@@ -13,63 +17,76 @@ const CATEGORY_LABELS: Record<string, string> = {
   facial: 'عناية بالبشرة', coloring: 'صبغة', styling: 'تسريح', package: 'باقة',
 };
 
+interface ServicesFormData {
+  services: ServiceFormData[];
+}
+
 export default function ServicesManagement({ onBack }: { onBack: () => void }) {
   const { themeConfig } = useApp();
   const { appUser } = useAuth();
-  const [services, setServices] = useState<AppService[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
+  const {
+    control,
+    handleSubmit: handleFormSubmit,
+    formState: { errors: formErrors },
+    setValue,
+  } = useForm<ServicesFormData>({
+    resolver: zodResolver(servicesArraySchema),
+    defaultValues: {
+      services: [],
+    },
+  });
+
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: 'services',
+  });
+
   useEffect(() => {
     if (!appUser?.id) { setIsLoading(false); return; }
     getProfessionalServices(appUser.id)
       .then(data => {
-        setServices(data.map(s => ({
-          id: s.id,
+        const mapped = data.map(s => ({
           name: s.name,
           description: s.description || '',
           price: Number(s.price),
           duration: s.duration_minutes,
           category: (s.category as unknown as AppService["category"]) || "haircut",
-        })));
+        }));
+        setValue('services', mapped);
       })
       .catch(() => setError('فشل تحميل الخدمات'))
       .finally(() => setIsLoading(false));
   }, [appUser?.id]);
 
   const addService = () => {
-    const newService: AppService = { id: `temp-${Date.now()}`, name: '', description: '', price: 0, duration: 30, category: 'haircut' };
-    setServices(prev => [...prev, newService]);
+    append({ name: '', description: '', price: 0, duration: 30, category: 'haircut' });
     setSuccess(false);
   };
 
-  const removeService = async (index: number) => {
-    const svc = services[index];
-    if (!svc.id.startsWith('temp-')) {
-      try { await deleteService(svc.id); } catch { setError('فشل حذف الخدمة'); return; }
-    }
-    setServices(prev => prev.filter((_, i) => i !== index));
+  const handleRemove = async (index: number) => {
+    // Remove from the form array. The DB deletion for existing
+    // services is handled in the save logic by comparing with existing services.
+    remove(index);
     setSuccess(false);
   };
 
-  const updateServiceField = (index: number, field: keyof AppService, value: string | number) => {
-    setServices(prev => prev.map((s, i) => i === index ? { ...s, [field]: value } : s));
-    setSuccess(false); setError(null);
-  };
-
-  const handleSave = async () => {
+  const onSubmit = async (data: ServicesFormData) => {
     if (!appUser?.id) { setError('لا يوجد معرف للمختص'); return; }
-    if (services.some(s => !s.name.trim())) { setError('جميع الخدمات يجب أن تحتوي على اسم'); return; }
-    if (services.some(s => s.price <= 0)) { setError('جميع الخدمات يجب أن تحتوي على سعر موجب'); return; }
-    if (services.some(s => s.duration <= 0)) { setError('جميع الخدمات يجب أن تحتوي على مدة موجبة'); return; }
 
     setIsSaving(true); setError(null); setSuccess(false);
     try {
       const proId = appUser.id;
-      for (const svc of services) {
-        if (svc.id.startsWith('temp-')) {
+      const existingServices = await getProfessionalServices(proId);
+      const existingMap = new Map(existingServices.map(s => [s.name, s]));
+
+      for (const svc of data.services) {
+        const existing = existingMap.get(svc.name.trim());
+        if (!existing) {
           await createService({
             professional_id: proId,
             name: svc.name.trim(),
@@ -80,7 +97,7 @@ export default function ServicesManagement({ onBack }: { onBack: () => void }) {
             is_active: true,
           });
         } else {
-          await updateService(svc.id, {
+          await updateService(existing.id, {
             name: svc.name.trim(),
             description: (svc.description || "").trim() || null,
             price: svc.price,
@@ -88,13 +105,19 @@ export default function ServicesManagement({ onBack }: { onBack: () => void }) {
             category: svc.category as unknown as Database["public"]["Enums"]["service_category"],
             is_active: true,
           });
+          existingMap.delete(svc.name.trim());
         }
       }
-      // Refresh to get server-generated IDs for new services
-      const refreshed = await getProfessionalServices(proId);
-      setServices(refreshed.map(s => ({
-        id: s.id, name: s.name, description: s.description || '', price: Number(s.price), duration: s.duration_minutes, category: (s.category as unknown as AppService["category"]) || "haircut",
-      })));
+
+      // Delete services that are no longer in the form
+      for (const [, remaining] of existingMap) {
+        try {
+          await deleteService(remaining.id);
+        } catch (err) {
+          console.error('Failed to delete service:', err);
+        }
+      }
+
       setSuccess(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'فشل حفظ الخدمات');
@@ -114,7 +137,7 @@ export default function ServicesManagement({ onBack }: { onBack: () => void }) {
         <h2 className="text-base font-bold" style={{ color: themeConfig.colors.text }}>إدارة الخدمات</h2>
       </div>
 
-      <div className="px-4 mt-4 space-y-4">
+      <form onSubmit={handleFormSubmit(onSubmit)} className="px-4 mt-4 space-y-4">
         {error && (
           <div className="p-3 rounded-xl flex items-center gap-3" style={{ backgroundColor: themeConfig.colors.error + '15' }}>
             <AlertCircle size={16} style={{ color: themeConfig.colors.error }} />
@@ -129,33 +152,93 @@ export default function ServicesManagement({ onBack }: { onBack: () => void }) {
         )}
 
         <div className="space-y-3">
-          {services.map((svc, index) => (
-            <div key={svc.id} className="rounded-2xl border p-4 space-y-3" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
-              <div className="flex items-center justify-between">
-                <h4 className="text-xs font-bold" style={{ color: themeConfig.colors.text }}>الخدمة {index + 1}</h4>
-                <button type="button" onClick={() => removeService(index)} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: themeConfig.colors.error + '15' }}>
-                  <Trash2 size={14} style={{ color: themeConfig.colors.error }} />
-                </button>
+          {fields.map((field, index) => {
+            const nameError = formErrors.services?.[index]?.name?.message;
+            const priceError = formErrors.services?.[index]?.price?.message;
+            const durationError = formErrors.services?.[index]?.duration?.message;
+
+            return (
+              <div key={field.id} className="rounded-2xl border p-4 space-y-3" style={{ backgroundColor: themeConfig.colors.surface, borderColor: nameError ? themeConfig.colors.error : themeConfig.colors.border }}>
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold" style={{ color: themeConfig.colors.text }}>الخدمة {index + 1}</h4>
+                  <button type="button" onClick={() => handleRemove(index)} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: themeConfig.colors.error + '15' }}>
+                    <Trash2 size={14} style={{ color: themeConfig.colors.error }} />
+                  </button>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold mb-1 block" style={{ color: themeConfig.colors.textMuted }}>الاسم</label>
+                  <input
+                    type="text"
+                    {...control.register(`services.${index}.name` as const)}
+                    placeholder="مثال: قص شعر كلاسيك"
+                    className="w-full px-3 py-2 rounded-lg text-xs border"
+                    style={{
+                      backgroundColor: themeConfig.colors.background,
+                      borderColor: nameError ? themeConfig.colors.error : themeConfig.colors.border,
+                      color: themeConfig.colors.text,
+                    }}
+                  />
+                  {nameError && <p className="text-[10px] mt-1" style={{ color: themeConfig.colors.error }}>{nameError}</p>}
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold mb-1 block" style={{ color: themeConfig.colors.textMuted }}>الوصف</label>
+                  <input
+                    type="text"
+                    {...control.register(`services.${index}.description` as const)}
+                    placeholder="وصف قصير"
+                    className="w-full px-3 py-2 rounded-lg text-xs border"
+                    style={{ backgroundColor: themeConfig.colors.background, borderColor: themeConfig.colors.border, color: themeConfig.colors.text }}
+                  />
+                </div>
+
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <label className="text-[10px] font-bold mb-1 block" style={{ color: themeConfig.colors.textMuted }}>السعر (دج)</label>
+                    <input
+                      type="number"
+                      {...control.register(`services.${index}.price` as const, { valueAsNumber: true })}
+                      min={0}
+                      className="w-full px-3 py-2 rounded-lg text-xs border"
+                      style={{
+                        backgroundColor: themeConfig.colors.background,
+                        borderColor: priceError ? themeConfig.colors.error : themeConfig.colors.border,
+                        color: themeConfig.colors.text,
+                      }}
+                    />
+                    {priceError && <p className="text-[10px] mt-1" style={{ color: themeConfig.colors.error }}>{priceError}</p>}
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold mb-1 block" style={{ color: themeConfig.colors.textMuted }}>المدة (دقيقة)</label>
+                    <input
+                      type="number"
+                      {...control.register(`services.${index}.duration` as const, { valueAsNumber: true })}
+                      min={5}
+                      step={5}
+                      className="w-full px-3 py-2 rounded-lg text-xs border"
+                      style={{
+                        backgroundColor: themeConfig.colors.background,
+                        borderColor: durationError ? themeConfig.colors.error : themeConfig.colors.border,
+                        color: themeConfig.colors.text,
+                      }}
+                    />
+                    {durationError && <p className="text-[10px] mt-1" style={{ color: themeConfig.colors.error }}>{durationError}</p>}
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold mb-1 block" style={{ color: themeConfig.colors.textMuted }}>الفئة</label>
+                    <select
+                      {...control.register(`services.${index}.category` as const)}
+                      className="w-full px-3 py-2 rounded-lg text-xs border"
+                      style={{ backgroundColor: themeConfig.colors.background, borderColor: themeConfig.colors.border, color: themeConfig.colors.text }}
+                    >
+                      {SERVICE_CATEGORIES.map(cat => <option key={cat} value={cat}>{CATEGORY_LABELS[cat]}</option>)}
+                    </select>
+                  </div>
+                </div>
               </div>
-
-              <div><label className="text-[10px] font-bold mb-1 block" style={{ color: themeConfig.colors.textMuted }}>الاسم</label>
-                <input type="text" value={svc.name} onChange={(e) => updateServiceField(index, 'name', e.target.value)} placeholder="مثال: قص شعر كلاسيك" className="w-full px-3 py-2 rounded-lg text-xs border" style={{ backgroundColor: themeConfig.colors.background, borderColor: themeConfig.colors.border, color: themeConfig.colors.text }} /></div>
-
-              <div><label className="text-[10px] font-bold mb-1 block" style={{ color: themeConfig.colors.textMuted }}>الوصف</label>
-                <input type="text" value={svc.description} onChange={(e) => updateServiceField(index, 'description', e.target.value)} placeholder="وصف قصير" className="w-full px-3 py-2 rounded-lg text-xs border" style={{ backgroundColor: themeConfig.colors.background, borderColor: themeConfig.colors.border, color: themeConfig.colors.text }} /></div>
-
-              <div className="grid grid-cols-3 gap-2">
-                <div><label className="text-[10px] font-bold mb-1 block" style={{ color: themeConfig.colors.textMuted }}>السعر (دج)</label>
-                  <input type="number" value={svc.price || ''} onChange={(e) => updateServiceField(index, 'price', Number(e.target.value))} min={0} className="w-full px-3 py-2 rounded-lg text-xs border" style={{ backgroundColor: themeConfig.colors.background, borderColor: themeConfig.colors.border, color: themeConfig.colors.text }} /></div>
-                <div><label className="text-[10px] font-bold mb-1 block" style={{ color: themeConfig.colors.textMuted }}>المدة (دقيقة)</label>
-                  <input type="number" value={svc.duration || ''} onChange={(e) => updateServiceField(index, 'duration', Number(e.target.value))} min={5} step={5} className="w-full px-3 py-2 rounded-lg text-xs border" style={{ backgroundColor: themeConfig.colors.background, borderColor: themeConfig.colors.border, color: themeConfig.colors.text }} /></div>
-                <div><label className="text-[10px] font-bold mb-1 block" style={{ color: themeConfig.colors.textMuted }}>الفئة</label>
-                  <select value={svc.category} onChange={(e) => updateServiceField(index, 'category', e.target.value as AppService['category'])} className="w-full px-3 py-2 rounded-lg text-xs border" style={{ backgroundColor: themeConfig.colors.background, borderColor: themeConfig.colors.border, color: themeConfig.colors.text }}>
-                    {SERVICE_CATEGORIES.map(cat => <option key={cat} value={cat}>{CATEGORY_LABELS[cat]}</option>)}
-                  </select></div>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         <button type="button" onClick={addService} className="w-full h-10 rounded-xl text-xs font-bold border-2 border-dashed flex items-center justify-center gap-2 transition-all" style={{ borderColor: themeConfig.colors.border, color: themeConfig.colors.textMuted }}>
@@ -164,11 +247,11 @@ export default function ServicesManagement({ onBack }: { onBack: () => void }) {
 
         <div className="flex gap-2 pt-4">
           <button type="button" onClick={onBack} className="flex-1 h-12 rounded-xl text-sm font-bold border" style={{ borderColor: themeConfig.colors.border, color: themeConfig.colors.text }}>إلغاء</button>
-          <button type="button" onClick={handleSave} disabled={isSaving} className="flex-1 h-12 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 transition-all disabled:opacity-50" style={{ backgroundColor: themeConfig.colors.primary }}>
+          <button type="submit" disabled={isSaving} className="flex-1 h-12 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 transition-all disabled:opacity-50" style={{ backgroundColor: themeConfig.colors.primary }}>
             {isSaving ? <><Loader2 size={16} className="animate-spin" /> جاري الحفظ...</> : <><Save size={16} /> حفظ</>}
           </button>
         </div>
-      </div>
+      </form>
     </div>
   );
 }

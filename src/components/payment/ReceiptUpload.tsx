@@ -7,6 +7,10 @@
 import { useState, useRef } from 'react';
 import { Upload, FileImage, FileText, X, CheckCircle, AlertTriangle, Loader2 } from 'lucide-react';
 import { useApp } from '@/contexts/useApp';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { receiptUploadSchema } from '@/lib/validation';
+import type { ReceiptUploadFormData } from '@/lib/validation';
 
 interface ReceiptUploadProps {
   onUpload: (file: File, transactionReference?: string) => Promise<boolean>;
@@ -23,10 +27,19 @@ export function ReceiptUpload({ onUpload, isUploading, uploadProgress, error, pa
   const { themeConfig } = useApp();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
-  const [transactionRef, setTransactionRef] = useState('');
   const [fileError, setFileError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const {
+    register,
+    formState: { errors: formErrors },
+  } = useForm<ReceiptUploadFormData>({
+    resolver: zodResolver(receiptUploadSchema),
+    defaultValues: {
+      transactionRef: '',
+    },
+  });
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -60,7 +73,8 @@ export function ReceiptUpload({ onUpload, isUploading, uploadProgress, error, pa
 
   const handleSubmit = async () => {
     if (!selectedFile) return;
-    const success = await onUpload(selectedFile, transactionRef || undefined);
+    const transactionRef = formErrors.transactionRef ? '' : undefined;
+    const success = await onUpload(selectedFile, transactionRef);
     if (success) {
       setSubmitted(true);
     }
@@ -107,6 +121,7 @@ export function ReceiptUpload({ onUpload, isUploading, uploadProgress, error, pa
       {/* File Upload Area */}
       {!selectedFile ? (
         <button
+          type="button"
           onClick={() => fileInputRef.current?.click()}
           className="flex flex-col items-center gap-3 p-6 rounded-xl border-2 border-dashed transition-all active:scale-[0.98]"
           style={{ borderColor: themeConfig.colors.border }}
@@ -122,6 +137,7 @@ export function ReceiptUpload({ onUpload, isUploading, uploadProgress, error, pa
       ) : (
         <div className="relative p-3 rounded-xl border" style={{ borderColor: themeConfig.colors.border }}>
           <button
+            type="button"
             onClick={handleRemoveFile}
             className="absolute top-2 left-2 w-6 h-6 rounded-full flex items-center justify-center"
             style={{ backgroundColor: themeConfig.colors.error + '20' }}
@@ -163,13 +179,19 @@ export function ReceiptUpload({ onUpload, isUploading, uploadProgress, error, pa
         <p className="text-xs font-bold mb-1.5" style={{ color: themeConfig.colors.text }}>رقم العملية (اختياري)</p>
         <input
           type="text"
-          value={transactionRef}
-          onChange={(e) => setTransactionRef(e.target.value)}
+          {...register('transactionRef')}
           placeholder="مثال: 123456789"
           className="w-full p-3 rounded-xl border text-xs"
-          style={{ backgroundColor: themeConfig.colors.background, borderColor: themeConfig.colors.border, color: themeConfig.colors.text }}
+          style={{
+            backgroundColor: themeConfig.colors.background,
+            borderColor: formErrors.transactionRef ? themeConfig.colors.error : themeConfig.colors.border,
+            color: themeConfig.colors.text,
+          }}
           dir="ltr"
         />
+        {formErrors.transactionRef && (
+          <p className="text-[10px] mt-1" style={{ color: themeConfig.colors.error }}>{formErrors.transactionRef.message}</p>
+        )}
       </div>
 
       {/* Progress Indicator */}
@@ -198,6 +220,7 @@ export function ReceiptUpload({ onUpload, isUploading, uploadProgress, error, pa
 
       {/* Submit Button */}
       <button
+        type="button"
         onClick={handleSubmit}
         disabled={!selectedFile || isUploading}
         className="w-full h-11 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 transition-all disabled:opacity-50"

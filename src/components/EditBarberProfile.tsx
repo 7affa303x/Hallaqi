@@ -4,9 +4,13 @@ import { useAuth } from '@/hooks/useAuth';
 import { updateProfile, updateProfessionalProfile, addPortfolioItem, deletePortfolioItem, updatePortfolioItem, getPortfolioItems } from '@/supabase/database';
 import { uploadPortfolioItemWithMeta, deletePortfolioFile } from '@/supabase/storage';
 import { ArrowLeft, Save, AlertCircle, CheckCircle, Plus, Trash2, Upload, Image as ImageIcon, Video, Loader2 } from 'lucide-react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { editBarberProfileSchema } from '@/lib/validation';
+import type { PortfolioItem } from '@/types/supabase';
+import type { EditBarberProfileFormData } from '@/lib/validation';
 import WorkingHoursEditor from './WorkingHoursEditor';
 import AvailabilityExceptions from './AvailabilityExceptions';
-import type { PortfolioItem } from '@/types/supabase';
 
 interface EditBarberProfileProps {
   onBack: () => void;
@@ -23,51 +27,56 @@ interface PortfolioItemWithPreview extends PortfolioItem {
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const ALLOWED_VIDEO_TYPES = ['video/mp4', 'video/webm', 'video/quicktime'];
 const ALLOWED_TYPES = [...ALLOWED_IMAGE_TYPES, ...ALLOWED_VIDEO_TYPES];
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const MAX_PORTFOLIO_ITEMS = 10;
 
 export default function EditBarberProfile({ onBack, userRole: _userRole }: EditBarberProfileProps) {
   const { themeConfig } = useApp();
   const { appUser } = useAuth();
-  const [isLoading, setIsLoading] = useState(false);
-  const [isFetching, setIsFetching] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
 
-  const [formData, setFormData] = useState({
-    full_name: '',
-    bio: '',
-    phone_number: '',
-    business_name: '',
-    business_address: '',
-    business_phone: '',
-    business_email: '',
-    website_url: '',
+  const {
+    register,
+    handleSubmit: handleFormSubmit,
+    formState: { errors: formErrors, isSubmitting },
+    setValue,
+  } = useForm<EditBarberProfileFormData>({
+    resolver: zodResolver(editBarberProfileSchema),
+    defaultValues: {
+      full_name: '',
+      bio: '',
+      phone_number: '',
+      business_name: '',
+      business_address: '',
+      business_phone: '',
+      business_email: '',
+      website_url: '',
+    },
   });
+
+  const [isFetching, setIsFetching] = useState(true);
+  const [serverError, setServerError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
 
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null);
 
-  // Portfolio items: existing from DB + new uploads
   const [portfolioItems, setPortfolioItems] = useState<PortfolioItemWithPreview[]>([]);
   const [uploadProgress, setUploadProgress] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (appUser) {
-      setFormData({
-        full_name: (appUser as Record<string, unknown>).full_name as string || '',
-        bio: (appUser as Record<string, unknown>).bio as string || '',
-        phone_number: (appUser as Record<string, unknown>).phone_number as string || '',
-        business_name: (appUser as Record<string, unknown>).business_name as string || '',
-        business_address: (appUser as Record<string, unknown>).business_address as string || '',
-        business_phone: (appUser as Record<string, unknown>).business_phone as string || '',
-        business_email: (appUser as Record<string, unknown>).business_email as string || '',
-        website_url: (appUser as Record<string, unknown>).website_url as string || '',
-      });
-      setAvatarPreviewUrl((appUser as Record<string, unknown>).avatar_url as string || null);
+      const profileData = appUser as Record<string, unknown>;
+      setValue('full_name', (profileData.full_name as string) || '');
+      setValue('bio', (profileData.bio as string) || '');
+      setValue('phone_number', (profileData.phone_number as string) || '');
+      setValue('business_name', (profileData.business_name as string) || '');
+      setValue('business_address', (profileData.business_address as string) || '');
+      setValue('business_phone', (profileData.business_phone as string) || '');
+      setValue('business_email', (profileData.business_email as string) || '');
+      setValue('website_url', (profileData.website_url as string) || '');
+      setAvatarPreviewUrl((profileData.avatar_url as string) || null);
       setIsFetching(false);
 
-      // Load existing portfolio items from DB
       if (appUser.id) {
         loadPortfolioItems(appUser.id);
       }
@@ -85,18 +94,13 @@ export default function EditBarberProfile({ onBack, userRole: _userRole }: EditB
     }
   };
 
-  const handleInputChange = (field: string, value: unknown) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-    setError(null);
-  };
-
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) { setError('الصورة يجب أن تكون أقل من 5 ميجا'); return; }
+    if (file.size > 5 * 1024 * 1024) { setServerError('الصورة يجب أن تكون أقل من 5 ميجا'); return; }
     setAvatarFile(file);
     setAvatarPreviewUrl(URL.createObjectURL(file));
-    setError(null);
+    setServerError(null);
   };
 
   const validateFile = (file: File): string | null => {
@@ -114,15 +118,14 @@ export default function EditBarberProfile({ onBack, userRole: _userRole }: EditB
     if (files.length === 0) return;
 
     if (portfolioItems.filter(p => !p.isDeleted).length + files.length > MAX_PORTFOLIO_ITEMS) {
-      setError(`الحد الأقصى هو ${MAX_PORTFOLIO_ITEMS} عناصر. لديك ${portfolioItems.filter(p => !p.isDeleted).length} حالياً.`);
+      setServerError(`الحد الأقصى هو ${MAX_PORTFOLIO_ITEMS} عناصر. لديك ${portfolioItems.filter(p => !p.isDeleted).length} حالياً.`);
       return;
     }
 
-    // Validate all files
     for (const file of files) {
       const validationError = validateFile(file);
       if (validationError) {
-        setError(validationError);
+        setServerError(validationError);
         return;
       }
     }
@@ -142,63 +145,53 @@ export default function EditBarberProfile({ onBack, userRole: _userRole }: EditB
     }));
 
     setPortfolioItems(prev => [...prev, ...newItems]);
-    setError(null);
+    setServerError(null);
   };
 
   const removePortfolioItem = (index: number) => {
     const item = portfolioItems[index];
-    if (item.isNew && !item.id.startsWith('temp-')) {
-      // Existing DB item - mark for deletion
-      setPortfolioItems(prev => prev.map((p, i) => i === index ? { ...p, isDeleted: true } : p));
-    } else if (item.isNew && item.file) {
-      // New file not yet uploaded - remove from local state
+    if (item.isNew && item.file) {
       if (item.previewUrl) URL.revokeObjectURL(item.previewUrl);
       setPortfolioItems(prev => prev.filter((_, i) => i !== index));
-    } else if (!item.isNew) {
-      // Existing DB item - mark for deletion
+    } else {
       setPortfolioItems(prev => prev.map((p, i) => i === index ? { ...p, isDeleted: true } : p));
     }
   };
 
+  const onSubmit = async (data: EditBarberProfileFormData) => {
+    if (!appUser?.id) {
+      setServerError('حدث خطأ في تحميل بيانات الحساب. يرجى تسجيل الخروج وإعادة الدخول.');
+      return;
+    }
 
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!appUser?.id) { setError('حدث خطأ في تحميل بيانات الحساب. يرجى تسجيل الخروج وإعادة الدخول.'); return; }
-    if (!formData.full_name.trim()) { setError('الاسم مطلوب'); return; }
-
-    setIsLoading(true); setError(null); setSuccess(false);
+    setServerError(null);
+    setSuccess(false);
 
     try {
-      // Update profile (profiles table)
       await updateProfile(appUser.id, {
-        full_name: formData.full_name.trim(),
-        phone_number: formData.phone_number.trim() || null,
+        full_name: data.full_name.trim(),
+        phone_number: data.phone_number?.trim() || null,
         updated_at: new Date().toISOString(),
       });
 
-      // Update professional profile (professionals table)
       await updateProfessionalProfile(appUser.id, {
-        bio: formData.bio.trim() || null,
-        business_name: formData.business_name.trim() || null,
-        business_address: formData.business_address.trim() || null,
-        business_phone: formData.business_phone.trim() || null,
-        business_email: formData.business_email.trim() || null,
-        website_url: formData.website_url.trim() || null,
+        bio: data.bio?.trim() || null,
+        business_name: data.business_name?.trim() || null,
+        business_address: data.business_address?.trim() || null,
+        business_phone: data.business_phone?.trim() || null,
+        business_email: data.business_email?.trim() || null,
+        website_url: data.website_url?.trim() || null,
       });
 
-      // Upload avatar if changed
       if (avatarFile && appUser.id) {
         const { uploadAvatar } = await import('@/supabase/storage');
         const avatarUrl = await uploadAvatar(appUser.id, avatarFile);
         if (avatarUrl) await updateProfile(appUser.id, { avatar_url: avatarUrl });
       }
 
-      // Handle portfolio items
       const activeItems = portfolioItems.filter(p => !p.isDeleted);
       const deletedItems = portfolioItems.filter(p => p.isDeleted && !p.isNew);
 
-      // Upload new items
       const uploadPromises = activeItems.filter(p => p.isNew && p.file).map(async (item, idx) => {
         if (!item.file || !appUser?.id) return;
         setUploadProgress(prev => ({ ...prev, [item.id]: true }));
@@ -213,26 +206,21 @@ export default function EditBarberProfile({ onBack, userRole: _userRole }: EditB
               sort_order: idx,
               thumbnail_url: null,
             });
-            // Update the local item with the real DB id
             setPortfolioItems(prev => prev.map(p => p.id === item.id ? { ...p, ...dbItem, file: undefined, previewUrl: undefined, isNew: false } : p));
           }
         } catch (err) {
           console.error('Failed to upload portfolio item:', err);
-          // Mark upload as failed
           setUploadProgress(prev => ({ ...prev, [item.id]: false }));
         }
       });
 
       await Promise.all(uploadPromises);
 
-      // Delete removed items
       for (const item of deletedItems) {
         try {
-          // Extract file path from URL
           const urlParts = item.url.split('/');
           const fileName = urlParts[urlParts.length - 1];
-          const folder = item.professional_id;
-          const fullPath = `${folder}/${fileName}`;
+          const fullPath = `${item.professional_id}/${fileName}`;
           await deletePortfolioFile(fullPath);
         } catch (err) {
           console.error('Failed to delete portfolio file:', err);
@@ -244,9 +232,8 @@ export default function EditBarberProfile({ onBack, userRole: _userRole }: EditB
         }
       }
 
-      // Update captions for existing items that were modified
       for (const item of activeItems) {
-        if (!item.isNew && item.id && (item.caption || item.sort_order !== undefined)) {
+        if (!item.isNew && item.id) {
           try {
             await updatePortfolioItem(item.id, {
               caption: item.caption || null,
@@ -258,16 +245,13 @@ export default function EditBarberProfile({ onBack, userRole: _userRole }: EditB
         }
       }
 
-      // Clean up deleted items from local state
       setPortfolioItems(prev => prev.filter(p => !p.isDeleted));
-
       setSuccess(true);
       setAvatarFile(null);
       setTimeout(() => { onBack(); }, 2000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'فشل تحديث البيانات');
+      setServerError(err instanceof Error ? err.message : 'فشل تحديث البيانات');
     } finally {
-      setIsLoading(false);
       setUploadProgress({});
     }
   };
@@ -283,6 +267,15 @@ export default function EditBarberProfile({ onBack, userRole: _userRole }: EditB
   const activeItems = portfolioItems.filter(p => !p.isDeleted);
   const isUploading = Object.values(uploadProgress).some(v => v === true);
 
+  const getFieldStyle = (fieldName: keyof EditBarberProfileFormData) => {
+    const hasError = !!formErrors[fieldName];
+    return {
+      backgroundColor: themeConfig.colors.background,
+      borderColor: hasError ? themeConfig.colors.error : themeConfig.colors.border,
+      color: themeConfig.colors.text,
+    };
+  };
+
   return (
     <div className="pb-20 min-h-screen" style={{ backgroundColor: themeConfig.colors.background }}>
       <div className="sticky top-0 z-30 flex items-center gap-3 px-4 py-3 backdrop-blur-lg border-b" style={{ backgroundColor: `${themeConfig.colors.background}ee`, borderColor: themeConfig.colors.border }}>
@@ -290,11 +283,13 @@ export default function EditBarberProfile({ onBack, userRole: _userRole }: EditB
         <h2 className="text-base font-bold" style={{ color: themeConfig.colors.text }}>تعديل البروفايل</h2>
       </div>
 
-      <form onSubmit={handleSubmit} className="px-4 mt-4 space-y-4">
-        {error && (
+      <form onSubmit={handleFormSubmit(onSubmit)} className="px-4 mt-4 space-y-4">
+        {(serverError || Object.keys(formErrors).length > 0) && (
           <div className="p-3 rounded-xl flex items-start gap-3" style={{ backgroundColor: themeConfig.colors.error + '15' }}>
             <AlertCircle size={18} style={{ color: themeConfig.colors.error }} className="flex-shrink-0 mt-0.5" />
-            <p className="text-xs" style={{ color: themeConfig.colors.error }}>{error}</p>
+            <p className="text-xs" style={{ color: themeConfig.colors.error }}>
+              {serverError || Object.values(formErrors)[0]?.message as string || ''}
+            </p>
           </div>
         )}
         {success && (
@@ -325,12 +320,37 @@ export default function EditBarberProfile({ onBack, userRole: _userRole }: EditB
         <div>
           <h3 className="text-xs font-bold mb-3 px-1" style={{ color: themeConfig.colors.textMuted }}>المعلومات الأساسية</h3>
           <div className="space-y-3 rounded-2xl border p-4" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
-            <div><label className="text-xs font-bold mb-1.5 block" style={{ color: themeConfig.colors.text }}>الاسم الكامل *</label>
-              <input type="text" value={formData.full_name} onChange={(e) => handleInputChange('full_name', e.target.value)} placeholder="أدخل اسمك" className="w-full px-3 py-2.5 rounded-lg text-sm border" style={{ backgroundColor: themeConfig.colors.background, borderColor: themeConfig.colors.border, color: themeConfig.colors.text }} /></div>
-            <div><label className="text-xs font-bold mb-1.5 block" style={{ color: themeConfig.colors.text }}>النبذة الشخصية</label>
-              <textarea value={formData.bio} onChange={(e) => handleInputChange('bio', e.target.value)} placeholder="أخبرنا عن نفسك" rows={3} className="w-full px-3 py-2.5 rounded-lg text-sm border resize-none" style={{ backgroundColor: themeConfig.colors.background, borderColor: themeConfig.colors.border, color: themeConfig.colors.text }} /></div>
-            <div><label className="text-xs font-bold mb-1.5 block" style={{ color: themeConfig.colors.text }}>رقم الهاتف</label>
-              <input type="tel" value={formData.phone_number} onChange={(e) => handleInputChange('phone_number', e.target.value)} placeholder="+213 XXX XXX XXX" className="w-full px-3 py-2.5 rounded-lg text-sm border" style={{ backgroundColor: themeConfig.colors.background, borderColor: themeConfig.colors.border, color: themeConfig.colors.text }} /></div>
+            <div>
+              <label className="text-xs font-bold mb-1.5 block" style={{ color: themeConfig.colors.text }}>الاسم الكامل *</label>
+              <input
+                type="text"
+                {...register('full_name')}
+                placeholder="أدخل اسمك"
+                className="w-full px-3 py-2.5 rounded-lg text-sm border"
+                style={getFieldStyle('full_name')}
+              />
+              {formErrors.full_name && <p className="text-[10px] mt-1" style={{ color: themeConfig.colors.error }}>{formErrors.full_name.message}</p>}
+            </div>
+            <div>
+              <label className="text-xs font-bold mb-1.5 block" style={{ color: themeConfig.colors.text }}>النبذة الشخصية</label>
+              <textarea
+                {...register('bio')}
+                placeholder="أخبرنا عن نفسك"
+                rows={3}
+                className="w-full px-3 py-2.5 rounded-lg text-sm border resize-none"
+                style={getFieldStyle('bio')}
+              />
+            </div>
+            <div>
+              <label className="text-xs font-bold mb-1.5 block" style={{ color: themeConfig.colors.text }}>رقم الهاتف</label>
+              <input
+                type="tel"
+                {...register('phone_number')}
+                placeholder="+213 XXX XXX XXX"
+                className="w-full px-3 py-2.5 rounded-lg text-sm border"
+                style={getFieldStyle('phone_number')}
+              />
+            </div>
           </div>
         </div>
 
@@ -338,16 +358,58 @@ export default function EditBarberProfile({ onBack, userRole: _userRole }: EditB
         <div>
           <h3 className="text-xs font-bold mb-3 px-1" style={{ color: themeConfig.colors.textMuted }}>معلومات العمل</h3>
           <div className="space-y-3 rounded-2xl border p-4" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
-            <div><label className="text-xs font-bold mb-1.5 block" style={{ color: themeConfig.colors.text }}>اسم الصالون</label>
-              <input type="text" value={formData.business_name} onChange={(e) => handleInputChange('business_name', e.target.value)} placeholder="اسم الصالون" className="w-full px-3 py-2.5 rounded-lg text-sm border" style={{ backgroundColor: themeConfig.colors.background, borderColor: themeConfig.colors.border, color: themeConfig.colors.text }} /></div>
-            <div><label className="text-xs font-bold mb-1.5 block" style={{ color: themeConfig.colors.text }}>عنوان العمل</label>
-              <input type="text" value={formData.business_address} onChange={(e) => handleInputChange('business_address', e.target.value)} placeholder="عنوان الصالون" className="w-full px-3 py-2.5 rounded-lg text-sm border" style={{ backgroundColor: themeConfig.colors.background, borderColor: themeConfig.colors.border, color: themeConfig.colors.text }} /></div>
-            <div><label className="text-xs font-bold mb-1.5 block" style={{ color: themeConfig.colors.text }}>هاتف العمل</label>
-              <input type="tel" value={formData.business_phone} onChange={(e) => handleInputChange('business_phone', e.target.value)} placeholder="هاتف الصالون" className="w-full px-3 py-2.5 rounded-lg text-sm border" style={{ backgroundColor: themeConfig.colors.background, borderColor: themeConfig.colors.border, color: themeConfig.colors.text }} /></div>
-            <div><label className="text-xs font-bold mb-1.5 block" style={{ color: themeConfig.colors.text }}>بريد العمل</label>
-              <input type="email" value={formData.business_email} onChange={(e) => handleInputChange('business_email', e.target.value)} placeholder="email@salon.com" className="w-full px-3 py-2.5 rounded-lg text-sm border" style={{ backgroundColor: themeConfig.colors.background, borderColor: themeConfig.colors.border, color: themeConfig.colors.text }} /></div>
-            <div><label className="text-xs font-bold mb-1.5 block" style={{ color: themeConfig.colors.text }}>الموقع الإلكتروني</label>
-              <input type="text" value={formData.website_url} onChange={(e) => handleInputChange('website_url', e.target.value)} placeholder="https://" className="w-full px-3 py-2.5 rounded-lg text-sm border" style={{ backgroundColor: themeConfig.colors.background, borderColor: themeConfig.colors.border, color: themeConfig.colors.text }} /></div>
+            <div>
+              <label className="text-xs font-bold mb-1.5 block" style={{ color: themeConfig.colors.text }}>اسم الصالون</label>
+              <input
+                type="text"
+                {...register('business_name')}
+                placeholder="اسم الصالون"
+                className="w-full px-3 py-2.5 rounded-lg text-sm border"
+                style={getFieldStyle('business_name')}
+              />
+            </div>
+            <div>
+              <label className="text-xs font-bold mb-1.5 block" style={{ color: themeConfig.colors.text }}>عنوان العمل</label>
+              <input
+                type="text"
+                {...register('business_address')}
+                placeholder="عنوان الصالون"
+                className="w-full px-3 py-2.5 rounded-lg text-sm border"
+                style={getFieldStyle('business_address')}
+              />
+            </div>
+            <div>
+              <label className="text-xs font-bold mb-1.5 block" style={{ color: themeConfig.colors.text }}>هاتف العمل</label>
+              <input
+                type="tel"
+                {...register('business_phone')}
+                placeholder="هاتف الصالون"
+                className="w-full px-3 py-2.5 rounded-lg text-sm border"
+                style={getFieldStyle('business_phone')}
+              />
+            </div>
+            <div>
+              <label className="text-xs font-bold mb-1.5 block" style={{ color: themeConfig.colors.text }}>بريد العمل</label>
+              <input
+                type="email"
+                {...register('business_email')}
+                placeholder="email@salon.com"
+                className="w-full px-3 py-2.5 rounded-lg text-sm border"
+                style={getFieldStyle('business_email')}
+              />
+              {formErrors.business_email && <p className="text-[10px] mt-1" style={{ color: themeConfig.colors.error }}>{formErrors.business_email.message}</p>}
+            </div>
+            <div>
+              <label className="text-xs font-bold mb-1.5 block" style={{ color: themeConfig.colors.text }}>الموقع الإلكتروني</label>
+              <input
+                type="text"
+                {...register('website_url')}
+                placeholder="https://"
+                className="w-full px-3 py-2.5 rounded-lg text-sm border"
+                style={getFieldStyle('website_url')}
+              />
+              {formErrors.website_url && <p className="text-[10px] mt-1" style={{ color: themeConfig.colors.error }}>{formErrors.website_url.message}</p>}
+            </div>
           </div>
         </div>
 
@@ -373,20 +435,14 @@ export default function EditBarberProfile({ onBack, userRole: _userRole }: EditB
                       {item.type === 'video' ? <Video size={24} style={{ color: themeConfig.colors.textMuted }} /> : <ImageIcon size={24} style={{ color: themeConfig.colors.textMuted }} />}
                     </div>
                   )}
-
-                  {/* Type badge */}
                   <div className="absolute top-1 left-1 px-1.5 py-0.5 rounded-md text-[8px] font-bold"
                     style={{ backgroundColor: item.type === 'video' ? '#8B5CF6' : themeConfig.colors.primary, color: '#fff' }}>
                     {item.type === 'video' ? 'فيديو' : 'صورة'}
                   </div>
-
-                  {/* Delete button */}
                   <button type="button" onClick={() => removePortfolioItem(portfolioItems.findIndex(p => p.id === item.id))}
                     className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                     <Trash2 size={24} color="white" />
                   </button>
-
-                  {/* Upload loading indicator */}
                   {uploadProgress[item.id] && (
                     <div className="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center">
                       <Loader2 size={20} className="animate-spin text-white" />
@@ -395,7 +451,6 @@ export default function EditBarberProfile({ onBack, userRole: _userRole }: EditB
                 </div>
               ))}
 
-              {/* Add new button */}
               {!isUploading && activeItems.length < MAX_PORTFOLIO_ITEMS && (
                 <label htmlFor="portfolio-upload" className="flex flex-col items-center justify-center w-full aspect-square rounded-lg border-2 border-dashed cursor-pointer"
                   style={{ borderColor: themeConfig.colors.border, color: themeConfig.colors.textMuted }}>
@@ -404,8 +459,6 @@ export default function EditBarberProfile({ onBack, userRole: _userRole }: EditB
                 </label>
               )}
             </div>
-
-            {/* File type hint */}
             <p className="text-[10px]" style={{ color: themeConfig.colors.textMuted }}>
               يدعم الصور (JPG, PNG, WebP) والفيديو (MP4, WebM) - الحد الأقصى 10 ميجابايت لكل ملف
             </p>
@@ -435,8 +488,8 @@ export default function EditBarberProfile({ onBack, userRole: _userRole }: EditB
         {/* Submit */}
         <div className="flex gap-2 pt-4">
           <button type="button" onClick={onBack} className="flex-1 h-12 rounded-xl text-sm font-bold border transition-all" style={{ borderColor: themeConfig.colors.border, color: themeConfig.colors.text }}>إلغاء</button>
-          <button type="submit" disabled={isLoading || isUploading} className="flex-1 h-12 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 transition-all disabled:opacity-50" style={{ backgroundColor: themeConfig.colors.primary }}>
-            {isLoading ? <><div className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin" />جاري الحفظ...</> : isUploading ? <><Loader2 size={16} className="animate-spin" />جاري الرفع...</> : <><Save size={16} />حفظ التغييرات</>}
+          <button type="submit" disabled={isSubmitting || isUploading} className="flex-1 h-12 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 transition-all disabled:opacity-50" style={{ backgroundColor: themeConfig.colors.primary }}>
+            {isSubmitting ? <><div className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin" />جاري الحفظ...</> : isUploading ? <><Loader2 size={16} className="animate-spin" />جاري الرفع...</> : <><Save size={16} />حفظ التغييرات</>}
           </button>
         </div>
       </form>

@@ -1,43 +1,53 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useApp } from '../../contexts/useApp';
 import { supabase } from '../../supabase/client';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Mail, ArrowRight, AlertCircle, CheckCircle } from 'lucide-react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { forgotPasswordSchema } from '@/lib/validation';
+import type { ForgotPasswordFormData } from '@/lib/validation';
 
 const ForgotPassword = () => {
   const { navigate, themeConfig } = useApp();
-  const [email, setEmail] = useState('');
+
+  const {
+    register,
+    handleSubmit: handleFormSubmit,
+    formState: { errors: formErrors, isSubmitting },
+  } = useForm<ForgotPasswordFormData>({
+    resolver: zodResolver(forgotPasswordSchema),
+    defaultValues: {
+      email: '',
+    },
+  });
+
   const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [localError, setLocalError] = useState('');
   const [success, setSuccess] = useState(false);
 
-  const handleResetPassword = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const error = localError || '';
+
+  const onSubmit = async (data: ForgotPasswordFormData) => {
     setMessage('');
-    setError('');
-    setLoading(true);
+    setLocalError('');
 
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      const { error } = await supabase.auth.resetPasswordForEmail(data.email, {
         redirectTo: `${window.location.origin}/reset-password`,
       });
 
       if (error) {
-        setError(error.message || 'فشل إرسال رابط إعادة التعيين. حاول مرة أخرى.');
-        setLoading(false);
+        setLocalError(error.message || 'فشل إرسال رابط إعادة التعيين. حاول مرة أخرى.');
       } else {
         setSuccess(true);
         setMessage('تم إرسال رابط إعادة تعيين كلمة المرور إلى بريدك الإلكتروني. يرجى التحقق من صندوق الوارد.');
-        setEmail('');
-        setLoading(false);
         setTimeout(() => {
           navigate('login');
         }, 3000);
       }
     } catch (err) {
-      setError('حدث خطأ غير متوقع. حاول مرة أخرى.');
-      setLoading(false);
+      setLocalError('حدث خطأ غير متوقع. حاول مرة أخرى.');
       console.error('Password reset error:', err);
     }
   };
@@ -126,7 +136,7 @@ const ForgotPassword = () => {
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2, duration: 0.4 }}
-          onSubmit={handleResetPassword}
+          onSubmit={handleFormSubmit(onSubmit)}
           className="flex-1 px-5 space-y-4 mt-6"
         >
           {/* Email */}
@@ -138,39 +148,50 @@ const ForgotPassword = () => {
               <Mail
                 size={16}
                 className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
-                style={{ color: themeConfig.colors.textMuted }}
+                style={{ color: formErrors.email ? themeConfig.colors.error : themeConfig.colors.textMuted }}
               />
               <input
                 type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                {...register('email')}
                 placeholder="example@email.com"
                 dir="ltr"
                 autoComplete="email"
-                disabled={loading}
-                required
+                disabled={isSubmitting}
                 className="w-full h-[52px] pr-10 pl-4 text-sm rounded-2xl outline-none transition-all duration-200 disabled:opacity-50"
                 style={{
                   backgroundColor: themeConfig.colors.surface,
                   color: themeConfig.colors.text,
-                  border: `2px solid ${themeConfig.colors.border}`,
+                  border: `2px solid ${formErrors.email ? themeConfig.colors.error : themeConfig.colors.border}`,
                 }}
               />
             </div>
+            <AnimatePresence>
+              {formErrors.email && (
+                <motion.p
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  className="text-[11px] font-semibold mt-1.5 px-1"
+                  style={{ color: themeConfig.colors.error }}
+                >
+                  {formErrors.email.message}
+                </motion.p>
+              )}
+            </AnimatePresence>
           </div>
 
           {/* Submit Button */}
           <motion.button
             type="submit"
-            disabled={loading || !email}
-            whileTap={loading ? {} : { scale: 0.97 }}
+            disabled={isSubmitting}
+            whileTap={isSubmitting ? {} : { scale: 0.97 }}
             className="w-full h-[52px] rounded-2xl text-sm font-bold text-white transition-all duration-200 flex items-center justify-center gap-2.5 disabled:opacity-60 mt-6"
             style={{
               backgroundColor: themeConfig.colors.primary,
               boxShadow: `0 4px 16px ${themeConfig.colors.primary}30`,
             }}
           >
-            {loading ? (
+            {isSubmitting ? (
               <motion.div
                 animate={{ rotate: 360 }}
                 transition={{ repeat: Infinity, duration: 0.8, ease: 'linear' }}

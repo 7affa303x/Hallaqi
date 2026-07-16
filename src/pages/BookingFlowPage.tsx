@@ -12,6 +12,10 @@ import { useCCPPayment } from '@/hooks/useCCPPayment';
 import { ReceiptUpload } from '@/components/payment/ReceiptUpload';
 import type { Service, BookingStatus, PaymentStatus } from '@/types';
 import type { Database } from '@/types/supabase';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { bookingStep3Schema } from '@/lib/validation';
+import type { BookingStep3FormData } from '@/lib/validation';
 
 const ALL_TIME_SLOTS = [
   '08:00', '08:30', '09:00', '09:30', '10:00', '10:30',
@@ -85,15 +89,11 @@ export default function BookingFlowPage() {
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [selectedTime, setSelectedTime] = useState<string>('');
-  const [paymentMethod, setPaymentMethod] = useState<'ccp' | 'baridi-mob' | 'cash' | 'card'>('cash');
   const { initiatePayment, isProcessing: isPaymentProcessing, error: paymentError } = usePayment();
   const { createCCPPayment, uploadReceiptAndSubmit, isProcessing: isCCPProcessing, uploadProgress, error: ccpError } = useCCPPayment();
   const [showReceiptUpload, setShowReceiptUpload] = useState(false);
   const [ccpPaymentId, setCcpPaymentId] = useState<string | null>(null);
   const [savedBookingId, setSavedBookingId] = useState<string | null>(null);
-  const [note, setNote] = useState('');
-  const [isMobileService, setIsMobileService] = useState(false);
-  const [address, setAddress] = useState('');
   const [confirmed, setConfirmed] = useState(false);
   const [existingBookings, setExistingBookings] = useState<Array<{
     booking_start_time: string | null;
@@ -103,6 +103,24 @@ export default function BookingFlowPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [isLoadingSlots, setIsLoadingSlots] = useState(false);
+
+  const {
+    register: registerStep3,
+    handleSubmit: handleStep3Submit,
+    formState: { errors: step3Errors },
+    watch: watchStep3,
+  } = useForm<BookingStep3FormData>({
+    resolver: zodResolver(bookingStep3Schema),
+    defaultValues: {
+      paymentMethod: 'cash',
+      note: '',
+      isMobileService: false,
+      address: '',
+    },
+  });
+
+  const watchedPaymentMethod = watchStep3('paymentMethod');
+  const watchedIsMobileService = watchStep3('isMobileService');
 
   const barber = barbers.find(b => b.id === screenParams?.barberId);
   const dates = generateDates();
@@ -201,7 +219,7 @@ export default function BookingFlowPage() {
     return end.toISOString();
   };
 
-  const handleConfirm = async () => {
+  const handleConfirmStep3 = async (data: BookingStep3FormData) => {
     if (!appUser) {
       setSaveError('يجب تسجيل الدخول لإتمام الحجز');
       return;
@@ -235,7 +253,7 @@ export default function BookingFlowPage() {
         booking_end_time: bookingEndTime,
         status: 'pending' as BookingStatus,
         total_price: totalPrice,
-        notes: note || null,
+        notes: data.note || null,
         payment_status: 'pending' as PaymentStatus,
       };
 
@@ -243,7 +261,7 @@ export default function BookingFlowPage() {
 
       if (saved) {
         // If card payment selected, redirect to Stripe Checkout
-        if (paymentMethod === 'card') {
+        if (data.paymentMethod === 'card') {
           const baseUrl = window.location.origin;
           const lineItems = selectedServicesData.map(svc => ({
             name: svc.name,
@@ -274,7 +292,7 @@ export default function BookingFlowPage() {
         }
 
         // For CCP/BaridiMob, create a payment record and show receipt upload
-        if (paymentMethod === 'ccp' || paymentMethod === 'baridi-mob') {
+        if (data.paymentMethod === 'ccp' || data.paymentMethod === 'baridi-mob') {
           const paymentId = await createCCPPayment({
             bookingId: saved.id,
             clientId: appUser.id,
@@ -285,7 +303,7 @@ export default function BookingFlowPage() {
               barber_name: barber.name,
               booking_date: selectedDate,
               booking_time: selectedTime,
-              payment_method: paymentMethod,
+              payment_method: data.paymentMethod,
             },
           });
           if (paymentId) {
@@ -296,6 +314,7 @@ export default function BookingFlowPage() {
             return;
           }
         }
+
         // For non-card payments, proceed as before
         // Notify the barber that they received a new booking
         try {
@@ -332,14 +351,14 @@ export default function BookingFlowPage() {
           time: selectedTime,
           status: 'pending' as BookingStatus,
           totalPrice: totalPrice,
-          note: note || undefined,
+          note: data.note || undefined,
           createdAt: new Date().toISOString(),
           location: barber.location,
-          isMobileService: isMobileService,
-          paymentMethod: paymentMethod,
+          isMobileService: data.isMobileService,
+          paymentMethod: data.paymentMethod,
           paymentStatus: 'pending' as PaymentStatus,
           reviewed: false,
-          address: isMobileService ? address : undefined,
+          address: data.isMobileService ? data.address : undefined,
         };
         addBooking(newBooking as unknown as Parameters<typeof addBooking>[0]);
 
@@ -358,7 +377,6 @@ export default function BookingFlowPage() {
 
   // Show receipt upload screen for CCP/BaridiMob
   if (showReceiptUpload && ccpPaymentId && savedBookingId) {
-    const barber = barbers.find(b => b.id === screenParams?.barberId);
     return (
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -373,7 +391,7 @@ export default function BookingFlowPage() {
           <h1 className="text-lg font-bold" style={{ color: themeConfig.colors.text }}>رفع إيصال الدفع</h1>
         </div>
         <ReceiptUpload
-          paymentMethod={paymentMethod as 'ccp' | 'baridi-mob'}
+          paymentMethod={watchedPaymentMethod as 'ccp' | 'baridi-mob'}
           isUploading={isCCPProcessing}
           uploadProgress={uploadProgress}
           error={ccpError}
@@ -498,7 +516,7 @@ export default function BookingFlowPage() {
             {barber.services.map((svc: Service) => {
               const isSelected = selectedServices.includes(svc.id);
               return (
-                <button key={svc.id} onClick={() => toggleService(svc.id)}
+                <button key={svc.id} type="button" onClick={() => toggleService(svc.id)}
                   className="w-full flex items-center gap-3 p-3 rounded-2xl border transition-all text-right"
                   style={{ backgroundColor: isSelected ? themeConfig.colors.primary + '08' : themeConfig.colors.surface, borderColor: isSelected ? themeConfig.colors.primary : themeConfig.colors.border }}>
                   <div className="w-5 h-5 rounded-lg border-2 flex items-center justify-center flex-shrink-0" style={{ borderColor: isSelected ? themeConfig.colors.primary : themeConfig.colors.border, backgroundColor: isSelected ? themeConfig.colors.primary : 'transparent' }}>
@@ -511,7 +529,7 @@ export default function BookingFlowPage() {
             })}
           </div>
 
-          <button onClick={() => selectedServices.length > 0 ? setStep(2) : setSaveError('اختر خدمة واحدة على الأقل')} className="w-full h-12 rounded-xl text-sm font-bold text-white mt-4" style={{ backgroundColor: themeConfig.colors.primary }}>متابعة</button>
+          <button type="button" onClick={() => selectedServices.length > 0 ? setStep(2) : setSaveError('اختر خدمة واحدة على الأقل')} className="w-full h-12 rounded-xl text-sm font-bold text-white mt-4" style={{ backgroundColor: themeConfig.colors.primary }}>متابعة</button>
         </div>
       )}
 
@@ -526,7 +544,7 @@ export default function BookingFlowPage() {
                 const isAvailable = isDateAvailable(d.full);
                 const isSelected = selectedDate === d.full;
                 return (
-                  <button key={d.full} onClick={() => { if (isAvailable) { setSelectedDate(d.full); setSelectedTime(''); } }}
+                  <button key={d.full} type="button" onClick={() => { if (isAvailable) { setSelectedDate(d.full); setSelectedTime(''); } }}
                     disabled={!isAvailable}
                     className="flex-shrink-0 w-16 h-20 rounded-2xl border flex flex-col items-center justify-center gap-1 transition-all disabled:opacity-40"
                     style={{ backgroundColor: isSelected ? themeConfig.colors.primary : themeConfig.colors.surface, borderColor: isSelected ? themeConfig.colors.primary : themeConfig.colors.border }}>
@@ -550,7 +568,7 @@ export default function BookingFlowPage() {
                   {timeSlots.map(slot => {
                     const isSelected = selectedTime === slot;
                     return (
-                      <button key={slot} onClick={() => setSelectedTime(slot)}
+                      <button key={slot} type="button" onClick={() => setSelectedTime(slot)}
                         className="h-10 rounded-xl text-xs font-bold border transition-all"
                         style={{ backgroundColor: isSelected ? themeConfig.colors.primary : themeConfig.colors.surface, borderColor: isSelected ? themeConfig.colors.primary : themeConfig.colors.border, color: isSelected ? '#fff' : themeConfig.colors.text }}>
                         {slot}
@@ -562,13 +580,13 @@ export default function BookingFlowPage() {
             </div>
           )}
 
-          <button onClick={() => selectedTime ? setStep(3) : setSaveError('اختر الوقت')} className="w-full h-12 rounded-xl text-sm font-bold text-white mt-4" style={{ backgroundColor: themeConfig.colors.primary }}>متابعة</button>
+          <button type="button" onClick={() => selectedTime ? setStep(3) : setSaveError('اختر الوقت')} className="w-full h-12 rounded-xl text-sm font-bold text-white mt-4" style={{ backgroundColor: themeConfig.colors.primary }}>متابعة</button>
         </div>
       )}
 
       {/* === STEP 3: CONFIRM === */}
       {step === 3 && (
-        <div className="px-4 mt-4 space-y-4">
+        <form onSubmit={handleStep3Submit(handleConfirmStep3)} className="px-4 mt-4 space-y-4">
           {/* Booking summary */}
           <div className="rounded-2xl border p-4" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
             <div className="flex items-center gap-2 mb-3"><img src={barber.avatar} alt={barber.name} className="w-8 h-8 rounded-lg object-cover" /><p className="text-sm font-bold" style={{ color: themeConfig.colors.text }}>{barber.name}</p></div>
@@ -588,11 +606,11 @@ export default function BookingFlowPage() {
             <p className="text-xs font-bold mb-2" style={{ color: themeConfig.colors.text }}>طريقة الدفع</p>
             <div className="grid grid-cols-4 gap-2">
               {[{ key: 'card' as const, label: 'بطاقة', icon: CreditCard }, { key: 'cash' as const, label: 'نقداً', icon: Banknote }, { key: 'ccp' as const, label: 'CCP', icon: CreditCard }, { key: 'baridi-mob' as const, label: 'بريدي موب', icon: Wallet }].map(pm => (
-                <button key={pm.key} onClick={() => setPaymentMethod(pm.key)}
+                <button key={pm.key} type="button" onClick={() => registerStep3('paymentMethod').onChange({ target: { value: pm.key } })}
                   className="flex flex-col items-center gap-1 p-3 rounded-xl border transition-all"
-                  style={{ backgroundColor: paymentMethod === pm.key ? themeConfig.colors.primary + '08' : themeConfig.colors.surface, borderColor: paymentMethod === pm.key ? themeConfig.colors.primary : themeConfig.colors.border }}>
-                  <pm.icon size={20} style={{ color: paymentMethod === pm.key ? themeConfig.colors.primary : themeConfig.colors.textMuted }} />
-                  <span className="text-[10px] font-bold" style={{ color: paymentMethod === pm.key ? themeConfig.colors.primary : themeConfig.colors.textMuted }}>{pm.label}</span>
+                  style={{ backgroundColor: watchedPaymentMethod === pm.key ? themeConfig.colors.primary + '08' : themeConfig.colors.surface, borderColor: watchedPaymentMethod === pm.key ? themeConfig.colors.primary : themeConfig.colors.border }}>
+                  <pm.icon size={20} style={{ color: watchedPaymentMethod === pm.key ? themeConfig.colors.primary : themeConfig.colors.textMuted }} />
+                  <span className="text-[10px] font-bold" style={{ color: watchedPaymentMethod === pm.key ? themeConfig.colors.primary : themeConfig.colors.textMuted }}>{pm.label}</span>
                 </button>
               ))}
             </div>
@@ -601,26 +619,27 @@ export default function BookingFlowPage() {
           {/* Mobile service */}
           <div className="flex items-center justify-between p-3 rounded-xl border" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
             <div className="flex items-center gap-2"><Car size={18} style={{ color: themeConfig.colors.primary }} /><span className="text-xs font-bold" style={{ color: themeConfig.colors.text }}>خدمة متنقلة (يأتي لعندك)</span></div>
-            <button onClick={() => setIsMobileService(!isMobileService)} className="w-12 h-6 rounded-full relative transition-all" style={{ backgroundColor: isMobileService ? themeConfig.colors.primary : themeConfig.colors.border }}>
-              <div className="w-5 h-5 rounded-full bg-white absolute top-0.5 transition-all" style={{ right: isMobileService ? '2px' : 'auto', left: isMobileService ? 'auto' : '2px' }} />
+            <button type="button" onClick={() => registerStep3('isMobileService').onChange({ target: { value: !watchedIsMobileService } })} className="w-12 h-6 rounded-full relative transition-all" style={{ backgroundColor: watchedIsMobileService ? themeConfig.colors.primary : themeConfig.colors.border }}>
+              <div className="w-5 h-5 rounded-full bg-white absolute top-0.5 transition-all" style={{ right: watchedIsMobileService ? '2px' : 'auto', left: watchedIsMobileService ? 'auto' : '2px' }} />
             </button>
           </div>
 
           {/* Address for mobile */}
-          {isMobileService && (
+          {watchedIsMobileService && (
             <div>
               <p className="text-xs font-bold mb-2" style={{ color: themeConfig.colors.text }}>العنوان</p>
-              <div className="flex items-center gap-2 p-3 rounded-xl border" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
-                <MapPin size={16} style={{ color: themeConfig.colors.primary }} />
-                <input type="text" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="أدخل عنوانك" className="flex-1 bg-transparent text-xs outline-none" style={{ color: themeConfig.colors.text }} />
+              <div className="flex items-center gap-2 p-3 rounded-xl border" style={{ backgroundColor: themeConfig.colors.surface, borderColor: step3Errors.address ? themeConfig.colors.error : themeConfig.colors.border }}>
+                <MapPin size={16} style={{ color: step3Errors.address ? themeConfig.colors.error : themeConfig.colors.primary }} />
+                <input type="text" {...registerStep3('address')} placeholder="أدخل عنوانك" className="flex-1 text-xs outline-none" style={{ backgroundColor: 'transparent', color: themeConfig.colors.text }} />
               </div>
+              {step3Errors.address && <p className="text-[10px] mt-1" style={{ color: themeConfig.colors.error }}>{step3Errors.address.message}</p>}
             </div>
           )}
 
           {/* Note */}
           <div>
             <p className="text-xs font-bold mb-2" style={{ color: themeConfig.colors.text }}>ملاحظات (اختياري)</p>
-            <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="أي ملاحظات خاصة..." rows={2} className="w-full p-3 rounded-xl border text-xs resize-none" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border, color: themeConfig.colors.text }} />
+            <textarea {...registerStep3('note')} placeholder="أي ملاحظات خاصة..." rows={2} className="w-full p-3 rounded-xl border text-xs resize-none" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border, color: themeConfig.colors.text }} />
           </div>
 
           {(saveError || paymentError || ccpError) && (
@@ -630,12 +649,12 @@ export default function BookingFlowPage() {
             </div>
           )}
 
-          <button onClick={handleConfirm} disabled={isSaving || isPaymentProcessing || isCCPProcessing}
+          <button type="submit" disabled={isSaving || isPaymentProcessing || isCCPProcessing}
             className="w-full h-12 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 transition-all disabled:opacity-50"
             style={{ backgroundColor: themeConfig.colors.primary }}>
-            {(isSaving || isPaymentProcessing || isCCPProcessing) ? <><div className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin" /> {paymentMethod === 'card' ? 'جاري التوجيه للدفع...' : 'جاري الحفظ...'}</> : <>{paymentMethod === 'card' ? `الدفع بالبطاقة - ${totalPrice} دج` : `تأكيد الحجز - ${totalPrice} دج`}</>}
+            {(isSaving || isPaymentProcessing || isCCPProcessing) ? <><div className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin" /> {watchedPaymentMethod === 'card' ? 'جاري التوجيه للدفع...' : 'جاري الحفظ...'}</> : <>{watchedPaymentMethod === 'card' ? `الدفع بالبطاقة - ${totalPrice} دج` : `تأكيد الحجز - ${totalPrice} دج`}</>}
           </button>
-        </div>
+        </form>
       )}
     </motion.div>
   );

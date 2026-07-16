@@ -1,37 +1,52 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useApp } from '../../contexts/useApp';
 import { supabase } from '../../supabase/client';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Lock, Eye, EyeOff, ArrowRight, AlertCircle, CheckCircle } from 'lucide-react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { resetPasswordSchema } from '@/lib/validation';
+import type { ResetPasswordFormData } from '@/lib/validation';
 
 const ResetPassword = () => {
   const { navigate, themeConfig } = useApp();
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+
+  const {
+    register,
+    handleSubmit: handleFormSubmit,
+    formState: { errors: formErrors, isSubmitting },
+
+  } = useForm<ResetPasswordFormData>({
+    resolver: zodResolver(resetPasswordSchema),
+    defaultValues: {
+      password: '',
+      confirmPassword: '',
+    },
+  });
+
   const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
+  const [localError, setLocalError] = useState('');
   const [loading, setLoading] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [success, setSuccess] = useState(false);
 
+  const error = localError || '';
+
   useEffect(() => {
     const checkRecoveryToken = async () => {
       try {
-        // Check if there's a recovery token in the URL
         const { data: { session } } = await supabase.auth.getSession();
         
-        // If no session but we're on /reset-password, the user likely has a recovery token
-        // Supabase will handle this automatically with detectSessionInUrl: true
         if (session?.user || window.location.hash.includes('type=recovery')) {
           setLoading(false);
         } else {
-          setError('لم يتم العثور على رابط إعادة تعيين صحيح. يرجى طلب رابط جديد.');
+          setLocalError('لم يتم العثور على رابط إعادة تعيين صحيح. يرجى طلب رابط جديد.');
           setLoading(false);
         }
       } catch (err) {
         console.error('Error checking recovery token:', err);
-        setError('حدث خطأ في التحقق من الرابط.');
+        setLocalError('حدث خطأ في التحقق من الرابط.');
         setLoading(false);
       }
     };
@@ -39,37 +54,24 @@ const ResetPassword = () => {
     checkRecoveryToken();
   }, []);
 
-  const handleUpdatePassword = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const onSubmit = async (data: ResetPasswordFormData) => {
     setMessage('');
-    setError('');
-
-    if (password !== confirmPassword) {
-      setError('كلمات المرور غير متطابقة.');
-      return;
-    }
-
-    if (password.length < 6) {
-      setError('كلمة المرور يجب أن تكون 6 أحرف على الأقل.');
-      return;
-    }
+    setLocalError('');
 
     try {
-      const { error } = await supabase.auth.updateUser({ password });
+      const { error } = await supabase.auth.updateUser({ password: data.password });
 
       if (error) {
-        setError(error.message || 'فشل تحديث كلمة المرور. حاول مرة أخرى.');
+        setLocalError(error.message || 'فشل تحديث كلمة المرور. حاول مرة أخرى.');
       } else {
         setSuccess(true);
         setMessage('تم تحديث كلمة المرور بنجاح! سيتم إعادة توجيهك للدخول...');
-        setPassword('');
-        setConfirmPassword('');
         setTimeout(() => {
           navigate('login');
         }, 2000);
       }
     } catch (err) {
-      setError('حدث خطأ غير متوقع. حاول مرة أخرى.');
+      setLocalError('حدث خطأ غير متوقع. حاول مرة أخرى.');
       console.error('Password update error:', err);
     }
   };
@@ -177,7 +179,7 @@ const ResetPassword = () => {
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2, duration: 0.4 }}
-          onSubmit={handleUpdatePassword}
+          onSubmit={handleFormSubmit(onSubmit)}
           className="flex-1 px-5 space-y-4 mt-6"
         >
           {/* New Password */}
@@ -189,20 +191,20 @@ const ResetPassword = () => {
               <Lock
                 size={16}
                 className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
-                style={{ color: themeConfig.colors.textMuted }}
+                style={{ color: formErrors.password ? themeConfig.colors.error : themeConfig.colors.textMuted }}
               />
               <input
                 type={showPassword ? 'text' : 'password'}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                {...register('password')}
                 placeholder="••••••••"
                 dir="ltr"
                 autoComplete="new-password"
-                className="w-full h-[52px] pr-10 pl-12 text-sm rounded-2xl outline-none transition-all duration-200"
+                disabled={isSubmitting}
+                className="w-full h-[52px] pr-10 pl-12 text-sm rounded-2xl outline-none transition-all duration-200 disabled:opacity-50"
                 style={{
                   backgroundColor: themeConfig.colors.surface,
                   color: themeConfig.colors.text,
-                  border: `2px solid ${themeConfig.colors.border}`,
+                  border: `2px solid ${formErrors.password ? themeConfig.colors.error : themeConfig.colors.border}`,
                 }}
               />
               <motion.button
@@ -218,6 +220,19 @@ const ResetPassword = () => {
                 }
               </motion.button>
             </div>
+            <AnimatePresence>
+              {formErrors.password && (
+                <motion.p
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  className="text-[11px] font-semibold mt-1.5 px-1"
+                  style={{ color: themeConfig.colors.error }}
+                >
+                  {formErrors.password.message}
+                </motion.p>
+              )}
+            </AnimatePresence>
           </div>
 
           {/* Confirm Password */}
@@ -229,20 +244,20 @@ const ResetPassword = () => {
               <Lock
                 size={16}
                 className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
-                style={{ color: themeConfig.colors.textMuted }}
+                style={{ color: formErrors.confirmPassword ? themeConfig.colors.error : themeConfig.colors.textMuted }}
               />
               <input
                 type={showConfirmPassword ? 'text' : 'password'}
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
+                {...register('confirmPassword')}
                 placeholder="••••••••"
                 dir="ltr"
                 autoComplete="new-password"
-                className="w-full h-[52px] pr-10 pl-12 text-sm rounded-2xl outline-none transition-all duration-200"
+                disabled={isSubmitting}
+                className="w-full h-[52px] pr-10 pl-12 text-sm rounded-2xl outline-none transition-all duration-200 disabled:opacity-50"
                 style={{
                   backgroundColor: themeConfig.colors.surface,
                   color: themeConfig.colors.text,
-                  border: `2px solid ${themeConfig.colors.border}`,
+                  border: `2px solid ${formErrors.confirmPassword ? themeConfig.colors.error : themeConfig.colors.border}`,
                 }}
               />
               <motion.button
@@ -258,19 +273,41 @@ const ResetPassword = () => {
                 }
               </motion.button>
             </div>
+            <AnimatePresence>
+              {formErrors.confirmPassword && (
+                <motion.p
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  className="text-[11px] font-semibold mt-1.5 px-1"
+                  style={{ color: themeConfig.colors.error }}
+                >
+                  {formErrors.confirmPassword.message}
+                </motion.p>
+              )}
+            </AnimatePresence>
           </div>
 
           {/* Submit Button */}
           <motion.button
             type="submit"
-            whileTap={{ scale: 0.97 }}
-            className="w-full h-[52px] rounded-2xl text-sm font-bold text-white transition-all duration-200 flex items-center justify-center gap-2.5 mt-6"
+            disabled={isSubmitting}
+            whileTap={isSubmitting ? {} : { scale: 0.97 }}
+            className="w-full h-[52px] rounded-2xl text-sm font-bold text-white transition-all duration-200 flex items-center justify-center gap-2.5 mt-6 disabled:opacity-60"
             style={{
               backgroundColor: themeConfig.colors.primary,
               boxShadow: `0 4px 16px ${themeConfig.colors.primary}30`,
             }}
           >
-            تحديث كلمة المرور
+            {isSubmitting ? (
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ repeat: Infinity, duration: 0.8, ease: 'linear' }}
+                className="w-5 h-5 border-[2.5px] border-white/30 border-t-white rounded-full"
+              />
+            ) : (
+              'تحديث كلمة المرور'
+            )}
           </motion.button>
         </motion.form>
       )}

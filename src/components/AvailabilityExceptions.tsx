@@ -1,6 +1,10 @@
 import { useState } from 'react';
 import { useApp } from '@/contexts/useApp';
 import { CalendarOff, Plus, AlertCircle, Info } from 'lucide-react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { availabilityExceptionSchema } from '@/lib/validation';
+import type { AvailabilityExceptionFormData } from '@/lib/validation';
 
 interface ExceptionItem {
   id: string;
@@ -21,27 +25,32 @@ export default function AvailabilityExceptions() {
   const [showForm, setShowForm] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Form state
-  const [newDate, setNewDate] = useState('');
-  const [newType, setNewType] = useState('closed');
-  const [newReason, setNewReason] = useState('');
-  const [isAdding, setIsAdding] = useState(false);
+  const {
+    register: registerException,
+    handleSubmit: handleExceptionSubmit,
+    formState: { errors: exceptionErrors, isSubmitting: isAdding },
+    reset: resetExceptionForm,
+    watch: watchException,
+  } = useForm<AvailabilityExceptionFormData>({
+    resolver: zodResolver(availabilityExceptionSchema),
+    defaultValues: {
+      date: '',
+      type: 'closed',
+      reason: '',
+    },
+  });
 
-  const handleAdd = async () => {
-    if (!newDate) {
-      setError('يرجى اختيار التاريخ');
-      return;
-    }
-    setIsAdding(true);
+  const watchedType = watchException('type');
+
+  const onAddException = async () => {
     setError(null);
     try {
       // availability_exceptions table does not exist — show informational message
       setError('ميزة إدارة الاستثناءات غير متاحة حالياً. يرجى تحديث ساعات العمل من إعدادات البروفايل.');
       setShowForm(false);
+      resetExceptionForm({ date: '', type: 'closed', reason: '' });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'فشل إضافة الاستثناء');
-    } finally {
-      setIsAdding(false);
     }
   };
 
@@ -92,7 +101,8 @@ export default function AvailabilityExceptions() {
 
       {/* Add Form */}
       {showForm && (
-        <div
+        <form
+          onSubmit={handleExceptionSubmit(onAddException)}
           className="p-3 rounded-xl border space-y-3"
           style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}
         >
@@ -101,16 +111,16 @@ export default function AvailabilityExceptions() {
             <label className="text-[10px] font-bold block mb-1" style={{ color: themeConfig.colors.textMuted }}>التاريخ</label>
             <input
               type="date"
-              value={newDate}
-              onChange={(e) => setNewDate(e.target.value)}
+              {...registerException('date')}
               min={new Date().toISOString().split('T')[0]}
               className="w-full px-3 py-2 rounded-lg text-xs border"
               style={{
                 backgroundColor: themeConfig.colors.background,
-                borderColor: themeConfig.colors.border,
+                borderColor: exceptionErrors.date ? themeConfig.colors.error : themeConfig.colors.border,
                 color: themeConfig.colors.text,
               }}
             />
+            {exceptionErrors.date && <p className="text-[10px] mt-1" style={{ color: themeConfig.colors.error }}>{exceptionErrors.date.message}</p>}
           </div>
 
           {/* Type */}
@@ -121,12 +131,12 @@ export default function AvailabilityExceptions() {
                 <button
                   key={t.key}
                   type="button"
-                  onClick={() => setNewType(t.key)}
+                  onClick={() => registerException('type').onChange({ target: { value: t.key } })}
                   className="flex-1 px-2 py-1.5 rounded-lg text-[10px] font-bold border transition-all"
                   style={{
-                    backgroundColor: newType === t.key ? themeConfig.colors.primary + '15' : themeConfig.colors.background,
-                    borderColor: newType === t.key ? themeConfig.colors.primary : themeConfig.colors.border,
-                    color: newType === t.key ? themeConfig.colors.primary : themeConfig.colors.textMuted,
+                    backgroundColor: watchedType === t.key ? themeConfig.colors.primary + '15' : themeConfig.colors.background,
+                    borderColor: watchedType === t.key ? themeConfig.colors.primary : themeConfig.colors.border,
+                    color: watchedType === t.key ? themeConfig.colors.primary : themeConfig.colors.textMuted,
                   }}
                 >
                   {t.label}
@@ -140,8 +150,7 @@ export default function AvailabilityExceptions() {
             <label className="text-[10px] font-bold block mb-1" style={{ color: themeConfig.colors.textMuted }}>السبب (اختياري)</label>
             <input
               type="text"
-              value={newReason}
-              onChange={(e) => setNewReason(e.target.value)}
+              {...registerException('reason')}
               placeholder="مثال: عيد الأضحى"
               className="w-full px-3 py-2 rounded-lg text-xs border"
               style={{
@@ -156,23 +165,22 @@ export default function AvailabilityExceptions() {
           <div className="flex gap-2">
             <button
               type="button"
-              onClick={() => setShowForm(false)}
+              onClick={() => { setShowForm(false); resetExceptionForm(); }}
               className="flex-1 h-9 rounded-lg text-[10px] font-bold border"
               style={{ borderColor: themeConfig.colors.border, color: themeConfig.colors.textMuted }}
             >
               إلغاء
             </button>
             <button
-              type="button"
-              onClick={handleAdd}
-              disabled={isAdding || !newDate}
+              type="submit"
+              disabled={isAdding}
               className="flex-1 h-9 rounded-lg text-[10px] font-bold text-white disabled:opacity-50"
               style={{ backgroundColor: themeConfig.colors.primary }}
             >
               {isAdding ? 'جاري الإضافة...' : 'إضافة'}
             </button>
           </div>
-        </div>
+        </form>
       )}
 
       {/* Exceptions List */}

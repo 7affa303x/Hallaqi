@@ -8,33 +8,10 @@ import {
   UserPlus, Mail, Lock, Eye, EyeOff, ArrowRight, User,
   Chrome, AlertCircle, WifiOff, ShieldCheck, Check
 } from 'lucide-react';
-
-/* ------------------------------------------------------------------ */
-/*  Validation                                                         */
-/* ------------------------------------------------------------------ */
-function validateName(name: string): string | null {
-  if (!name.trim()) return 'أدخل اسمك الكامل';
-  if (name.trim().length < 2) return 'الاسم قصير جداً';
-  return null;
-}
-
-function validateEmail(email: string): string | null {
-  if (!email.trim()) return 'أدخل البريد الإلكتروني';
-  if (!/^[^\s@]+@[^\s@.]+\.[^\s@]+$/.test(email)) return 'البريد الإلكتروني غير صالح';
-  return null;
-}
-
-function validatePassword(password: string): string | null {
-  if (!password) return 'أدخل كلمة المرور';
-  if (password.length < 6) return 'يجب أن تكون 6 أحرف على الأقل';
-  return null;
-}
-
-function validateConfirm(password: string, confirm: string): string | null {
-  if (!confirm) return 'أكد كلمة المرور';
-  if (password !== confirm) return 'كلمتا المرور غير متطابقتين';
-  return null;
-}
+import { useForm, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { registerSchema } from '@/lib/validation';
+import type { RegisterFormData } from '@/lib/validation';
 
 function getPasswordStrength(pw: string): { score: number; label: string; color: string } {
   if (!pw) return { score: 0, label: '', color: '' };
@@ -56,76 +33,58 @@ function getPasswordStrength(pw: string): { score: number; label: string; color:
 /* ------------------------------------------------------------------ */
 export default function RegisterScreen() {
   const { themeConfig, navigate } = useApp();
-  const { googleSignIn, register, isLoading, error: authError } = useAuth();
+  const { googleSignIn, register, error: authError } = useAuth();
   const setAuthenticated = useStore(s => s.setAuthenticated);
   const isOnline = useStore(s => s.isOnline);
 
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirm, setConfirm] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [acceptedTerms, setAcceptedTerms] = useState(false);
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const {
+    register: registerField,
+    handleSubmit: handleFormSubmit,
+    formState: { errors: formErrors, touchedFields, isSubmitting },
+    control,
+    watch,
+  } = useForm<RegisterFormData>({
+    resolver: zodResolver(registerSchema),
+    defaultValues: {
+      name: '',
+      email: '',
+      password: '',
+      confirm: '',
+      acceptedTerms: false,
+    },
+  });
+
   const [localError, setLocalError] = useState('');
-  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const [showPassword, setShowPassword] = useState(false);
 
   const error = localError || authError || '';
+  const password = watch('password', '');
   const strength = getPasswordStrength(password);
-
-  /* ---- Touch handlers ---- */
-  const touch = (key: string) => setTouched(p => ({ ...p, [key]: true }));
 
   const clearErrors = useCallback(() => {
     setLocalError('');
-    setFieldErrors({});
   }, []);
 
-  /* ---- Validate all ---- */
-  const validateAll = () => {
-    const errs: Record<string, string> = {};
-    const n = validateName(name);
-    const e = validateEmail(email);
-    const p = validatePassword(password);
-    const c = validateConfirm(password, confirm);
-    if (n) errs.name = n;
-    if (e) errs.email = e;
-    if (p) errs.password = p;
-    if (c) errs.confirm = c;
-    if (!acceptedTerms) errs.terms = 'يجب قبول الشروط';
-    return errs;
-  };
-
-  /* ---- Submit ---- */
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const onSubmit = async (data: RegisterFormData) => {
     clearErrors();
-
-    const errs = validateAll();
-    setFieldErrors(errs);
-    setTouched({ name: true, email: true, password: true, confirm: true, terms: true });
-
-    if (Object.keys(errs).length > 0) return;
-
     try {
-      await register(email, password, name.trim());
+      await register(data.email, data.password, data.name.trim());
       setAuthenticated(true);
       navigate('home');
     } catch (err) {
       const msg = getErrMsg(err);
       if (msg.includes('email-already') || msg.includes('مستخدم')) {
-        setFieldErrors({ email: 'هذا البريد مسجل بالفعل' });
+        setLocalError('هذا البريد مسجل بالفعل');
       } else if (msg.includes('weak-password')) {
-        setFieldErrors({ password: 'كلمة المرور ضعيفة' });
+        setLocalError('كلمة المرور ضعيفة');
       } else if (msg.includes('invalid-email')) {
-        setFieldErrors({ email: 'البريد غير صالح' });
+        setLocalError('البريد غير صالح');
       } else {
         setLocalError(msg || 'فشل إنشاء الحساب. حاول مرة أخرى.');
       }
     }
   };
 
-  /* ---- Google ---- */
   const handleGoogle = async () => {
     clearErrors();
     try {
@@ -137,8 +96,8 @@ export default function RegisterScreen() {
     }
   };
 
-  const renderFieldError = (key: string) => {
-    const msg = (touched[key] ? fieldErrors[key] : undefined) || fieldErrors[key];
+  const renderFieldError = (fieldName: keyof RegisterFormData) => {
+    const msg = formErrors[fieldName]?.message;
     if (!msg) return null;
     return (
       <motion.p
@@ -151,6 +110,14 @@ export default function RegisterScreen() {
         {msg}
       </motion.p>
     );
+  };
+
+  const getFieldBorder = (fieldName: keyof RegisterFormData) => {
+    const hasError = !!formErrors[fieldName];
+    const isTouched = touchedFields[fieldName] === true;
+    if (hasError) return themeConfig.colors.error;
+    if (isTouched) return themeConfig.colors.primary + '40';
+    return themeConfig.colors.border;
   };
 
   return (
@@ -231,7 +198,7 @@ export default function RegisterScreen() {
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
-        onSubmit={handleSubmit}
+        onSubmit={handleFormSubmit(onSubmit)}
         className="flex-1 px-5 space-y-3.5 overflow-y-auto"
       >
         {/* Name */}
@@ -240,18 +207,17 @@ export default function RegisterScreen() {
             الاسم الكامل
           </label>
           <div className="relative">
-            <User size={16} className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: fieldErrors.name ? themeConfig.colors.error : themeConfig.colors.textMuted }} />
+            <User size={16} className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: formErrors.name ? themeConfig.colors.error : themeConfig.colors.textMuted }} />
             <input
-              type="text" value={name}
-              onChange={(e) => { setName(e.target.value); clearErrors(); }}
-              onBlur={() => touch('name')}
+              type="text"
+              {...registerField('name')}
               placeholder="محمد أحمد"
-              disabled={isLoading}
+              disabled={isSubmitting}
               className="w-full h-[52px] pr-10 pl-4 text-sm rounded-2xl outline-none transition-all disabled:opacity-50"
               style={{
                 backgroundColor: themeConfig.colors.surface,
                 color: themeConfig.colors.text,
-                border: `2px solid ${fieldErrors.name && touched.name ? themeConfig.colors.error : touched.name ? themeConfig.colors.primary + '40' : themeConfig.colors.border}`,
+                border: `2px solid ${getFieldBorder('name')}`,
               }}
             />
           </div>
@@ -264,19 +230,18 @@ export default function RegisterScreen() {
             البريد الإلكتروني
           </label>
           <div className="relative">
-            <Mail size={16} className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: fieldErrors.email ? themeConfig.colors.error : themeConfig.colors.textMuted }} />
+            <Mail size={16} className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: formErrors.email ? themeConfig.colors.error : themeConfig.colors.textMuted }} />
             <input
-              type="email" value={email}
-              onChange={(e) => { setEmail(e.target.value); clearErrors(); }}
-              onBlur={() => touch('email')}
+              type="email"
+              {...registerField('email')}
               placeholder="example@email.com"
               dir="ltr" autoComplete="email"
-              disabled={isLoading}
+              disabled={isSubmitting}
               className="w-full h-[52px] pr-10 pl-4 text-sm rounded-2xl outline-none transition-all disabled:opacity-50"
               style={{
                 backgroundColor: themeConfig.colors.surface,
                 color: themeConfig.colors.text,
-                border: `2px solid ${fieldErrors.email && touched.email ? themeConfig.colors.error : touched.email ? themeConfig.colors.primary + '40' : themeConfig.colors.border}`,
+                border: `2px solid ${getFieldBorder('email')}`,
               }}
             />
           </div>
@@ -289,19 +254,18 @@ export default function RegisterScreen() {
             كلمة المرور
           </label>
           <div className="relative">
-            <Lock size={16} className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: fieldErrors.password ? themeConfig.colors.error : themeConfig.colors.textMuted }} />
+            <Lock size={16} className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: formErrors.password ? themeConfig.colors.error : themeConfig.colors.textMuted }} />
             <input
-              type={showPassword ? 'text' : 'password'} value={password}
-              onChange={(e) => { setPassword(e.target.value); clearErrors(); }}
-              onBlur={() => touch('password')}
+              type={showPassword ? 'text' : 'password'}
+              {...registerField('password')}
               placeholder="••••••••"
               dir="ltr" autoComplete="new-password"
-              disabled={isLoading}
+              disabled={isSubmitting}
               className="w-full h-[52px] pr-10 pl-12 text-sm rounded-2xl outline-none transition-all disabled:opacity-50"
               style={{
                 backgroundColor: themeConfig.colors.surface,
                 color: themeConfig.colors.text,
-                border: `2px solid ${fieldErrors.password && touched.password ? themeConfig.colors.error : touched.password ? themeConfig.colors.primary + '40' : themeConfig.colors.border}`,
+                border: `2px solid ${getFieldBorder('password')}`,
               }}
             />
             <motion.button
@@ -350,22 +314,21 @@ export default function RegisterScreen() {
             تأكيد كلمة المرور
           </label>
           <div className="relative">
-            <Lock size={16} className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: fieldErrors.confirm ? themeConfig.colors.error : themeConfig.colors.textMuted }} />
+            <Lock size={16} className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: formErrors.confirm ? themeConfig.colors.error : themeConfig.colors.textMuted }} />
             <input
-              type={showPassword ? 'text' : 'password'} value={confirm}
-              onChange={(e) => { setConfirm(e.target.value); clearErrors(); }}
-              onBlur={() => touch('confirm')}
+              type={showPassword ? 'text' : 'password'}
+              {...registerField('confirm')}
               placeholder="••••••••"
               dir="ltr" autoComplete="new-password"
-              disabled={isLoading}
+              disabled={isSubmitting}
               className="w-full h-[52px] pr-10 pl-4 text-sm rounded-2xl outline-none transition-all disabled:opacity-50"
               style={{
                 backgroundColor: themeConfig.colors.surface,
                 color: themeConfig.colors.text,
-                border: `2px solid ${fieldErrors.confirm && touched.confirm ? themeConfig.colors.error : confirm && password === confirm ? '#22C55E40' : touched.confirm ? themeConfig.colors.primary + '40' : themeConfig.colors.border}`,
+                border: `2px solid ${getFieldBorder('confirm')}`,
               }}
             />
-            {confirm && password === confirm && (
+            {watch('confirm') && password && password === watch('confirm') && (
               <Check size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2" style={{ color: '#22C55E' }} />
             )}
           </div>
@@ -373,41 +336,47 @@ export default function RegisterScreen() {
         </div>
 
         {/* Terms */}
-        <button
-          type="button"
-          onClick={() => { setAcceptedTerms(!acceptedTerms); clearErrors(); }}
-          className="flex items-start gap-2.5 w-full pt-1"
-        >
-          <motion.div
-            whileTap={{ scale: 0.9 }}
-            className="w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 mt-0.5 transition-all"
-            style={{
-              borderColor: fieldErrors.terms && touched.terms ? themeConfig.colors.error : acceptedTerms ? themeConfig.colors.primary : themeConfig.colors.border,
-              backgroundColor: acceptedTerms ? themeConfig.colors.primary : 'transparent',
-            }}
-          >
-            {acceptedTerms && <Check size={12} className="text-white" strokeWidth={3} />}
-          </motion.div>
-          <p className="text-[11px] leading-relaxed text-right" style={{ color: themeConfig.colors.textMuted }}>
-            أوافق على{' '}
-            <span className="font-bold" style={{ color: themeConfig.colors.primary }}>شروط الاستخدام</span>
-            {' '}و{' '}
-            <span className="font-bold" style={{ color: themeConfig.colors.primary }}>سياسة الخصوصية</span>
-          </p>
-        </button>
+        <Controller
+          name="acceptedTerms"
+          control={control}
+          render={({ field }) => (
+            <button
+              type="button"
+              onClick={() => { field.onChange(!field.value); clearErrors(); }}
+              className="flex items-start gap-2.5 w-full pt-1"
+            >
+              <motion.div
+                whileTap={{ scale: 0.9 }}
+                className="w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 mt-0.5 transition-all"
+                style={{
+                  borderColor: formErrors.acceptedTerms ? themeConfig.colors.error : field.value ? themeConfig.colors.primary : themeConfig.colors.border,
+                  backgroundColor: field.value ? themeConfig.colors.primary : 'transparent',
+                }}
+              >
+                {field.value && <Check size={12} className="text-white" strokeWidth={3} />}
+              </motion.div>
+              <p className="text-[11px] leading-relaxed text-right" style={{ color: themeConfig.colors.textMuted }}>
+                أوافق على{' '}
+                <span className="font-bold" style={{ color: themeConfig.colors.primary }}>شروط الاستخدام</span>
+                {' '}و{' '}
+                <span className="font-bold" style={{ color: themeConfig.colors.primary }}>سياسة الخصوصية</span>
+              </p>
+            </button>
+          )}
+        />
 
         {/* Submit */}
         <motion.button
           type="submit"
-          disabled={isLoading}
-          whileTap={isLoading ? {} : { scale: 0.97 }}
+          disabled={isSubmitting}
+          whileTap={isSubmitting ? {} : { scale: 0.97 }}
           className="w-full h-[52px] rounded-2xl text-sm font-bold text-white transition-all duration-200 flex items-center justify-center gap-2.5 disabled:opacity-60 mt-1"
           style={{
             backgroundColor: themeConfig.colors.primary,
             boxShadow: `0 4px 16px ${themeConfig.colors.primary}30`,
           }}
         >
-          {isLoading ? (
+          {isSubmitting ? (
             <motion.div
               animate={{ rotate: 360 }}
               transition={{ repeat: Infinity, duration: 0.8, ease: 'linear' }}
@@ -432,8 +401,8 @@ export default function RegisterScreen() {
         <motion.button
           type="button"
           onClick={handleGoogle}
-          disabled={isLoading || !isOnline}
-          whileTap={isLoading ? {} : { scale: 0.97 }}
+          disabled={isSubmitting || !isOnline}
+          whileTap={isSubmitting ? {} : { scale: 0.97 }}
           className="w-full h-[52px] rounded-2xl text-sm font-bold border-2 transition-all duration-200 flex items-center justify-center gap-2.5 disabled:opacity-50"
           style={{
             backgroundColor: themeConfig.colors.surface,

@@ -2,6 +2,10 @@ import { useState, useEffect } from 'react';
 import { useApp } from '@/contexts/useApp';
 import { getProfessionalSchedules, updateProfessionalSchedules } from '@/supabase/database';
 import { Clock, Save, AlertCircle, CheckCircle } from 'lucide-react';
+import { useFieldArray, useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { workingHoursSchema } from '@/lib/validation';
+import type { WorkingHoursFormData } from '@/lib/validation';
 
 interface DaySchedule {
   day_of_week: number;
@@ -11,7 +15,7 @@ interface DaySchedule {
 }
 
 interface WorkingHoursEditorProps {
-  barberId: string; // This is the professional_id (profiles.id)
+  barberId: string;
 }
 
 const DAYS = [
@@ -33,11 +37,33 @@ const DEFAULT_SCHEDULE: DaySchedule[] = DAYS.map(d => ({
 
 export default function WorkingHoursEditor({ barberId }: WorkingHoursEditorProps) {
   const { themeConfig } = useApp();
-  const [schedules, setSchedules] = useState<DaySchedule[]>(DEFAULT_SCHEDULE);
   const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+
+  const {
+    control: controlWH,
+    handleSubmit: handleWHSubmit,
+    formState: { errors: whErrors, isSubmitting },
+    register,
+    setValue: setFormValue,
+    watch,
+  } = useForm<WorkingHoursFormData>({
+    resolver: zodResolver(workingHoursSchema),
+    defaultValues: {
+      days: DEFAULT_SCHEDULE.map(d => ({
+        day_of_week: d.day_of_week,
+        start_time: d.start_time,
+        end_time: d.end_time,
+        is_active: d.is_active,
+      })),
+    },
+  });
+
+  const { fields } = useFieldArray({
+    control: controlWH,
+    name: 'days',
+  });
 
   useEffect(() => {
     const fetchSchedule = async () => {
@@ -53,7 +79,12 @@ export default function WorkingHoursEditor({ barberId }: WorkingHoursEditorProps
               is_active: found ? (found.is_active ?? false) : d.key !== 6,
             };
           });
-          setSchedules(mapped);
+          mapped.forEach((day, index) => {
+            setFormValue(`days.${index}.day_of_week`, day.day_of_week);
+            setFormValue(`days.${index}.start_time`, day.start_time);
+            setFormValue(`days.${index}.end_time`, day.end_time);
+            setFormValue(`days.${index}.is_active`, day.is_active);
+          });
         }
       } catch (err) {
         console.error('Failed to fetch availability:', err);
@@ -65,21 +96,17 @@ export default function WorkingHoursEditor({ barberId }: WorkingHoursEditorProps
   }, [barberId]);
 
   const toggleDay = (dayIndex: number) => {
-    setSchedules(prev => prev.map(s => s.day_of_week === dayIndex ? { ...s, is_active: !s.is_active } : s));
+    const currentActive = watch(`days.${dayIndex}.is_active`);
+    setFormValue(`days.${dayIndex}.is_active`, !currentActive);
     setSuccess(false); setError(null);
   };
 
-  const updateTime = (dayIndex: number, field: 'start_time' | 'end_time', value: string) => {
-    setSchedules(prev => prev.map(s => s.day_of_week === dayIndex ? { ...s, [field]: value } : s));
-    setSuccess(false); setError(null);
-  };
-
-  const handleSave = async () => {
-    setIsSaving(true); setError(null); setSuccess(false);
+  const onWHSubmit = async (data: WorkingHoursFormData) => {
+    setError(null); setSuccess(false);
     try {
       await updateProfessionalSchedules(
         barberId,
-        schedules.map(s => ({
+        data.days.map(s => ({
           professional_id: barberId,
           day_of_week: s.day_of_week,
           start_time: s.start_time,
@@ -91,8 +118,6 @@ export default function WorkingHoursEditor({ barberId }: WorkingHoursEditorProps
       setTimeout(() => setSuccess(false), 3000);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'فشل حفظ ساعات العمل');
-    } finally {
-      setIsSaving(false);
     }
   };
 
@@ -107,40 +132,60 @@ export default function WorkingHoursEditor({ barberId }: WorkingHoursEditorProps
   }
 
   return (
-    <div className="space-y-3">
+    <form onSubmit={handleWHSubmit(onWHSubmit)} className="space-y-3">
       <div className="flex items-center gap-2 mb-2">
         <Clock size={16} style={{ color: themeConfig.colors.primary }} />
         <span className="text-xs font-bold" style={{ color: themeConfig.colors.text }}>جدول العمل الأسبوعي</span>
       </div>
 
-      {schedules.map(schedule => {
-        const day = DAYS.find(d => d.key === schedule.day_of_week);
+      {fields.map((field, index) => {
+        const isActive = watch(`days.${index}.is_active`);
+        const startTimeError = whErrors.days?.[index]?.start_time?.message;
+        const endTimeError = whErrors.days?.[index]?.end_time?.message;
+        const day = DAYS.find(d => d.key === field.day_of_week);
+
         return (
           <div
-            key={schedule.day_of_week}
+            key={field.id}
             className="flex items-center gap-3 p-3 rounded-xl border transition-all"
             style={{
-              backgroundColor: schedule.is_active ? themeConfig.colors.surface : themeConfig.colors.background,
-              borderColor: schedule.is_active ? themeConfig.colors.primary + '30' : themeConfig.colors.border,
-              opacity: schedule.is_active ? 1 : 0.6,
+              backgroundColor: isActive ? themeConfig.colors.surface : themeConfig.colors.background,
+              borderColor: isActive ? themeConfig.colors.primary + '30' : themeConfig.colors.border,
+              opacity: isActive ? 1 : 0.6,
             }}
           >
             <button
               type="button"
-              onClick={() => toggleDay(schedule.day_of_week)}
+              onClick={() => toggleDay(index)}
               className="w-10 h-5 rounded-full relative transition-all flex-shrink-0"
-              style={{ backgroundColor: schedule.is_active ? themeConfig.colors.primary : themeConfig.colors.border }}
+              style={{ backgroundColor: isActive ? themeConfig.colors.primary : themeConfig.colors.border }}
             >
-              <div className="w-4 h-4 rounded-full bg-white absolute top-0.5 transition-all" style={{ left: schedule.is_active ? '22px' : '2px' }} />
+              <div className="w-4 h-4 rounded-full bg-white absolute top-0.5 transition-all" style={{ left: isActive ? '22px' : '2px' }} />
             </button>
             <span className="text-xs font-bold w-14 flex-shrink-0" style={{ color: themeConfig.colors.text }}>{day?.label}</span>
-            {schedule.is_active ? (
+            {isActive ? (
               <div className="flex items-center gap-2 flex-1">
-                <input type="time" value={schedule.start_time} onChange={(e) => updateTime(schedule.day_of_week, 'start_time', e.target.value)}
-                  className="flex-1 px-2 py-1 rounded-lg text-xs border text-center" style={{ backgroundColor: themeConfig.colors.background, borderColor: themeConfig.colors.border, color: themeConfig.colors.text }} />
+                <input
+                  type="time"
+                  {...register(`days.${index}.start_time` as const)}
+                  className="flex-1 px-2 py-1 rounded-lg text-xs border text-center"
+                  style={{
+                    backgroundColor: themeConfig.colors.background,
+                    borderColor: startTimeError ? themeConfig.colors.error : themeConfig.colors.border,
+                    color: themeConfig.colors.text,
+                  }}
+                />
                 <span className="text-[10px]" style={{ color: themeConfig.colors.textMuted }}>إلى</span>
-                <input type="time" value={schedule.end_time} onChange={(e) => updateTime(schedule.day_of_week, 'end_time', e.target.value)}
-                  className="flex-1 px-2 py-1 rounded-lg text-xs border text-center" style={{ backgroundColor: themeConfig.colors.background, borderColor: themeConfig.colors.border, color: themeConfig.colors.text }} />
+                <input
+                  type="time"
+                  {...register(`days.${index}.end_time` as const)}
+                  className="flex-1 px-2 py-1 rounded-lg text-xs border text-center"
+                  style={{
+                    backgroundColor: themeConfig.colors.background,
+                    borderColor: endTimeError ? themeConfig.colors.error : themeConfig.colors.border,
+                    color: themeConfig.colors.text,
+                  }}
+                />
               </div>
             ) : (
               <span className="text-[10px] font-bold" style={{ color: themeConfig.colors.error }}>مغلق</span>
@@ -162,11 +207,11 @@ export default function WorkingHoursEditor({ barberId }: WorkingHoursEditorProps
         </div>
       )}
 
-      <button type="button" onClick={handleSave} disabled={isSaving}
+      <button type="submit" disabled={isSubmitting}
         className="w-full h-10 rounded-xl text-xs font-bold text-white flex items-center justify-center gap-2 transition-all disabled:opacity-50"
         style={{ backgroundColor: themeConfig.colors.primary }}>
-        {isSaving ? <div className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin border-white" /> : <><Save size={14} /> حفظ ساعات العمل</>}
+        {isSubmitting ? <div className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin border-white" /> : <><Save size={14} /> حفظ ساعات العمل</>}
       </button>
-    </div>
+    </form>
   );
 }

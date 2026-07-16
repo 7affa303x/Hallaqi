@@ -6,6 +6,10 @@
 import { useState } from 'react';
 import { CheckCircle, XCircle, Eye, Loader2, AlertTriangle } from 'lucide-react';
 import { useApp } from '@/contexts/useApp';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { paymentRejectSchema } from '@/lib/validation';
+import type { PaymentRejectFormData } from '@/lib/validation';
 
 interface PaymentApprovalProps {
   paymentId: string;
@@ -32,9 +36,20 @@ export function PaymentApproval({
 }: PaymentApprovalProps) {
   const { themeConfig } = useApp();
   const [showReceipt, setShowReceipt] = useState(false);
-  const [rejectReason, setRejectReason] = useState('');
   const [showRejectInput, setShowRejectInput] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+
+  const {
+    register,
+    handleSubmit: handleRejectSubmit,
+    reset: resetRejectForm,
+    formState: { isSubmitting: isRejecting },
+  } = useForm<PaymentRejectFormData>({
+    resolver: zodResolver(paymentRejectSchema),
+    defaultValues: {
+      reason: '',
+    },
+  });
 
   const handleApprove = async () => {
     setActionError(null);
@@ -44,14 +59,14 @@ export function PaymentApproval({
     }
   };
 
-  const handleReject = async () => {
+  const onRejectFormSubmit = async (data: PaymentRejectFormData) => {
     setActionError(null);
-    const success = await onReject(paymentId, rejectReason || undefined);
+    const success = await onReject(paymentId, data.reason || undefined);
     if (!success) {
       setActionError('فشل في رفض الدفع');
     }
     setShowRejectInput(false);
-    setRejectReason('');
+    resetRejectForm();
   };
 
   const statusLabels: Record<string, { label: string; color: string }> = {
@@ -90,6 +105,7 @@ export function PaymentApproval({
       {receiptUrl && (
         <>
           <button
+            type="button"
             onClick={() => setShowReceipt(!showReceipt)}
             className="flex items-center justify-center gap-2 p-3 rounded-xl border transition-all"
             style={{ borderColor: themeConfig.colors.border }}
@@ -125,39 +141,44 @@ export function PaymentApproval({
       {(status === 'pending' || status === 'processing') && (
         <>
           {showRejectInput && (
-            <div className="flex flex-col gap-2">
+            <form onSubmit={handleRejectSubmit(onRejectFormSubmit)} className="flex flex-col gap-2">
               <input
                 type="text"
-                value={rejectReason}
-                onChange={(e) => setRejectReason(e.target.value)}
+                {...register('reason')}
                 placeholder="سبب الرفض (اختياري)"
                 className="w-full p-3 rounded-xl border text-xs"
-                style={{ backgroundColor: themeConfig.colors.background, borderColor: themeConfig.colors.border, color: themeConfig.colors.text }}
+                style={{
+                  backgroundColor: themeConfig.colors.background,
+                  borderColor: themeConfig.colors.border,
+                  color: themeConfig.colors.text,
+                }}
               />
               <div className="flex gap-2">
                 <button
-                  onClick={handleReject}
-                  disabled={isProcessing}
+                  type="submit"
+                  disabled={isRejecting}
                   className="flex-1 h-10 rounded-xl text-xs font-bold text-white flex items-center justify-center gap-1 disabled:opacity-50"
                   style={{ backgroundColor: themeConfig.colors.error }}
                 >
-                  {isProcessing ? <Loader2 size={14} className="animate-spin" /> : <XCircle size={14} />}
+                  {isRejecting ? <Loader2 size={14} className="animate-spin" /> : <XCircle size={14} />}
                   تأكيد الرفض
                 </button>
                 <button
-                  onClick={() => { setShowRejectInput(false); setRejectReason(''); }}
+                  type="button"
+                  onClick={() => { setShowRejectInput(false); resetRejectForm(); }}
                   className="flex-1 h-10 rounded-xl text-xs font-bold border flex items-center justify-center"
                   style={{ borderColor: themeConfig.colors.border, color: themeConfig.colors.textMuted }}
                 >
                   إلغاء
                 </button>
               </div>
-            </div>
+            </form>
           )}
 
           {!showRejectInput && (
             <div className="flex gap-2">
               <button
+                type="button"
                 onClick={handleApprove}
                 disabled={isProcessing}
                 className="flex-1 h-11 rounded-xl text-xs font-bold text-white flex items-center justify-center gap-2 disabled:opacity-50"
@@ -167,6 +188,7 @@ export function PaymentApproval({
                 موافقة
               </button>
               <button
+                type="button"
                 onClick={() => setShowRejectInput(true)}
                 disabled={isProcessing}
                 className="flex-1 h-11 rounded-xl text-xs font-bold text-white flex items-center justify-center gap-2 disabled:opacity-50"
