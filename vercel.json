@@ -1,6 +1,7 @@
 {
   "outputDirectory": "dist",
   "rewrites": [
+    { "source": "/icon.png", "destination": "/logo-icon.png" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
