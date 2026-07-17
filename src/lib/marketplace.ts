@@ -339,3 +339,193 @@ export function openVisitStore(url: string) {
   }
   window.open(normalized, '_blank', 'noopener,noreferrer');
 }
+
+export async function listOwnerProducts(ownerId: string, ownerType: 'store' | 'company') {
+  if (!isSupabaseConfigured()) return [];
+  const column = ownerType === 'store' ? 'store_id' : 'company_id';
+  const { data, error } = await supabase
+    .from('marketplace_products')
+    .select('*')
+    .eq(column, ownerId)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data || []) as MarketplaceProduct[];
+}
+
+export async function createMarketplaceProduct(input: {
+  ownerType: 'store' | 'company';
+  ownerId: string;
+  title: string;
+  description?: string;
+  categoryId?: string;
+  brand?: string;
+  priceDzd?: number;
+  compareAtPriceDzd?: number;
+  externalUrl?: string;
+  wilayaCode?: number;
+}) {
+  if (!isSupabaseConfigured()) throw new Error('Supabase غير مُعد');
+  const row = {
+    owner_type: input.ownerType,
+    store_id: input.ownerType === 'store' ? input.ownerId : null,
+    company_id: input.ownerType === 'company' ? input.ownerId : null,
+    title: input.title.trim(),
+    description: input.description?.trim() || null,
+    category_id: input.categoryId || null,
+    brand: input.brand?.trim() || null,
+    price_dzd: input.priceDzd ?? null,
+    compare_at_price_dzd: input.compareAtPriceDzd ?? null,
+    external_url: input.externalUrl?.trim() || null,
+    wilaya_code: input.wilayaCode ?? null,
+    is_active: true,
+    is_new: true,
+  };
+  const { data, error } = await supabase.from('marketplace_products').insert(row).select('*').single();
+  if (error) throw error;
+  return data as MarketplaceProduct;
+}
+
+export async function updateMarketplaceProduct(
+  productId: string,
+  patch: Partial<{
+    title: string;
+    description: string | null;
+    category_id: string | null;
+    brand: string | null;
+    price_dzd: number | null;
+    compare_at_price_dzd: number | null;
+    external_url: string | null;
+    is_active: boolean;
+    is_featured: boolean;
+    is_best_seller: boolean;
+    is_new: boolean;
+  }>
+) {
+  if (!isSupabaseConfigured()) throw new Error('Supabase غير مُعد');
+  const { data, error } = await supabase
+    .from('marketplace_products')
+    .update({ ...patch, updated_at: new Date().toISOString() })
+    .eq('id', productId)
+    .select('*')
+    .single();
+  if (error) throw error;
+  return data as MarketplaceProduct;
+}
+
+export async function deleteMarketplaceProduct(productId: string) {
+  if (!isSupabaseConfigured()) throw new Error('Supabase غير مُعد');
+  const { error } = await supabase.from('marketplace_products').delete().eq('id', productId);
+  if (error) throw error;
+}
+
+export async function getOwnerItemCap(ownerId: string, ownerType: 'store' | 'company') {
+  if (!isSupabaseConfigured()) return 5;
+  if (ownerType === 'store') {
+    const { data } = await supabase.from('stores').select('premium_item_cap').eq('id', ownerId).maybeSingle();
+    return Math.min(data?.premium_item_cap ?? 5, 99);
+  }
+  const { data } = await supabase.from('companies').select('premium_item_cap').eq('id', ownerId).maybeSingle();
+  return Math.min(data?.premium_item_cap ?? 5, 99);
+}
+
+export async function listBarberExtras(professionalId: string) {
+  if (!isSupabaseConfigured()) return [];
+  const { data, error } = await supabase
+    .from('barber_service_extras')
+    .select('*')
+    .eq('professional_id', professionalId)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
+
+export async function createBarberExtra(input: {
+  professionalId: string;
+  name: string;
+  description?: string;
+  category: 'extra' | 'premium_treatment' | 'vip' | 'beard_care' | 'skin_care' | 'hair_treatment';
+  priceDzd: number;
+  durationMinutes?: number;
+}) {
+  if (!isSupabaseConfigured()) throw new Error('Supabase غير مُعد');
+  const { data, error } = await supabase.from('barber_service_extras').insert({
+    professional_id: input.professionalId,
+    name: input.name.trim(),
+    description: input.description?.trim() || null,
+    category: input.category,
+    price_dzd: input.priceDzd,
+    duration_minutes: input.durationMinutes ?? null,
+    is_active: true,
+  }).select('*').single();
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteBarberExtra(extraId: string) {
+  if (!isSupabaseConfigured()) throw new Error('Supabase غير مُعد');
+  const { error } = await supabase.from('barber_service_extras').delete().eq('id', extraId);
+  if (error) throw error;
+}
+
+export async function adminSetProductOfTheDay(input: {
+  productId: string;
+  storeId?: string | null;
+  bidAmountDzd: number;
+  displayDiscountPercent?: number;
+  headlineAr?: string;
+  placementDate?: string;
+}) {
+  if (!isSupabaseConfigured()) throw new Error('Supabase غير مُعد');
+  const placementDate = input.placementDate || new Date().toISOString().slice(0, 10);
+  const { data, error } = await supabase.from('product_of_the_day').upsert({
+    product_id: input.productId,
+    store_id: input.storeId ?? null,
+    placement_date: placementDate,
+    bid_amount_dzd: input.bidAmountDzd,
+    display_discount_percent: input.displayDiscountPercent ?? null,
+    headline_ar: input.headlineAr ?? null,
+    is_active: true,
+  }, { onConflict: 'placement_date' }).select('*').single();
+  if (error) throw error;
+  return data;
+}
+
+export async function adminListActiveProducts(limit = 40) {
+  if (!isSupabaseConfigured()) return [];
+  const { data, error } = await supabase
+    .from('marketplace_products')
+    .select('id, title, store_id, company_id, is_featured, price_dzd')
+    .eq('is_active', true)
+    .order('popularity_score', { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return data || [];
+}
+
+export async function adminToggleStoreFeatured(storeId: string, featured: boolean) {
+  if (!isSupabaseConfigured()) throw new Error('Supabase غير مُعد');
+  const { error } = await supabase.from('stores').update({
+    is_featured: featured,
+    updated_at: new Date().toISOString(),
+  }).eq('id', storeId);
+  if (error) throw error;
+}
+
+export async function adminListStores() {
+  if (!isSupabaseConfigured()) return [];
+  const { data, error } = await supabase
+    .from('stores')
+    .select('id, store_name, approval_status, is_featured, is_premium, website_url')
+    .order('created_at', { ascending: false })
+    .limit(100);
+  if (error) throw error;
+  return data || [];
+}
+
+export async function getDoctorProfile(doctorId: string) {
+  if (!isSupabaseConfigured()) return null;
+  const { data, error } = await supabase.from('doctor_profiles').select('*').eq('id', doctorId).maybeSingle();
+  if (error) throw error;
+  return data;
+}
+

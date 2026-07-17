@@ -320,14 +320,43 @@ export default function ProfileTab() {
           </button>
           <button
             type="button"
-            onClick={() => navigate('marketplace')}
+            onClick={() => navigate('seller-catalog')}
             className="col-span-2 flex items-center gap-2 p-3 rounded-2xl border text-right"
             style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}
           >
             <Globe size={16} style={{ color: themeConfig.colors.primary }} />
             <span>
+              <span className="block text-xs font-bold" style={{ color: themeConfig.colors.text }}>كتالوج المنتجات</span>
+              <span className="block text-[10px]" style={{ color: themeConfig.colors.textMuted }}>حتى 99 عنصر · ابدأ مجاناً وادفع كلما كبرت</span>
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate('marketplace')}
+            className="col-span-2 flex items-center gap-2 p-3 rounded-2xl border text-right"
+            style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}
+          >
+            <Globe size={16} style={{ color: themeConfig.colors.accent }} />
+            <span>
               <span className="block text-xs font-bold" style={{ color: themeConfig.colors.text }}>سوق حلاقي</span>
-              <span className="block text-[10px]" style={{ color: themeConfig.colors.textMuted }}>اكتشف · ابدأ مجاناً وادفع كلما كبرت</span>
+              <span className="block text-[10px]" style={{ color: themeConfig.colors.textMuted }}>اكتشف · بدون عمولة في هذه المرحلة</span>
+            </span>
+          </button>
+        </div>
+      )}
+
+      {(userRole === 'barber' || userRole === 'specialist') && (
+        <div className="px-4 mt-3">
+          <button
+            type="button"
+            onClick={() => navigate('barber-extras')}
+            className="w-full flex items-center gap-2 p-3 rounded-2xl border text-right"
+            style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}
+          >
+            <Crown size={16} style={{ color: themeConfig.colors.primary }} />
+            <span>
+              <span className="block text-xs font-bold" style={{ color: themeConfig.colors.text }}>خدمات إضافية للحلاق</span>
+              <span className="block text-[10px]" style={{ color: themeConfig.colors.textMuted }}>VIP · علاجات · عناية — ليست منتجات متجر</span>
             </span>
           </button>
         </div>
@@ -340,6 +369,16 @@ export default function ProfileTab() {
             <p className="text-[11px] mt-1" style={{ color: themeConfig.colors.textMuted }}>
               شارة موثوقة بعد موافقة الإدارة. التخصص الحالي: طب الجلد — قابل لتخصصات طبية لاحقًا دون تغيير نموذج الطبيب.
             </p>
+            {appUser?.id && (
+              <button
+                type="button"
+                onClick={() => navigate('doctor-profile', { doctorId: appUser.id })}
+                className="mt-3 w-full h-9 rounded-xl text-xs font-bold text-white"
+                style={{ backgroundColor: themeConfig.colors.primary }}
+              >
+                عرض ملف الطبيب
+              </button>
+            )}
             <p className="text-[10px] mt-2 font-bold" style={{ color: themeConfig.colors.accent }}>محتوى الاستشارات والتوصيات · قريبًا</p>
           </div>
         </div>

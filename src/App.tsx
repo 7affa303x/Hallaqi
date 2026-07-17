@@ -39,6 +39,9 @@ const StoreWebViewPage = lazy(() => import("@/pages/StoreWebViewPage"));
 const BusinessAnalyticsPage = lazy(() => import("@/pages/BusinessAnalyticsPage"));
 const SellerAIToolsPage = lazy(() => import("@/pages/SellerAIToolsPage"));
 const CompanyDetailPage = lazy(() => import("@/pages/CompanyDetailPage"));
+const SellerCatalogPage = lazy(() => import("@/pages/SellerCatalogPage"));
+const BarberExtrasPage = lazy(() => import("@/pages/BarberExtrasPage"));
+const DoctorProfilePage = lazy(() => import("@/pages/DoctorProfilePage"));
 
 function TabContent({ tab }: { tab: string }) {
   let content;
@@ -113,6 +116,12 @@ function ScreenRouter() {
       return <Suspense fallback={<LoadingFallback />}><BusinessAnalyticsPage /></Suspense>;
     case 'seller-ai-tools':
       return <Suspense fallback={<LoadingFallback />}><SellerAIToolsPage /></Suspense>;
+    case 'seller-catalog':
+      return <Suspense fallback={<LoadingFallback />}><SellerCatalogPage /></Suspense>;
+    case 'barber-extras':
+      return <Suspense fallback={<LoadingFallback />}><BarberExtrasPage /></Suspense>;
+    case 'doctor-profile':
+      return <Suspense fallback={<LoadingFallback />}><DoctorProfilePage /></Suspense>;
     default: {
       const params = screenParams;
       if (params?.title) {

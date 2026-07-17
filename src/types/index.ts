@@ -396,6 +396,9 @@ export type ScreenName =
   | 'store-webview'
   | 'business-analytics'
   | 'seller-ai-tools'
+  | 'seller-catalog'
+  | 'barber-extras'
+  | 'doctor-profile'
   | 'coming-soon';
 
 export interface ScreenParams {
@@ -412,6 +415,7 @@ export interface ScreenParams {
   eta?: string;
   storeId?: string;
   companyId?: string;
+  doctorId?: string;
   url?: string;
   cameraMode?: string;
   [key: string]: string | undefined;

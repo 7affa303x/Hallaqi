@@ -60,7 +60,7 @@ const queryScreens = new Set<ScreenName>([
   'booking-flow', 'chat-room', 'messages', 'notifications', 'create-post',
   'login', 'register', 'payment-success', 'admin-dashboard', 'ai-advisor',
   'marketplace', 'store-detail', 'company-detail', 'store-webview',
-  'business-analytics', 'seller-ai-tools',
+  'business-analytics', 'seller-ai-tools', 'seller-catalog', 'barber-extras', 'doctor-profile',
   'mfa-challenge', 'coming-soon',
 ]);
 

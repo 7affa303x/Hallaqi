@@ -71,7 +71,7 @@ export default function AdminDashboard() {
   const [recentUsers, setRecentUsers] = useState<RecentUser[]>([]);
   const [chartData, setChartData] = useState<ChartData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeSection, setActiveSection] = useState<'home' | 'users' | 'bookings' | 'payments' | 'reviews' | 'identity' | 'subscriptions' | 'reports' | 'business'>('home');
+  const [activeSection, setActiveSection] = useState<'home' | 'users' | 'bookings' | 'payments' | 'reviews' | 'identity' | 'subscriptions' | 'reports' | 'business' | 'placements'>('home');
 
   const isAdmin = !!appUser && appUser.user_role === 'admin';
 
@@ -305,6 +305,7 @@ export default function AdminDashboard() {
     { label: 'توثيق الهويات', action: () => setActiveSection('identity'), icon: Shield },
     { label: 'طلبات الاشتراك', action: () => setActiveSection('subscriptions'), icon: Crown },
     { label: 'موافقة متجر/شركة/طبيب', action: () => setActiveSection('business'), icon: Shield },
+    { label: 'منتج اليوم والمميزة', action: () => setActiveSection('placements'), icon: Crown },
     { label: 'البلاغات', action: () => setActiveSection('reports'), icon: Flag },
   ];
 
@@ -507,11 +508,132 @@ interface AdminReportRow {
   targetName: string;
 }
 
-function AdminSection({ section, adminId, onBack }: { section: 'users' | 'bookings' | 'payments' | 'reviews' | 'identity' | 'subscriptions' | 'reports' | 'business'; adminId: string; onBack: () => void }) {
+function AdminSection({ section, adminId, onBack }: { section: 'users' | 'bookings' | 'payments' | 'reviews' | 'identity' | 'subscriptions' | 'reports' | 'business' | 'placements'; adminId: string; onBack: () => void }) {
   if (section === 'business') {
     return <BusinessApprovalsSection onBack={onBack} />;
   }
+  if (section === 'placements') {
+    return <PlacementsAdminSection onBack={onBack} />;
+  }
   return <AdminSectionInner section={section} adminId={adminId} onBack={onBack} />;
+}
+
+function PlacementsAdminSection({ onBack }: { onBack: () => void }) {
+  const { themeConfig } = useApp();
+  const [products, setProducts] = useState<Array<{ id: string; title: string; store_id: string | null; price_dzd: number | null }>>([]);
+  const [stores, setStores] = useState<Array<{ id: string; store_name: string; is_featured: boolean; approval_status: string }>>([]);
+  const [productId, setProductId] = useState('');
+  const [bid, setBid] = useState('10000');
+  const [discount, setDiscount] = useState('30');
+  const [headline, setHeadline] = useState('منتج اليوم — مساحة إعلانية مدفوعة');
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const mp = await import('@/lib/marketplace');
+      const [p, s] = await Promise.all([mp.adminListActiveProducts(), mp.adminListStores()]);
+      setProducts(p as typeof products);
+      setStores(s as typeof stores);
+      if (p[0] && !productId) setProductId(p[0].id);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'تعذر التحميل');
+    } finally {
+      setLoading(false);
+    }
+  }, [productId]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const setPotd = async () => {
+    setError('');
+    setMessage('');
+    try {
+      const mp = await import('@/lib/marketplace');
+      const selected = products.find(p => p.id === productId);
+      await mp.adminSetProductOfTheDay({
+        productId,
+        storeId: selected?.store_id,
+        bidAmountDzd: Number(bid) || 0,
+        displayDiscountPercent: Number(discount) || undefined,
+        headlineAr: headline,
+      });
+      setMessage('تم تعيين منتج اليوم (أعلى عرض مدفوع — ليس خصمًا عشوائيًا)');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'فشل التعيين');
+    }
+  };
+
+  return (
+    <div className="min-h-screen pb-6" style={{ backgroundColor: themeConfig.colors.background }}>
+      <div className="sticky top-0 z-50 px-4 py-3 flex items-center gap-3" style={{ backgroundColor: themeConfig.colors.surface, borderBottom: `1px solid ${themeConfig.colors.border}` }}>
+        <button type="button" onClick={onBack} className="p-2 rounded-xl" style={{ backgroundColor: themeConfig.colors.background }}>
+          <ChevronRight className="w-5 h-5" style={{ color: themeConfig.colors.text }} />
+        </button>
+        <div>
+          <h1 className="text-lg font-bold" style={{ color: themeConfig.colors.text }}>المساحات الإعلانية</h1>
+          <p className="text-xs" style={{ color: themeConfig.colors.textMuted }}>منتج اليوم · متاجر مميزة</p>
+        </div>
+      </div>
+      <div className="px-4 pt-4 space-y-4">
+        {loading && <p className="text-sm" style={{ color: themeConfig.colors.textMuted }}>جاري التحميل...</p>}
+        {error && <p className="text-sm" style={{ color: themeConfig.colors.error }}>{error}</p>}
+        {message && <p className="text-sm" style={{ color: themeConfig.colors.success }}>{message}</p>}
+
+        <div className="rounded-2xl border p-4 space-y-2" style={{ borderColor: themeConfig.colors.border, backgroundColor: themeConfig.colors.surface }}>
+          <p className="text-sm font-bold" style={{ color: themeConfig.colors.text }}>منتج اليوم</p>
+          <p className="text-[11px]" style={{ color: themeConfig.colors.textMuted }}>اختر المنتج الذي دفع أعلى مبلغ للظهور — عرض خصم شكلي للفت الانتباه</p>
+          <select value={productId} onChange={e => setProductId(e.target.value)} className="w-full h-10 rounded-xl border px-2 text-xs"
+            style={{ borderColor: themeConfig.colors.border, backgroundColor: themeConfig.colors.background, color: themeConfig.colors.text }}>
+            <option value="">اختر منتجًا</option>
+            {products.map(p => <option key={p.id} value={p.id}>{p.title}{p.price_dzd != null ? ` · ${p.price_dzd} دج` : ''}</option>)}
+          </select>
+          {!products.length && (
+            <p className="text-[11px]" style={{ color: themeConfig.colors.textMuted }}>لا منتجات بعد — أضف عبر كتالوج البائع أولًا. قريبًا عيّنات تجريبية.</p>
+          )}
+          <input value={bid} onChange={e => setBid(e.target.value)} type="number" placeholder="مبلغ العرض دج"
+            className="w-full h-10 rounded-xl border px-3 text-sm outline-none"
+            style={{ borderColor: themeConfig.colors.border, backgroundColor: themeConfig.colors.background, color: themeConfig.colors.text }} />
+          <input value={discount} onChange={e => setDiscount(e.target.value)} type="number" placeholder="نسبة خصم العرض الشكلي"
+            className="w-full h-10 rounded-xl border px-3 text-sm outline-none"
+            style={{ borderColor: themeConfig.colors.border, backgroundColor: themeConfig.colors.background, color: themeConfig.colors.text }} />
+          <input value={headline} onChange={e => setHeadline(e.target.value)} placeholder="عنوان العرض"
+            className="w-full h-10 rounded-xl border px-3 text-sm outline-none"
+            style={{ borderColor: themeConfig.colors.border, backgroundColor: themeConfig.colors.background, color: themeConfig.colors.text }} />
+          <button type="button" disabled={!productId} onClick={() => void setPotd()}
+            className="w-full h-11 rounded-xl text-sm font-bold text-white disabled:opacity-50"
+            style={{ backgroundColor: themeConfig.colors.primary }}>تعيين منتج اليوم</button>
+        </div>
+
+        <div className="space-y-2">
+          <p className="text-sm font-bold" style={{ color: themeConfig.colors.text }}>متاجر مميزة</p>
+          {stores.map(store => (
+            <div key={store.id} className="rounded-2xl border p-3 flex items-center justify-between gap-2"
+              style={{ borderColor: themeConfig.colors.border, backgroundColor: themeConfig.colors.surface }}>
+              <div>
+                <p className="text-sm font-bold" style={{ color: themeConfig.colors.text }}>{store.store_name}</p>
+                <p className="text-[11px]" style={{ color: themeConfig.colors.textMuted }}>{store.approval_status}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => void import('@/lib/marketplace').then(m => m.adminToggleStoreFeatured(store.id, !store.is_featured).then(load))}
+                className="px-3 h-9 rounded-xl text-xs font-bold"
+                style={{
+                  backgroundColor: store.is_featured ? themeConfig.colors.accent : `${themeConfig.colors.accent}14`,
+                  color: store.is_featured ? '#fff' : themeConfig.colors.accent,
+                }}
+              >
+                {store.is_featured ? 'إلغاء التمييز' : 'تمييز'}
+              </button>
+            </div>
+          ))}
+          {!stores.length && <p className="text-xs" style={{ color: themeConfig.colors.textMuted }}>لا متاجر بعد الموافقة</p>}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function BusinessApprovalsSection({ onBack }: { onBack: () => void }) {
