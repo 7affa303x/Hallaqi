@@ -3,7 +3,7 @@ import { useApp } from '@/contexts/useApp';
 import { motion } from 'framer-motion';
 import {
   Camera, QrCode, Scan, X, Flashlight, FlipHorizontal,
-  Aperture, Share2, Download, Copy, Check
+  Aperture, Share2, Download, Copy, Check, Image as ImageIcon
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import type { IScannerControls } from '@zxing/browser';
@@ -11,8 +11,13 @@ import type { IScannerControls } from '@zxing/browser';
 type CameraMode = 'scanner' | 'generator' | 'camera';
 
 export default function CameraTab() {
-  const { themeConfig, navigate, barbers } = useApp();
-  const [mode, setMode] = useState<CameraMode>('scanner');
+  const { themeConfig, navigate, barbers, screenParams } = useApp();
+  const initialMode = (screenParams?.cameraMode === 'camera' || screenParams?.cameraMode === 'gallery' || screenParams?.cameraMode === 'scanner' || screenParams?.cameraMode === 'generator')
+    ? (screenParams.cameraMode as CameraMode | 'gallery')
+    : 'scanner';
+  const [mode, setMode] = useState<CameraMode | 'gallery'>(initialMode === 'gallery' ? 'gallery' : initialMode);
+  const [galleryPreview, setGalleryPreview] = useState<string | null>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
   const [scannedResult, setScannedResult] = useState('');
   const [scannedBarberId, setScannedBarberId] = useState('');
   const [selectedBarberId, setSelectedBarberId] = useState(barbers[0]?.id || '');
@@ -109,6 +114,21 @@ export default function CameraTab() {
     else stopCamera();
     return () => stopCamera();
   }, [mode, startCamera, startScanner, stopCamera]);
+
+  useEffect(() => {
+    if (mode === 'gallery') {
+      // Auto-open picker once when entering gallery from AI radial.
+      const t = window.setTimeout(() => galleryInputRef.current?.click(), 200);
+      return () => window.clearTimeout(t);
+    }
+  }, [mode]);
+
+  useEffect(() => {
+    const next = screenParams?.cameraMode;
+    if (next === 'scanner' || next === 'generator' || next === 'camera' || next === 'gallery') {
+      setMode(next);
+    }
+  }, [screenParams?.cameraMode]);
 
   const qrData = selectedBarber
     ? JSON.stringify({
@@ -306,6 +326,50 @@ export default function CameraTab() {
           </div>
         )}
 
+        {mode === 'gallery' && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center p-6" style={{ backgroundColor: themeConfig.colors.background }}>
+            <ImageIcon size={40} style={{ color: themeConfig.colors.primary }} />
+            <p className="text-sm font-bold mt-3" style={{ color: themeConfig.colors.text }}>رفع من المعرض</p>
+            <p className="text-xs mt-1 text-center" style={{ color: themeConfig.colors.textMuted }}>
+              جزء من زر AI المركزي — للاستخدام مع أدوات المساعدة والتحليل لاحقًا
+            </p>
+            {galleryPreview && (
+              <>
+                <img src={galleryPreview} alt="معاينة" className="mt-4 max-h-56 rounded-2xl object-cover" />
+                <button
+                  type="button"
+                  onClick={() => setGalleryPreview(null)}
+                  className="mt-2 text-xs font-bold underline"
+                  style={{ color: themeConfig.colors.error }}
+                >
+                  مسح المعاينة
+                </button>
+              </>
+            )}
+            <button
+              type="button"
+              onClick={() => galleryInputRef.current?.click()}
+              className="mt-4 px-6 py-2.5 rounded-xl text-sm font-bold text-white"
+              style={{ backgroundColor: themeConfig.colors.primary }}
+            >
+              اختيار صورة
+            </button>
+            <input
+              ref={galleryInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={e => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                const url = URL.createObjectURL(file);
+                setGalleryPreview(url);
+              }}
+            />
+            <p className="text-[10px] mt-3" style={{ color: themeConfig.colors.accent }}>تحليل الصورة بالـ AI · قريبًا</p>
+          </div>
+        )}
+
         {/* No Camera Fallback */}
         {!cameraActive && (mode === 'scanner' || mode === 'camera') && (
           <div className="absolute inset-0 flex flex-col items-center justify-center" style={{ backgroundColor: themeConfig.colors.background }}>
@@ -329,12 +393,20 @@ export default function CameraTab() {
 
       {/* Bottom Controls */}
       <div className="flex-shrink-0 pb-8 pt-4 px-4" style={{ backgroundColor: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(20px)' }}>
+        <p
+          className="text-center text-[10px] mb-2"
+          aria-live="polite"
+          style={{ color: 'rgba(255,255,255,0.45)', height: 14 }}
+        >
+          {mode === 'scanner' ? 'مسح QR' : mode === 'camera' ? 'كاميرا' : mode === 'gallery' ? 'معرض' : 'إنشاء QR'}
+        </p>
         {/* Mode Switcher */}
         <div className="flex items-center justify-center gap-2 mb-6">
           {[
-            { key: 'scanner' as CameraMode, icon: Scan, label: 'مسح QR' },
-            { key: 'camera' as CameraMode, icon: Camera, label: 'كاميرا' },
-            { key: 'generator' as CameraMode, icon: QrCode, label: 'إنشاء QR' },
+            { key: 'scanner' as const, icon: Scan, label: 'مسح QR' },
+            { key: 'camera' as const, icon: Camera, label: 'كاميرا' },
+            { key: 'gallery' as const, icon: ImageIcon, label: 'معرض' },
+            { key: 'generator' as const, icon: QrCode, label: 'إنشاء QR' },
           ].map(m => (
             <motion.button
               key={m.key}
@@ -354,7 +426,7 @@ export default function CameraTab() {
         </div>
 
         {/* Action Buttons */}
-        {mode !== 'generator' && <div className="flex items-center justify-center gap-8">
+        {mode !== 'generator' && mode !== 'gallery' && <div className="flex items-center justify-center gap-8">
           <motion.button
             whileTap={{ scale: 0.85 }}
             onClick={() => void toggleFlash()}

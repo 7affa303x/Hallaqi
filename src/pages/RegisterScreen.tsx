@@ -6,7 +6,8 @@ import { getErrMsg } from '@/lib/error';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   UserPlus, Mail, Lock, Eye, EyeOff, ArrowRight, User,
-  Chrome, AlertCircle, WifiOff, ShieldCheck, Check, Scissors
+  Chrome, AlertCircle, WifiOff, ShieldCheck, Check, Scissors,
+  Store, Building2, Stethoscope
 } from 'lucide-react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -58,10 +59,21 @@ export default function RegisterScreen() {
   const [localError, setLocalError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [verificationEmail, setVerificationEmail] = useState('');
+  const [doctorSpecialty, setDoctorSpecialty] = useState<
+    'dermatologist' | 'trichologist' | 'aesthetic_medicine' | 'general'
+  >('dermatologist');
 
   const error = localError || authError || '';
   const password = watch('password', '');
+  const accountType = watch('accountType', 'client');
   const strength = getPasswordStrength(password);
+
+  const doctorSpecialtyOptions = [
+    { value: 'dermatologist' as const, label: 'طبيب جلدية' },
+    { value: 'trichologist' as const, label: 'أخصائي شعر وفروة' },
+    { value: 'aesthetic_medicine' as const, label: 'طب تجميلي' },
+    { value: 'general' as const, label: 'عام' },
+  ];
 
   const clearErrors = useCallback(() => {
     setLocalError('');
@@ -76,6 +88,19 @@ export default function RegisterScreen() {
         data.name.trim(),
         data.accountType
       );
+
+      // Queue admin approval for store / company / doctor (not every product).
+      if (result.user && (data.accountType === 'store' || data.accountType === 'company' || data.accountType === 'doctor')) {
+        const { submitBusinessAccountRequest } = await import('@/lib/marketplace');
+        const payload =
+          data.accountType === 'store'
+            ? { store_name: data.name.trim() }
+            : data.accountType === 'company'
+              ? { company_name: data.name.trim() }
+              : { display_name: data.name.trim(), specialty: doctorSpecialty };
+        void submitBusinessAccountRequest(result.user.id, data.accountType, payload).catch(() => {});
+      }
+
       if (result.session) {
         setAuthenticated(true);
         navigate('home');
@@ -395,6 +420,9 @@ export default function RegisterScreen() {
                 {([
                   { value: 'client', label: 'عميل', icon: User },
                   { value: 'barber', label: 'حلاق', icon: Scissors },
+                  { value: 'store', label: 'متجر', icon: Store },
+                  { value: 'company', label: 'شركة', icon: Building2 },
+                  { value: 'doctor', label: 'طبيب', icon: Stethoscope },
                 ] as const).map(option => {
                   const Icon = option.icon;
                   const selected = field.value === option.value;
@@ -419,6 +447,29 @@ export default function RegisterScreen() {
             </fieldset>
           )}
         />
+
+        {accountType === 'doctor' && (
+          <label className="block space-y-1.5">
+            <span className="block text-xs font-bold px-0.5" style={{ color: themeConfig.colors.text }}>
+              التخصص
+            </span>
+            <select
+              value={doctorSpecialty}
+              onChange={e => setDoctorSpecialty(e.target.value as typeof doctorSpecialty)}
+              disabled={isSubmitting}
+              className="w-full h-[52px] px-3 text-sm rounded-2xl outline-none disabled:opacity-50"
+              style={{
+                backgroundColor: themeConfig.colors.surface,
+                color: themeConfig.colors.text,
+                border: `2px solid ${themeConfig.colors.border}`,
+              }}
+            >
+              {doctorSpecialtyOptions.map(option => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </label>
+        )}
 
         {/* Terms */}
         <Controller

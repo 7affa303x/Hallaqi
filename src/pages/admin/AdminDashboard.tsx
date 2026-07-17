@@ -60,7 +60,7 @@ interface ChartData {
 
 export default function AdminDashboard() {
   const { appUser } = useAuth();
-  const { goBack, themeConfig } = useApp();
+  const { goBack, themeConfig, navigate } = useApp();
   const [stats, setStats] = useState<DashboardStats>({
     totalUsers: 0, totalProfessionals: 0, totalBookings: 0,
     totalPayments: 0, pendingCCPReceipts: 0, stripePayments: 0,
@@ -70,8 +70,9 @@ export default function AdminDashboard() {
   const [recentPayments, setRecentPayments] = useState<RecentPayment[]>([]);
   const [recentUsers, setRecentUsers] = useState<RecentUser[]>([]);
   const [chartData, setChartData] = useState<ChartData[]>([]);
+  const [pendingBusinessCount, setPendingBusinessCount] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [activeSection, setActiveSection] = useState<'home' | 'users' | 'bookings' | 'payments' | 'reviews' | 'identity' | 'subscriptions' | 'reports'>('home');
+  const [activeSection, setActiveSection] = useState<'home' | 'users' | 'bookings' | 'payments' | 'reviews' | 'identity' | 'subscriptions' | 'reports' | 'business' | 'placements'>('home');
 
   const isAdmin = !!appUser && appUser.user_role === 'admin';
 
@@ -109,6 +110,14 @@ export default function AdminDashboard() {
         pendingReviews: reviewsCount || 0,
         totalRevenue,
       });
+
+      try {
+        const { adminListBusinessAccountRequests } = await import('@/lib/marketplace');
+        const pendingBiz = await adminListBusinessAccountRequests();
+        setPendingBusinessCount(pendingBiz.length);
+      } catch {
+        setPendingBusinessCount(0);
+      }
     } catch (err) {
       console.error('Failed to fetch stats:', err);
     }
@@ -251,6 +260,7 @@ export default function AdminDashboard() {
   const getRoleLabel = (role: string) => {
     const labels: Record<string, string> = {
       client: 'عميل', barber: 'حلاق', specialist: 'متخصص', admin: 'مدير',
+      store: 'متجر', company: 'شركة', doctor: 'طبيب', moderator: 'مشرف',
     };
     return labels[role] || role;
   };
@@ -303,7 +313,16 @@ export default function AdminDashboard() {
     { label: 'إدارة الحجوزات', action: () => setActiveSection('bookings'), icon: Calendar },
     { label: 'توثيق الهويات', action: () => setActiveSection('identity'), icon: Shield },
     { label: 'طلبات الاشتراك', action: () => setActiveSection('subscriptions'), icon: Crown },
+    {
+      label: pendingBusinessCount > 0
+        ? `موافقة متجر/شركة/طبيب (${pendingBusinessCount})`
+        : 'موافقة متجر/شركة/طبيب',
+      action: () => setActiveSection('business'),
+      icon: Shield,
+    },
+    { label: 'منتج اليوم والمميزة', action: () => setActiveSection('placements'), icon: Crown },
     { label: 'البلاغات', action: () => setActiveSection('reports'), icon: Flag },
+    { label: 'معاينة السوق', action: () => navigate('marketplace'), icon: TrendingUp },
   ];
 
   return (
@@ -447,8 +466,11 @@ export default function AdminDashboard() {
 }
 
 /* ================= ADMIN MANAGEMENT SECTIONS (I2 / I3 / H3) ================= */
-const ROLE_OPTIONS = ['client', 'barber', 'specialist', 'moderator', 'admin'];
-const ROLE_LABELS: Record<string, string> = { client: 'عميل', barber: 'حلاق', specialist: 'متخصص', moderator: 'مشرف محتوى', admin: 'مدير' };
+const ROLE_OPTIONS = ['client', 'barber', 'store', 'company', 'doctor', 'specialist', 'moderator', 'admin'];
+const ROLE_LABELS: Record<string, string> = {
+  client: 'عميل', barber: 'حلاق', store: 'متجر', company: 'شركة', doctor: 'طبيب',
+  specialist: 'متخصص', moderator: 'مشرف محتوى', admin: 'مدير',
+};
 const BOOKING_STATUS_LABELS: Record<string, string> = {
   pending: 'قيد الانتظار',
   confirmed: 'مؤكد',
@@ -502,7 +524,273 @@ interface AdminReportRow {
   targetName: string;
 }
 
-function AdminSection({ section, adminId, onBack }: { section: 'users' | 'bookings' | 'payments' | 'reviews' | 'identity' | 'subscriptions' | 'reports'; adminId: string; onBack: () => void }) {
+function AdminSection({ section, adminId, onBack }: { section: 'users' | 'bookings' | 'payments' | 'reviews' | 'identity' | 'subscriptions' | 'reports' | 'business' | 'placements'; adminId: string; onBack: () => void }) {
+  if (section === 'business') {
+    return <BusinessApprovalsSection onBack={onBack} />;
+  }
+  if (section === 'placements') {
+    return <PlacementsAdminSection onBack={onBack} />;
+  }
+  return <AdminSectionInner section={section} adminId={adminId} onBack={onBack} />;
+}
+
+function PlacementsAdminSection({ onBack }: { onBack: () => void }) {
+  const { themeConfig } = useApp();
+  const [products, setProducts] = useState<Array<{ id: string; title: string; store_id: string | null; price_dzd: number | null }>>([]);
+  const [stores, setStores] = useState<Array<{ id: string; store_name: string; is_featured: boolean; approval_status: string }>>([]);
+  const [productId, setProductId] = useState('');
+  const [bid, setBid] = useState('10000');
+  const [discount, setDiscount] = useState('30');
+  const [headline, setHeadline] = useState('منتج اليوم — مساحة إعلانية مدفوعة');
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [lastPlacementStamp, setLastPlacementStamp] = useState(() => {
+    try {
+      return localStorage.getItem('hallaqi-last-placement-update') || '';
+    } catch {
+      return '';
+    }
+  });
+
+  const featuredCount = stores.filter(s => s.is_featured).length;
+
+  const stampPlacement = () => {
+    const stamp = new Date().toISOString();
+    try {
+      localStorage.setItem('hallaqi-last-placement-update', stamp);
+    } catch {
+      /* ignore */
+    }
+    setLastPlacementStamp(stamp);
+  };
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const mp = await import('@/lib/marketplace');
+      const [p, s] = await Promise.all([mp.adminListActiveProducts(), mp.adminListStores()]);
+      setProducts(p as typeof products);
+      setStores(s as typeof stores);
+      if (p[0] && !productId) setProductId(p[0].id);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'تعذر التحميل');
+    } finally {
+      setLoading(false);
+    }
+  }, [productId]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const setPotd = async () => {
+    setError('');
+    setMessage('');
+    const bidNum = Number(bid);
+    if (!(bidNum > 0)) {
+      setError('مبلغ العرض يجب أن يكون أكبر من صفر');
+      return;
+    }
+    try {
+      const mp = await import('@/lib/marketplace');
+      const selected = products.find(p => p.id === productId);
+      await mp.adminSetProductOfTheDay({
+        productId,
+        storeId: selected?.store_id,
+        bidAmountDzd: bidNum,
+        displayDiscountPercent: Number(discount) || undefined,
+        headlineAr: headline,
+      });
+      stampPlacement();
+      setMessage('تم تعيين منتج اليوم (أعلى عرض مدفوع — ليس خصمًا عشوائيًا)');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'فشل التعيين');
+    }
+  };
+
+  return (
+    <div className="min-h-screen pb-6" style={{ backgroundColor: themeConfig.colors.background }}>
+      <div className="sticky top-0 z-50 px-4 py-3 flex items-center gap-3" style={{ backgroundColor: themeConfig.colors.surface, borderBottom: `1px solid ${themeConfig.colors.border}` }}>
+        <button type="button" onClick={onBack} className="p-2 rounded-xl" style={{ backgroundColor: themeConfig.colors.background }}>
+          <ChevronRight className="w-5 h-5" style={{ color: themeConfig.colors.text }} />
+        </button>
+        <div>
+          <h1 className="text-lg font-bold" style={{ color: themeConfig.colors.text }}>المساحات الإعلانية</h1>
+          <p className="text-xs" style={{ color: themeConfig.colors.textMuted }}>منتج اليوم · متاجر مميزة</p>
+        </div>
+      </div>
+      <div className="px-4 pt-4 space-y-4">
+        {loading && <p className="text-sm" style={{ color: themeConfig.colors.textMuted }}>جاري التحميل...</p>}
+        {error && <p className="text-sm" style={{ color: themeConfig.colors.error }}>{error}</p>}
+        {message && <p className="text-sm" style={{ color: themeConfig.colors.success }}>{message}</p>}
+
+        <div className="rounded-2xl border p-3" style={{ borderColor: themeConfig.colors.border, backgroundColor: `${themeConfig.colors.primary}08` }}>
+          <p className="text-[11px] leading-5" style={{ color: themeConfig.colors.textMuted }}>
+            تلميح ترتيب الأقسام: منتج اليوم أعلى السوق، ثم المميزة، ثم الشبكة — أعد ترتيب الواجهة من الكود/docs عند الحاجة.
+          </p>
+          {lastPlacementStamp && (
+            <p className="text-[10px] mt-1 font-bold" style={{ color: themeConfig.colors.textMuted }}>
+              آخر تحديث مساحات: {new Date(lastPlacementStamp).toLocaleString('ar-DZ')}
+            </p>
+          )}
+        </div>
+
+        <div className="rounded-2xl border p-4 space-y-2" style={{ borderColor: themeConfig.colors.border, backgroundColor: themeConfig.colors.surface }}>
+          <p className="text-sm font-bold" style={{ color: themeConfig.colors.text }}>منتج اليوم</p>
+          <p className="text-[11px]" style={{ color: themeConfig.colors.textMuted }}>اختر المنتج الذي دفع أعلى مبلغ للظهور — عرض خصم شكلي للفت الانتباه</p>
+          <select value={productId} onChange={e => setProductId(e.target.value)} className="w-full h-10 rounded-xl border px-2 text-xs"
+            style={{ borderColor: themeConfig.colors.border, backgroundColor: themeConfig.colors.background, color: themeConfig.colors.text }}>
+            <option value="">اختر منتجًا</option>
+            {products.map(p => <option key={p.id} value={p.id}>{p.title}{p.price_dzd != null ? ` · ${p.price_dzd} دج` : ''}</option>)}
+          </select>
+          {!products.length && (
+            <p className="text-[11px]" style={{ color: themeConfig.colors.textMuted }}>لا منتجات بعد — أضف عبر كتالوج البائع أولًا. قريبًا عيّنات تجريبية.</p>
+          )}
+          <input value={bid} onChange={e => setBid(e.target.value)} type="number" placeholder="مبلغ العرض دج"
+            className="w-full h-10 rounded-xl border px-3 text-sm outline-none"
+            style={{ borderColor: themeConfig.colors.border, backgroundColor: themeConfig.colors.background, color: themeConfig.colors.text }} />
+          <input value={discount} onChange={e => setDiscount(e.target.value)} type="number" placeholder="نسبة خصم العرض الشكلي"
+            className="w-full h-10 rounded-xl border px-3 text-sm outline-none"
+            style={{ borderColor: themeConfig.colors.border, backgroundColor: themeConfig.colors.background, color: themeConfig.colors.text }} />
+          <input value={headline} onChange={e => setHeadline(e.target.value)} placeholder="عنوان العرض"
+            className="w-full h-10 rounded-xl border px-3 text-sm outline-none"
+            style={{ borderColor: themeConfig.colors.border, backgroundColor: themeConfig.colors.background, color: themeConfig.colors.text }} />
+          <button type="button" disabled={!productId || !(Number(bid) > 0)} onClick={() => void setPotd()}
+            className="w-full h-11 rounded-xl text-sm font-bold text-white disabled:opacity-50"
+            style={{ backgroundColor: themeConfig.colors.primary }}>تعيين منتج اليوم</button>
+        </div>
+
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-bold" style={{ color: themeConfig.colors.text }}>متاجر مميزة</p>
+            <span className="text-[11px] font-bold" style={{ color: themeConfig.colors.accent }}>
+              {featuredCount} مميز / {stores.length}
+            </span>
+          </div>
+          {stores.map(store => (
+            <div key={store.id} className="rounded-2xl border p-3 flex items-center justify-between gap-2"
+              style={{ borderColor: themeConfig.colors.border, backgroundColor: themeConfig.colors.surface }}>
+              <div>
+                <p className="text-sm font-bold" style={{ color: themeConfig.colors.text }}>{store.store_name}</p>
+                <p className="text-[11px]" style={{ color: themeConfig.colors.textMuted }}>{store.approval_status}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => void import('@/lib/marketplace').then(m => m.adminToggleStoreFeatured(store.id, !store.is_featured).then(() => { stampPlacement(); return load(); }))}
+                className="px-3 h-9 rounded-xl text-xs font-bold"
+                style={{
+                  backgroundColor: store.is_featured ? themeConfig.colors.accent : `${themeConfig.colors.accent}14`,
+                  color: store.is_featured ? '#fff' : themeConfig.colors.accent,
+                }}
+              >
+                {store.is_featured ? 'إلغاء التمييز' : 'تمييز'}
+              </button>
+            </div>
+          ))}
+          {!stores.length && <p className="text-xs" style={{ color: themeConfig.colors.textMuted }}>لا متاجر بعد الموافقة</p>}
+        </div>
+
+        <div className="rounded-2xl border p-4 border-dashed" style={{ borderColor: themeConfig.colors.border, backgroundColor: themeConfig.colors.surface }}>
+          <p className="text-sm font-bold" style={{ color: themeConfig.colors.text }}>محتوى مُبلَّغ عنه</p>
+          <p className="text-[11px] mt-1 leading-5" style={{ color: themeConfig.colors.textMuted }}>
+            قائمة المحتوى المُبلَّغ عنه في السوق · قريبًا. استخدم قسم البلاغات الحالي للمنشورات والملفات.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BusinessApprovalsSection({ onBack }: { onBack: () => void }) {
+  const { themeConfig } = useApp();
+  const [rows, setRows] = useState<Array<{
+    id: string;
+    account_type: string;
+    created_at: string;
+    payload: Record<string, unknown>;
+    profiles?: { full_name: string | null } | null;
+  }>>([]);
+  const [loading, setLoading] = useState(true);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const { adminListBusinessAccountRequests } = await import('@/lib/marketplace');
+      setRows((await adminListBusinessAccountRequests()) as unknown as typeof rows);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'تعذر التحميل');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const review = async (id: string, approve: boolean) => {
+    let notes: string | undefined;
+    if (!approve) {
+      const reason = window.prompt('سبب الرفض (اختياري لكن مُفضّل):');
+      if (reason === null) return;
+      notes = reason.trim() || undefined;
+    }
+    setBusyId(id);
+    try {
+      const { adminReviewBusinessAccountRequest } = await import('@/lib/marketplace');
+      await adminReviewBusinessAccountRequest(id, approve, notes);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'فشلت المراجعة');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  return (
+    <div className="min-h-screen pb-6" style={{ backgroundColor: themeConfig.colors.background }}>
+      <div className="sticky top-0 z-50 px-4 py-3 flex items-center gap-3" style={{ backgroundColor: themeConfig.colors.surface, borderBottom: `1px solid ${themeConfig.colors.border}` }}>
+        <button type="button" onClick={onBack} className="p-2 rounded-xl" style={{ backgroundColor: themeConfig.colors.background }}>
+          <ChevronRight className="w-5 h-5" style={{ color: themeConfig.colors.text }} />
+        </button>
+        <div>
+          <h1 className="text-lg font-bold" style={{ color: themeConfig.colors.text }}>موافقة الحسابات التجارية</h1>
+          <p className="text-xs" style={{ color: themeConfig.colors.textMuted }}>متجر · شركة · طبيب — دون موافقة كل منتج على حدة</p>
+        </div>
+      </div>
+      <div className="px-4 pt-4 space-y-3">
+        {loading && <p className="text-sm" style={{ color: themeConfig.colors.textMuted }}>جاري التحميل...</p>}
+        {error && <p className="text-sm" style={{ color: themeConfig.colors.error }}>{error}</p>}
+        {!loading && rows.length === 0 && (
+          <p className="text-sm" style={{ color: themeConfig.colors.textMuted }}>لا توجد طلبات معلقة</p>
+        )}
+        {rows.map(row => (
+          <div key={row.id} className="p-4 rounded-2xl border" style={{ borderColor: themeConfig.colors.border, backgroundColor: themeConfig.colors.surface }}>
+            <p className="text-sm font-bold" style={{ color: themeConfig.colors.text }}>
+              {row.profiles?.full_name || 'مستخدم'} · {ROLE_LABELS[row.account_type] || row.account_type}
+            </p>
+            {row.account_type === 'doctor' && (
+              <p className="text-[11px] mt-1 font-bold" style={{ color: themeConfig.colors.accent }}>
+                تحقق الطبيب مجاني — شارة موثوقة بعد الموافقة دون رسوم
+              </p>
+            )}
+            <p className="text-[11px] mt-1" style={{ color: themeConfig.colors.textMuted }}>
+              {JSON.stringify(row.payload || {}).slice(0, 160)}
+            </p>
+            <div className="flex gap-2 mt-3">
+              <button type="button" disabled={busyId === row.id} onClick={() => void review(row.id, true)}
+                className="flex-1 h-10 rounded-xl text-xs font-bold text-white" style={{ backgroundColor: themeConfig.colors.success }}>موافقة</button>
+              <button type="button" disabled={busyId === row.id} onClick={() => void review(row.id, false)}
+                className="flex-1 h-10 rounded-xl text-xs font-bold text-white" style={{ backgroundColor: themeConfig.colors.error }}>رفض</button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function AdminSectionInner({ section, adminId, onBack }: { section: 'users' | 'bookings' | 'payments' | 'reviews' | 'identity' | 'subscriptions' | 'reports'; adminId: string; onBack: () => void }) {
   const { themeConfig } = useApp();
   const [users, setUsers] = useState<AdminUserRow[]>([]);
   const [reviews, setReviews] = useState<AdminReviewRow[]>([]);

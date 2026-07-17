@@ -1,5 +1,34 @@
 # Hallaqi Changelog
 
+## v12.2.1 — Marketplace Wave 2 UX
+
+### Discovery & seller tools
+- Shared MarketUI helpers (stars, banners, progress, saved/recent products)
+- Seller catalog: progress bar, draft notes, duplicate/bulk deactivate, URL/title validation
+- Store/company detail polish: review sort & counters, delivery chips, share toast, safe-area CTA
+- Analytics refresh/export, saves rate, visit-store goal teaser
+- Admin: pending business count, reject reason prompt, POTD bid > 0, placement stamp
+- Bottom nav radial backdrop, haptic long-press, Discover POTD sparkle
+- i18n keys for saved/filters/trust strip; version bump
+
+---
+
+## v12.2.0 — Monetization & Multi-Role Marketplace
+
+### Platform Expansion
+- Separate roles: store, company, doctor (plus existing client/barber/admin)
+- Marketplace discovery layer inside Discover (not a bottom tab)
+- Central AI button with long-press radial (AI / QR / Camera / Gallery)
+- Visit Store WebView with external browser fallback
+- Independent subscription catalogs per business type; premium capped at 99
+- Product of the Day as paid placement (admin-controlled)
+- Store/company analytics, seller catalog, barber service extras, AI listing assist
+- Admin queues for business approvals and placements
+
+See `docs/MONETIZATION_BACKLOG_100.md` for the 100+ follow-up roadmap.
+
+---
+
 ## v12.1.0 — Product Completion & Growth
 
 ### Customer Experience

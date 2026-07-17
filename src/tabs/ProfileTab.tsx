@@ -251,7 +251,7 @@ export default function ProfileTab() {
       )}
 
       {appUser?.user_role === 'admin' && (
-        <div className="px-4 mt-4">
+        <div className="px-4 mt-4 space-y-2">
           <button
             onClick={() => navigate('admin-dashboard')}
             className="w-full flex items-center justify-center gap-3 p-4 rounded-2xl transition-all active:scale-95"
@@ -259,6 +259,56 @@ export default function ProfileTab() {
           >
             <Shield size={20} />
             <span className="text-sm font-bold">لوحة التحكم</span>
+          </button>
+          <p className="text-[10px] text-center" style={{ color: themeConfig.colors.textMuted }}>
+            تحسينات الموقع المستمرة
+          </p>
+        </div>
+      )}
+
+      {(!userRole || userRole === 'client') && (
+        <div className="px-4 mt-4 space-y-2">
+          <button
+            type="button"
+            onClick={() => navigate('marketplace')}
+            className="w-full flex items-center gap-2 p-3 rounded-2xl border text-right"
+            style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}
+          >
+            <Globe size={16} style={{ color: themeConfig.colors.accent }} />
+            <span>
+              <span className="block text-xs font-bold" style={{ color: themeConfig.colors.text }}>سوق حلاقي</span>
+              <span className="block text-[10px]" style={{ color: themeConfig.colors.textMuted }}>اكتشف متاجر ومنتجات · بدون عمولة</span>
+            </span>
+          </button>
+          <p className="text-[10px] text-center" style={{ color: themeConfig.colors.textMuted }}>
+            تحسينات الموقع المستمرة
+          </p>
+        </div>
+      )}
+
+      {(userRole === 'store' || userRole === 'company') && appUser?.user_status === 'pending' && (
+        <div className="px-4 mt-4">
+          <div className="p-3 rounded-2xl border" style={{ borderColor: themeConfig.colors.warning, backgroundColor: `${themeConfig.colors.warning}14` }}>
+            <p className="text-xs font-bold" style={{ color: themeConfig.colors.warning }}>انتظار موافقة الإدارة</p>
+            <p className="text-[10px] mt-1" style={{ color: themeConfig.colors.textMuted }}>
+              حسابك قيد المراجعة — ستظهر صفحة متجرك في السوق بعد الموافقة.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {userRole === 'store' && (
+        <div className="px-4 mt-3">
+          <button
+            type="button"
+            onClick={() => navigate('business-profile-edit')}
+            className="w-full p-3 rounded-2xl border text-right"
+            style={{ borderColor: themeConfig.colors.border, backgroundColor: `${themeConfig.colors.primary}08` }}
+          >
+            <p className="text-xs font-bold" style={{ color: themeConfig.colors.text }}>نصيحة: أضف رابط موقعك</p>
+            <p className="text-[10px] mt-0.5" style={{ color: themeConfig.colors.textMuted }}>
+              زر Visit Store يعمل أفضل مع موقع ويب — عدّل من صفحة المتجر
+            </p>
           </button>
         </div>
       )}
@@ -289,6 +339,113 @@ export default function ProfileTab() {
               <span className="block text-[10px]" style={{ color: themeConfig.colors.textMuted }}>نصائح وتصور قصات</span>
             </span>
           </button>
+        </div>
+      )}
+
+      {(userRole === 'store' || userRole === 'company') && (
+        <div className="px-4 mt-4 grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => navigate('business-analytics')}
+            className="flex items-center gap-2 p-3 rounded-2xl border text-right"
+            style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}
+          >
+            <Star size={16} style={{ color: themeConfig.colors.primary }} />
+            <span>
+              <span className="block text-xs font-bold" style={{ color: themeConfig.colors.text }}>تحليلات الأعمال</span>
+              <span className="block text-[10px]" style={{ color: themeConfig.colors.textMuted }}>مشاهدات ونقرات</span>
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate('seller-ai-tools')}
+            className="flex items-center gap-2 p-3 rounded-2xl border text-right"
+            style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}
+          >
+            <Sparkles size={16} style={{ color: themeConfig.colors.accent }} />
+            <span>
+              <span className="block text-xs font-bold" style={{ color: themeConfig.colors.text }}>AI للقوائم</span>
+              <span className="block text-[10px]" style={{ color: themeConfig.colors.textMuted }}>عناوين وأوصاف</span>
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate('seller-catalog')}
+            className="col-span-2 flex items-center gap-2 p-3 rounded-2xl border text-right"
+            style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}
+          >
+            <Globe size={16} style={{ color: themeConfig.colors.primary }} />
+            <span>
+              <span className="block text-xs font-bold" style={{ color: themeConfig.colors.text }}>كتالوج المنتجات</span>
+              <span className="block text-[10px]" style={{ color: themeConfig.colors.textMuted }}>حتى 99 عنصر · ابدأ مجاناً وادفع كلما كبرت</span>
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate('business-profile-edit')}
+            className="col-span-2 flex items-center gap-2 p-3 rounded-2xl border text-right"
+            style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}
+          >
+            <Settings size={16} style={{ color: themeConfig.colors.primary }} />
+            <span>
+              <span className="block text-xs font-bold" style={{ color: themeConfig.colors.text }}>تعديل صفحة المتجر</span>
+              <span className="block text-[10px]" style={{ color: themeConfig.colors.textMuted }}>شعار · غلاف · Visit Store</span>
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate('marketplace')}
+            className="col-span-2 flex items-center gap-2 p-3 rounded-2xl border text-right"
+            style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}
+          >
+            <Globe size={16} style={{ color: themeConfig.colors.accent }} />
+            <span>
+              <span className="block text-xs font-bold" style={{ color: themeConfig.colors.text }}>سوق حلاقي</span>
+              <span className="block text-[10px]" style={{ color: themeConfig.colors.textMuted }}>اكتشف · بدون عمولة في هذه المرحلة</span>
+            </span>
+          </button>
+          <p className="col-span-2 text-[10px] text-center" style={{ color: themeConfig.colors.textMuted }}>
+            تحسينات الموقع المستمرة
+          </p>
+        </div>
+      )}
+
+      {(userRole === 'barber' || userRole === 'specialist') && (
+        <div className="px-4 mt-3">
+          <button
+            type="button"
+            onClick={() => navigate('barber-extras')}
+            className="w-full flex items-center gap-2 p-3 rounded-2xl border text-right"
+            style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}
+          >
+            <Crown size={16} style={{ color: themeConfig.colors.primary }} />
+            <span>
+              <span className="block text-xs font-bold" style={{ color: themeConfig.colors.text }}>خدمات إضافية للحلاق</span>
+              <span className="block text-[10px]" style={{ color: themeConfig.colors.textMuted }}>VIP · علاجات · عناية — ليست منتجات متجر</span>
+            </span>
+          </button>
+        </div>
+      )}
+
+      {userRole === 'doctor' && (
+        <div className="px-4 mt-4">
+          <div className="p-4 rounded-2xl border" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.primary + '40' }}>
+            <p className="text-sm font-bold" style={{ color: themeConfig.colors.text }}>حساب طبيب · تحقق مجاني</p>
+            <p className="text-[11px] mt-1" style={{ color: themeConfig.colors.textMuted }}>
+              شارة موثوقة بعد موافقة الإدارة. التخصص الحالي: طب الجلد — قابل لتخصصات طبية لاحقًا دون تغيير نموذج الطبيب.
+            </p>
+            {appUser?.id && (
+              <button
+                type="button"
+                onClick={() => navigate('doctor-profile', { doctorId: appUser.id })}
+                className="mt-3 w-full h-9 rounded-xl text-xs font-bold text-white"
+                style={{ backgroundColor: themeConfig.colors.primary }}
+              >
+                عرض ملف الطبيب
+              </button>
+            )}
+            <p className="text-[10px] mt-2 font-bold" style={{ color: themeConfig.colors.accent }}>محتوى الاستشارات والتوصيات · قريبًا</p>
+          </div>
         </div>
       )}
 
@@ -726,7 +883,8 @@ function InformationPage({ onBack, kind }: { onBack: () => void; kind: 'help' | 
             <img src="/logo-icon.png" alt="Hallaqi" className="w-20 h-20 rounded-2xl mx-auto" />
             <h3 className="font-black text-lg mt-3" style={{ color: themeConfig.colors.text }}>Hallaqi — حلاقي</h3>
             <p className="text-xs mt-2 leading-relaxed" style={{ color: themeConfig.colors.textMuted }}>منصة جزائرية تربط العملاء بالحلاقين وتسهّل اكتشاف الخدمات والحجز والتواصل والدفع الآمن.</p>
-            <p className="text-[11px] mt-4" style={{ color: themeConfig.colors.textMuted }}>الإصدار 12.0.0</p>
+            <p className="text-[11px] mt-4" style={{ color: themeConfig.colors.textMuted }}>الإصدار 12.2.1</p>
+            <p className="text-[10px] mt-2" style={{ color: themeConfig.colors.textMuted }}>تحسينات الموقع المستمرة · Wave 2</p>
           </div>
         )}
       </div>
@@ -971,8 +1129,13 @@ function SubscriptionPage({ onBack }: { onBack: () => void }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
+    const role = appUser?.user_role;
+    const businessType =
+      role === 'store' ? 'store' :
+      role === 'company' ? 'company' :
+      'barber';
     void Promise.all([
-      getSubscriptionPlans(),
+      getSubscriptionPlans(businessType),
       appUser ? getLatestSubscriptionRequest(appUser.id) : Promise.resolve(null),
     ]).then(([loadedPlans, latestRequest]) => {
       setPlans(loadedPlans);
@@ -1004,6 +1167,9 @@ function SubscriptionPage({ onBack }: { onBack: () => void }) {
         <h2 className="text-base font-bold" style={{ color: themeConfig.colors.text }}>خطط الاشتراك</h2>
       </div>
       <div className="px-4 mt-4 space-y-3">
+        <div className="p-3 rounded-xl text-xs" style={{ backgroundColor: themeConfig.colors.primary + '10', color: themeConfig.colors.primary }}>
+          ابدأ مجاناً وادفع كلما كبرت — خطط مستقلة لكل نوع عمل. سقف البريميوم 99 عنصرًا (بدون unlimited).
+        </div>
         {requestStatus && (
           <div className="p-3 rounded-xl text-xs" style={{ backgroundColor: themeConfig.colors.info + '12', color: themeConfig.colors.info }}>
             حالة طلب الاشتراك: {requestStatus === 'pending' ? 'قيد المراجعة' : requestStatus}

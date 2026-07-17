@@ -7,7 +7,7 @@
 
 | Type | Values |
 |------|--------|
-| `user_role` | client, barber, specialist, admin, moderator |
+| `user_role` | client, barber, specialist, admin, moderator, store, company, doctor |
 | `user_status` | active, inactive, suspended, pending |
 | `verification_status` | unverified, pending, verified, premium |
 | `booking_status` | pending, confirmed, in_progress, completed, cancelled, no_show |
@@ -326,3 +326,77 @@ npx supabase link --project-ref cdwzbtjwqybnahhbhldy
 npx supabase migration list --linked
 npx supabase db push
 ```
+
+## Monetization / Marketplace Tables
+
+Discovery-layer marketplace (no in-app merchant checkout/commission in this phase).
+Source migrations: `20260717180000_monetization_platform_foundation.sql`,
+`20260717190000_marketplace_reviews.sql`.
+
+### `stores`
+| Column | Type | Notes |
+|--------|------|-------|
+| id | UUID PK | = profiles.id |
+| store_name | TEXT | NOT NULL |
+| slug | TEXT | unique |
+| logo_url / cover_url | TEXT | |
+| short_description / about | TEXT | |
+| website_url | TEXT | powers Visit Store CTA |
+| contact_phone / contact_email | TEXT | |
+| social_links | JSONB | default `{}` |
+| wilaya_code | INTEGER | |
+| city | TEXT | |
+| delivery_areas | TEXT[] | |
+| approval_status | TEXT | pending/approved/rejected/suspended |
+| is_premium / is_featured | BOOLEAN | |
+| premium_item_cap | INTEGER | capped at 99 |
+| average_rating / review_count | NUMERIC / INT | refreshed from reviews |
+
+### `companies`
+| Column | Type | Notes |
+|--------|------|-------|
+| id | UUID PK | = profiles.id |
+| company_name | TEXT | NOT NULL |
+| slug / branding / about / website_url | | same discovery pattern as stores |
+| has_company_badge | BOOLEAN | default true |
+| is_premium / is_featured | BOOLEAN | |
+| premium_item_cap | INTEGER | capped at 99 |
+| trust_tag | TEXT | default `official` |
+| approval_status | TEXT | pending/approved/rejected/suspended |
+
+### `doctor_profiles`
+| Column | Type | Notes |
+|--------|------|-------|
+| id | UUID PK | = profiles.id |
+| display_name | TEXT | |
+| specialty | TEXT | default `dermatologist` |
+| verification_status | TEXT | pending/verified/rejected/suspended |
+| trusted_badge / can_recommend | BOOLEAN | |
+| free_verification | BOOLEAN | default true |
+
+### `marketplace_categories`
+Seeded ids: hair, beard, skin, shaving, devices, courses, accessories, professional_tools (`name_ar` / `name_en`).
+
+### `marketplace_products`
+Owner is either `store_id` or `company_id` (`owner_type`). Placement flags: `is_featured`, `is_premium_placement`, `is_best_seller`, `is_new`. Prices in DZD; `external_url` for off-app purchase. Item insert enforced by `enforce_marketplace_item_cap` (max 99).
+
+### `barber_service_extras`
+Salon extras/premium treatments owned by `professional_id` (not physical store SKUs).
+
+### `product_of_the_day`
+Paid daily placement (`UNIQUE placement_date`): `product_id`, optional `store_id`, `bid_amount_dzd`, `display_discount_percent`, `headline_ar`.
+
+### `marketplace_placements`
+Generic featured/sponsored slots (`featured_store`, `featured_product`, `banner`, `sponsored`, `product_of_day`).
+
+### `business_account_requests`
+Admin approval queue for `store` / `company` / `doctor` signups (`payload` JSONB, `status`).
+
+### `marketplace_analytics_events`
+Funnel events: view, click, save, profile_visit, search_impression, product_of_day_view, featured_slot_view, visit_store_click, conversion_indicator.
+
+### `marketplace_reviews`
+Store/company/product reviews (`rating` 1–5, `moderation_status`). Trigger `refresh_store_rating` updates store aggregates.
+
+### Subscription extensions
+`subscription_plans.business_type` ∈ barber/store/company with independent tier catalogs and `max_items` ≤ 99. Tagline: ابدأ مجاناً وادفع كلما كبرت.
