@@ -77,6 +77,7 @@ export function mapBookingRow(value: unknown): Booking {
     time: startTime ? (startTime.split('T')[1] || '').slice(0, 5) : '',
     status: asString(row.status, 'pending') as Booking['status'],
     totalPrice: asNumber(row.total_price),
+    discountAmount: asNumber(row.discount_amount) || undefined,
     note: asString(row.notes) || undefined,
     createdAt: asString(row.created_at, new Date(0).toISOString()),
     location: asString(professional.business_address),

@@ -144,8 +144,10 @@ export type Database = {
           booking_start_time: string
           client_id: string | null
           created_at: string | null
+          discount_amount: number
           id: string
           is_mobile_service: boolean
+          loyalty_redemption_id: string | null
           notes: string | null
           payment_id: string | null
           payment_method: string | null
@@ -162,8 +164,10 @@ export type Database = {
           booking_start_time: string
           client_id?: string | null
           created_at?: string | null
+          discount_amount?: number
           id?: string
           is_mobile_service?: boolean
+          loyalty_redemption_id?: string | null
           notes?: string | null
           payment_id?: string | null
           payment_method?: string | null
@@ -180,8 +184,10 @@ export type Database = {
           booking_start_time?: string
           client_id?: string | null
           created_at?: string | null
+          discount_amount?: number
           id?: string
           is_mobile_service?: boolean
+          loyalty_redemption_id?: string | null
           notes?: string | null
           payment_id?: string | null
           payment_method?: string | null
@@ -199,6 +205,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bookings_loyalty_redemption_id_fkey"
+            columns: ["loyalty_redemption_id"]
+            isOneToOne: false
+            referencedRelation: "loyalty_redemptions"
             referencedColumns: ["id"]
           },
           {
@@ -657,33 +670,46 @@ export type Database = {
       }
       loyalty_redemptions: {
         Row: {
+          booking_id: string | null
           created_at: string
           expires_at: string
           id: string
           reward_id: string
           status: string
+          used_at: string | null
           user_id: string
           voucher_code: string
         }
         Insert: {
+          booking_id?: string | null
           created_at?: string
           expires_at?: string
           id?: string
           reward_id: string
           status?: string
+          used_at?: string | null
           user_id: string
           voucher_code?: string
         }
         Update: {
+          booking_id?: string | null
           created_at?: string
           expires_at?: string
           id?: string
           reward_id?: string
           status?: string
+          used_at?: string | null
           user_id?: string
           voucher_code?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "loyalty_redemptions_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "loyalty_redemptions_reward_id_fkey"
             columns: ["reward_id"]
@@ -1435,6 +1461,7 @@ export type Database = {
       complete_barber_onboarding: { Args: never; Returns: undefined }
       create_booking_with_services: {
         Args: {
+          loyalty_voucher?: string
           mobile_address?: string
           mobile_service?: boolean
           note?: string
@@ -1448,8 +1475,10 @@ export type Database = {
           booking_start_time: string
           client_id: string | null
           created_at: string | null
+          discount_amount: number
           id: string
           is_mobile_service: boolean
+          loyalty_redemption_id: string | null
           notes: string | null
           payment_id: string | null
           payment_method: string | null

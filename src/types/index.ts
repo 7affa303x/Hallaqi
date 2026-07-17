@@ -97,6 +97,7 @@ export interface Booking {
   time: string;
   status: BookingStatus;
   totalPrice: number;
+  discountAmount?: number;
   note?: string;
   createdAt: string;
   location: string;

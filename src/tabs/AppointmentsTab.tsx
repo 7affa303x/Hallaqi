@@ -226,6 +226,7 @@ export default function AppointmentsTab() {
                     </div>
                     <div className="text-left">
                       <p className="text-sm font-bold" style={{ color: themeConfig.colors.primary }}>{booking.totalPrice} دج</p>
+                      {booking.discountAmount && <span className="text-[9px] font-medium text-green-600">وفرت {booking.discountAmount} دج</span>}
                       {booking.paymentStatus === 'paid' && <span className="text-[10px] font-medium text-green-500">مدفوع</span>}
                       {booking.paymentStatus === 'pending' && <span className="text-[10px] font-medium text-amber-500">قيد الدفع</span>}
                     </div>

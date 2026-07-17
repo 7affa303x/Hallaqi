@@ -265,6 +265,7 @@ export async function createBookingWithServices(params: {
   paymentMethod: string;
   isMobileService: boolean;
   mobileAddress?: string;
+  voucherCode?: string;
 }) {
   guard();
   const { data, error } = await supabase.rpc('create_booking_with_services', {
@@ -275,6 +276,7 @@ export async function createBookingWithServices(params: {
     payment_method_name: params.paymentMethod,
     mobile_service: params.isMobileService,
     mobile_address: params.mobileAddress || undefined,
+    loyalty_voucher: params.voucherCode || undefined,
   });
   if (error) {
     if (error.code === '23P01' || error.code === '23505') {

@@ -10,6 +10,7 @@ import {
   createBookingWithServices,
   getProfessionalBookings,
   getProfessionalExceptions,
+  getLoyaltyDashboard,
   isSlotAvailable,
   sendNotification,
 } from '@/supabase/database';
@@ -33,6 +34,14 @@ const ALL_TIME_SLOTS = [
 const ccpConfigured = Boolean(
   import.meta.env.VITE_CCP_ACCOUNT_NUMBER && import.meta.env.VITE_CCP_CARD_NUMBER
 );
+
+interface AvailableVoucher {
+  id: string;
+  code: string;
+  title: string;
+  discountPercent: number;
+  expiresAt: string;
+}
 
 /** Map JS Date getDay() (0=Sun) to workingHours day key */
 const JS_DAY_TO_KEY: Record<number, string> = {
@@ -119,6 +128,8 @@ export default function BookingFlowPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [isLoadingSlots, setIsLoadingSlots] = useState(false);
+  const [availableVouchers, setAvailableVouchers] = useState<AvailableVoucher[]>([]);
+  const [selectedVoucherId, setSelectedVoucherId] = useState('');
 
   const {
     register: registerStep3,
@@ -150,6 +161,28 @@ export default function BookingFlowPage() {
     }
     setInitializedFromParams(true);
   }, [barber, initializedFromParams, screenParams?.serviceIds]);
+
+  useEffect(() => {
+    if (!appUser) return;
+    void getLoyaltyDashboard(appUser.id).then(data => {
+      const vouchers = data.redemptions.flatMap(redemption => {
+        const reward = redemption.loyalty_rewards;
+        if (
+          redemption.status !== 'available'
+          || new Date(redemption.expires_at) <= new Date()
+          || !reward
+        ) return [];
+        return [{
+          id: redemption.id,
+          code: redemption.voucher_code,
+          title: reward.title_ar,
+          discountPercent: reward.discount_percent,
+          expiresAt: redemption.expires_at,
+        }];
+      });
+      setAvailableVouchers(vouchers);
+    }).catch(() => setAvailableVouchers([]));
+  }, [appUser]);
 
   /** Fetch existing bookings for this professional */
   useEffect(() => {
@@ -275,7 +308,12 @@ export default function BookingFlowPage() {
   const selectedServicesData = barber.services.filter((s: Service) => selectedServices.includes(s.id));
   const totalPrice = selectedServicesData.reduce((sum: number, s: Service) => sum + s.price, 0);
   const totalDuration = selectedServicesData.reduce((sum: number, s: Service) => sum + s.duration, 0);
-  const estimatedLoyaltyPoints = Math.max(1, Math.floor(totalPrice / 100));
+  const selectedVoucher = availableVouchers.find(voucher => voucher.id === selectedVoucherId);
+  const discountAmount = selectedVoucher
+    ? Math.round(totalPrice * selectedVoucher.discountPercent) / 100
+    : 0;
+  const payableTotal = Math.max(0, totalPrice - discountAmount);
+  const estimatedLoyaltyPoints = Math.max(1, Math.floor(payableTotal / 100));
 
   /** Compute end time from start time + duration */
   const computeEndTime = (dateStr: string, timeStr: string, durationMin: number): string => {
@@ -321,26 +359,27 @@ export default function BookingFlowPage() {
         paymentMethod: data.paymentMethod,
         isMobileService: data.isMobileService,
         mobileAddress: data.address,
+        voucherCode: selectedVoucher?.code,
       });
 
       if (saved) {
         // If card payment selected, redirect to Stripe Checkout
         if (data.paymentMethod === 'card') {
           const baseUrl = window.location.origin;
-          const lineItems = selectedServicesData.map(svc => ({
-            name: svc.name,
-            description: `خدمة من ${barber.name}`,
-            amount: Math.round(svc.price * 100), // convert to centimes
+          const lineItems = [{
+            name: selectedServicesData.map(service => service.name).join(' + '),
+            description: `حجز مع ${barber.name}${selectedVoucher ? ` بعد ${selectedVoucher.title}` : ''}`,
+            amount: Math.round(saved.total_price * 100),
             quantity: 1,
             currency: 'dzd',
-          }));
+          }];
 
           await initiatePayment('stripe', {
             bookingId: saved.id,
             clientId: appUser.id,
             professionalId: barber.id,
             lineItems,
-            totalAmount: totalPrice,
+            totalAmount: saved.total_price,
             currency: 'dzd',
             metadata: {
               barber_name: barber.name,
@@ -361,7 +400,7 @@ export default function BookingFlowPage() {
             bookingId: saved.id,
             clientId: appUser.id,
             professionalId: barber.id,
-            amount: totalPrice,
+            amount: saved.total_price,
             currency: 'dzd',
             metadata: {
               barber_name: barber.name,
@@ -416,7 +455,8 @@ export default function BookingFlowPage() {
           date: selectedDate,
           time: selectedTime,
           status: 'pending' as BookingStatus,
-          totalPrice: totalPrice,
+          totalPrice: saved.total_price,
+          discountAmount: saved.discount_amount || undefined,
           note: data.note || undefined,
           createdAt: new Date().toISOString(),
           location: barber.location,
@@ -515,7 +555,7 @@ export default function BookingFlowPage() {
           </div>
           <div className="flex justify-between pt-2 border-t" style={{ borderColor: themeConfig.colors.border }}>
             <span className="text-sm font-bold" style={{ color: themeConfig.colors.text }}>الإجمالي</span>
-            <span className="text-sm font-bold" style={{ color: themeConfig.colors.primary }}>{totalPrice} دج</span>
+            <span className="text-sm font-bold" style={{ color: themeConfig.colors.primary }}>{payableTotal} دج</span>
           </div>
         </div>
         <div className="flex gap-2 w-full max-w-xs">
@@ -691,13 +731,34 @@ export default function BookingFlowPage() {
             </div>
             <div className="flex justify-between mt-3 pt-3 border-t" style={{ borderColor: themeConfig.colors.border }}>
               <span className="text-sm font-bold" style={{ color: themeConfig.colors.text }}>الإجمالي</span>
-              <span className="text-sm font-bold" style={{ color: themeConfig.colors.primary }}>{totalPrice} دج</span>
+              <span className="text-sm font-bold" style={{ color: themeConfig.colors.primary }}>{payableTotal} دج</span>
             </div>
+            {selectedVoucher && (
+              <div className="flex justify-between mt-2">
+                <span className="text-[11px]" style={{ color: themeConfig.colors.success }}>{selectedVoucher.title}</span>
+                <span className="text-[11px] font-bold" style={{ color: themeConfig.colors.success }}>-{discountAmount} دج</span>
+              </div>
+            )}
             <div className="flex items-center justify-between mt-2 p-2 rounded-lg" style={{ backgroundColor: themeConfig.colors.accent + '10' }}>
               <span className="text-[11px]" style={{ color: themeConfig.colors.textMuted }}>مكافأة إكمال الموعد</span>
               <span className="text-[11px] font-bold" style={{ color: themeConfig.colors.accent }}>+{estimatedLoyaltyPoints} نقطة ولاء</span>
             </div>
           </div>
+
+          {availableVouchers.length > 0 && (
+            <div>
+              <p className="text-xs font-bold mb-2" style={{ color: themeConfig.colors.text }}>قسائم الولاء</p>
+              <div className="space-y-2">
+                <button type="button" onClick={() => setSelectedVoucherId('')} className="w-full p-3 rounded-xl border text-right text-xs" style={{ backgroundColor: !selectedVoucherId ? themeConfig.colors.primary + '08' : themeConfig.colors.surface, borderColor: !selectedVoucherId ? themeConfig.colors.primary : themeConfig.colors.border, color: themeConfig.colors.text }}>بدون قسيمة</button>
+                {availableVouchers.map(voucher => (
+                  <button key={voucher.id} type="button" onClick={() => setSelectedVoucherId(voucher.id)} className="w-full p-3 rounded-xl border flex items-center justify-between" style={{ backgroundColor: selectedVoucherId === voucher.id ? themeConfig.colors.success + '10' : themeConfig.colors.surface, borderColor: selectedVoucherId === voucher.id ? themeConfig.colors.success : themeConfig.colors.border }}>
+                    <div className="text-right"><p className="text-xs font-bold" style={{ color: themeConfig.colors.text }}>{voucher.title}</p><p className="text-[9px] font-mono mt-0.5" style={{ color: themeConfig.colors.textMuted }}>{voucher.code}</p></div>
+                    <span className="text-xs font-bold" style={{ color: themeConfig.colors.success }}>خصم {voucher.discountPercent}%</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Payment method */}
           <div>
@@ -751,7 +812,7 @@ export default function BookingFlowPage() {
           <button type="submit" disabled={isSaving || isPaymentProcessing || isCCPProcessing}
             className="w-full h-12 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 transition-all disabled:opacity-50"
             style={{ backgroundColor: themeConfig.colors.primary }}>
-            {(isSaving || isPaymentProcessing || isCCPProcessing) ? <><div className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin" /> {watchedPaymentMethod === 'card' ? 'جاري التوجيه للدفع...' : 'جاري الحفظ...'}</> : <>{watchedPaymentMethod === 'card' ? `الدفع بالبطاقة - ${totalPrice} دج` : `تأكيد الحجز - ${totalPrice} دج`}</>}
+            {(isSaving || isPaymentProcessing || isCCPProcessing) ? <><div className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin" /> {watchedPaymentMethod === 'card' ? 'جاري التوجيه للدفع...' : 'جاري الحفظ...'}</> : <>{watchedPaymentMethod === 'card' ? `الدفع بالبطاقة - ${payableTotal} دج` : `تأكيد الحجز - ${payableTotal} دج`}</>}
           </button>
         </form>
       )}
