@@ -6,6 +6,8 @@ import {
   adminListProfiles, adminUpdateUserRole, adminUpdateUserStatus,
   adminListPendingReviews, adminModerateReview, adminListPendingPayments,
   adminListBookings, adminListPendingIdVerifications, adminReviewIdVerification,
+  adminListPendingSubscriptions, adminReviewSubscription,
+  adminListPendingReports, adminResolveReport,
   updateBookingStatus,
   type AdminUserRow, type AdminReviewRow,
 } from '@/supabase/database';
@@ -13,7 +15,7 @@ import { ccpProvider } from '@/lib/payment/ccp-provider';
 import { getSignedUrl } from '@/supabase/storage';
 import type { Database } from '@/types/supabase';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
-import { Users, Scissors, Calendar, CreditCard, Clock, Star, DollarSign, TrendingUp, ChevronRight, Shield, Check, X, ArrowRight } from 'lucide-react';
+import { Users, Scissors, Calendar, CreditCard, Clock, Star, DollarSign, TrendingUp, ChevronRight, Shield, Check, X, ArrowRight, Crown, Flag } from 'lucide-react';
 
 interface DashboardStats {
   totalUsers: number;
@@ -69,7 +71,7 @@ export default function AdminDashboard() {
   const [recentUsers, setRecentUsers] = useState<RecentUser[]>([]);
   const [chartData, setChartData] = useState<ChartData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeSection, setActiveSection] = useState<'home' | 'users' | 'bookings' | 'payments' | 'reviews' | 'identity'>('home');
+  const [activeSection, setActiveSection] = useState<'home' | 'users' | 'bookings' | 'payments' | 'reviews' | 'identity' | 'subscriptions' | 'reports'>('home');
 
   const isAdmin = !!appUser && appUser.user_role === 'admin';
 
@@ -300,6 +302,8 @@ export default function AdminDashboard() {
     { label: 'إدارة المستخدمين', action: () => setActiveSection('users'), icon: Users },
     { label: 'إدارة الحجوزات', action: () => setActiveSection('bookings'), icon: Calendar },
     { label: 'توثيق الهويات', action: () => setActiveSection('identity'), icon: Shield },
+    { label: 'طلبات الاشتراك', action: () => setActiveSection('subscriptions'), icon: Crown },
+    { label: 'البلاغات', action: () => setActiveSection('reports'), icon: Flag },
   ];
 
   return (
@@ -445,6 +449,14 @@ export default function AdminDashboard() {
 /* ================= ADMIN MANAGEMENT SECTIONS (I2 / I3 / H3) ================= */
 const ROLE_OPTIONS = ['client', 'barber', 'specialist', 'moderator', 'admin'];
 const ROLE_LABELS: Record<string, string> = { client: 'عميل', barber: 'حلاق', specialist: 'متخصص', moderator: 'مشرف محتوى', admin: 'مدير' };
+const BOOKING_STATUS_LABELS: Record<string, string> = {
+  pending: 'قيد الانتظار',
+  confirmed: 'مؤكد',
+  in_progress: 'جاري',
+  completed: 'مكتمل',
+  cancelled: 'ملغي',
+  no_show: 'لم يحضر',
+};
 
 interface PendingPaymentRow {
   id: string;
@@ -473,13 +485,32 @@ interface AdminIdVerificationRow {
   profiles?: { full_name: string | null } | null;
 }
 
-function AdminSection({ section, adminId, onBack }: { section: 'users' | 'bookings' | 'payments' | 'reviews' | 'identity'; adminId: string; onBack: () => void }) {
+interface AdminSubscriptionRow {
+  id: string;
+  plan_id: string;
+  created_at: string;
+  profiles?: { full_name: string | null } | null;
+  subscription_plans?: { name_ar: string; price_dzd: number } | null;
+}
+
+interface AdminReportRow {
+  id: string;
+  reason: string;
+  created_at: string | null;
+  kind: 'forum' | 'professional';
+  reporterName: string;
+  targetName: string;
+}
+
+function AdminSection({ section, adminId, onBack }: { section: 'users' | 'bookings' | 'payments' | 'reviews' | 'identity' | 'subscriptions' | 'reports'; adminId: string; onBack: () => void }) {
   const { themeConfig } = useApp();
   const [users, setUsers] = useState<AdminUserRow[]>([]);
   const [reviews, setReviews] = useState<AdminReviewRow[]>([]);
   const [payments, setPayments] = useState<PendingPaymentRow[]>([]);
   const [bookings, setBookings] = useState<AdminBookingRow[]>([]);
   const [identityRequests, setIdentityRequests] = useState<AdminIdVerificationRow[]>([]);
+  const [subscriptions, setSubscriptions] = useState<AdminSubscriptionRow[]>([]);
+  const [reports, setReports] = useState<AdminReportRow[]>([]);
   const [receiptUrls, setReceiptUrls] = useState<Record<string, string>>({});
   const [identityUrls, setIdentityUrls] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
@@ -493,6 +524,30 @@ function AdminSection({ section, adminId, onBack }: { section: 'users' | 'bookin
       if (section === 'users') setUsers(await adminListProfiles());
       else if (section === 'reviews') setReviews(await adminListPendingReviews());
       else if (section === 'bookings') setBookings((await adminListBookings()) as unknown as AdminBookingRow[]);
+      else if (section === 'subscriptions') {
+        setSubscriptions((await adminListPendingSubscriptions()) as unknown as AdminSubscriptionRow[]);
+      }
+      else if (section === 'reports') {
+        const pending = await adminListPendingReports();
+        setReports([
+          ...pending.forum.map(report => ({
+            id: report.id,
+            reason: report.reason,
+            created_at: report.created_at,
+            kind: 'forum' as const,
+            reporterName: report.profiles?.full_name || 'مستخدم',
+            targetName: report.forum_posts?.title || 'منشور أو تعليق',
+          })),
+          ...pending.professionals.map(report => ({
+            id: report.id,
+            reason: report.reason,
+            created_at: report.created_at,
+            kind: 'professional' as const,
+            reporterName: report.profiles?.full_name || 'مستخدم',
+            targetName: report.professionals?.business_name || 'حلاق',
+          })),
+        ]);
+      }
       else if (section === 'identity') {
         const rows = (await adminListPendingIdVerifications()) as unknown as AdminIdVerificationRow[];
         setIdentityRequests(rows);
@@ -524,7 +579,7 @@ function AdminSection({ section, adminId, onBack }: { section: 'users' | 'bookin
 
   useEffect(() => { load(); }, [load]);
 
-  const titles: Record<string, string> = { users: 'إدارة المستخدمين', bookings: 'إدارة الحجوزات', payments: 'مراجعة المدفوعات', reviews: 'إدارة المراجعات', identity: 'توثيق الهويات' };
+  const titles: Record<string, string> = { users: 'إدارة المستخدمين', bookings: 'إدارة الحجوزات', payments: 'مراجعة المدفوعات', reviews: 'إدارة المراجعات', identity: 'توثيق الهويات', subscriptions: 'طلبات الاشتراك', reports: 'البلاغات' };
 
   const changeRole = async (u: AdminUserRow, role: string) => {
     setBusyId(u.id);
@@ -568,6 +623,28 @@ function AdminSection({ section, adminId, onBack }: { section: 'users' | 'bookin
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'فشل مراجعة الهوية');
+    } finally {
+      setBusyId(null);
+    }
+  };
+  const reviewSubscription = async (request: AdminSubscriptionRow, approve: boolean) => {
+    setBusyId(request.id);
+    try {
+      await adminReviewSubscription(request.id, approve, approve ? undefined : 'لم يتم اعتماد طلب الاشتراك');
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'فشل مراجعة الاشتراك');
+    } finally {
+      setBusyId(null);
+    }
+  };
+  const resolveReport = async (report: AdminReportRow, accepted: boolean) => {
+    setBusyId(report.id);
+    try {
+      await adminResolveReport(report.kind, report.id, accepted);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'فشل مراجعة البلاغ');
     } finally {
       setBusyId(null);
     }
@@ -659,7 +736,7 @@ function AdminSection({ section, adminId, onBack }: { section: 'users' | 'bookin
                   className="mr-auto text-[11px] px-2 py-1 rounded-lg border bg-transparent"
                   style={{ borderColor: themeConfig.colors.border, color: themeConfig.colors.text }}
                 >
-                  {['pending', 'confirmed', 'in_progress', 'completed', 'cancelled', 'no_show'].map(status => <option key={status} value={status}>{status}</option>)}
+                  {Object.entries(BOOKING_STATUS_LABELS).map(([status, label]) => <option key={status} value={status}>{label}</option>)}
                 </select>
               </div>
             </div>
@@ -679,6 +756,43 @@ function AdminSection({ section, adminId, onBack }: { section: 'users' | 'bookin
               <div className="flex gap-2">
                 <button disabled={busyId === request.id} onClick={() => void reviewIdentity(request, true)} className="flex-1 h-8 rounded-lg text-xs font-bold disabled:opacity-50" style={{ backgroundColor: themeConfig.colors.success + '15', color: themeConfig.colors.success }}>قبول</button>
                 <button disabled={busyId === request.id} onClick={() => void reviewIdentity(request, false)} className="flex-1 h-8 rounded-lg text-xs font-bold disabled:opacity-50" style={{ backgroundColor: themeConfig.colors.error + '15', color: themeConfig.colors.error }}>رفض</button>
+              </div>
+            </div>
+          )))}
+
+        {!loading && section === 'subscriptions' && (subscriptions.length === 0
+          ? <p className="text-sm text-center py-6" style={{ color: themeConfig.colors.textMuted }}>لا توجد طلبات اشتراك معلقة</p>
+          : subscriptions.map(request => (
+            <div key={request.id} className="p-3 rounded-xl" style={{ backgroundColor: themeConfig.colors.surface, border: `1px solid ${themeConfig.colors.border}` }}>
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <p className="text-sm font-bold" style={{ color: themeConfig.colors.text }}>{request.profiles?.full_name || 'مستخدم'}</p>
+                  <p className="text-[11px]" style={{ color: themeConfig.colors.textMuted }}>{request.subscription_plans?.name_ar || request.plan_id} · {request.subscription_plans?.price_dzd || 0} دج</p>
+                </div>
+                <Crown size={20} style={{ color: themeConfig.colors.accent }} />
+              </div>
+              <div className="flex gap-2">
+                <button disabled={busyId === request.id} onClick={() => void reviewSubscription(request, true)} className="flex-1 h-8 rounded-lg text-xs font-bold disabled:opacity-50" style={{ backgroundColor: themeConfig.colors.success + '15', color: themeConfig.colors.success }}>تفعيل</button>
+                <button disabled={busyId === request.id} onClick={() => void reviewSubscription(request, false)} className="flex-1 h-8 rounded-lg text-xs font-bold disabled:opacity-50" style={{ backgroundColor: themeConfig.colors.error + '15', color: themeConfig.colors.error }}>رفض</button>
+              </div>
+            </div>
+          )))}
+
+        {!loading && section === 'reports' && (reports.length === 0
+          ? <p className="text-sm text-center py-6" style={{ color: themeConfig.colors.textMuted }}>لا توجد بلاغات معلقة</p>
+          : reports.map(report => (
+            <div key={`${report.kind}-${report.id}`} className="p-3 rounded-xl" style={{ backgroundColor: themeConfig.colors.surface, border: `1px solid ${themeConfig.colors.border}` }}>
+              <div className="flex items-center gap-2 mb-2">
+                <Flag size={16} style={{ color: themeConfig.colors.error }} />
+                <div className="flex-1">
+                  <p className="text-sm font-bold" style={{ color: themeConfig.colors.text }}>{report.targetName}</p>
+                  <p className="text-[10px]" style={{ color: themeConfig.colors.textMuted }}>بواسطة {report.reporterName} · {report.kind === 'forum' ? 'محتوى المنتدى' : 'ملف حلاق'}</p>
+                </div>
+              </div>
+              <p className="text-xs mb-3" style={{ color: themeConfig.colors.text }}>{report.reason}</p>
+              <div className="flex gap-2">
+                <button disabled={busyId === report.id} onClick={() => void resolveReport(report, true)} className="flex-1 h-8 rounded-lg text-xs font-bold disabled:opacity-50" style={{ backgroundColor: themeConfig.colors.warning + '15', color: themeConfig.colors.warning }}>تمت المراجعة</button>
+                <button disabled={busyId === report.id} onClick={() => void resolveReport(report, false)} className="flex-1 h-8 rounded-lg text-xs font-bold disabled:opacity-50" style={{ backgroundColor: themeConfig.colors.textMuted + '15', color: themeConfig.colors.textMuted }}>رفض البلاغ</button>
               </div>
             </div>
           )))}

@@ -8,6 +8,7 @@ import BrandLogo from '@/components/BrandLogo';
 import { motion } from 'framer-motion';
 import type { BarberTag, ServiceCategory } from '@/types';
 import { rankBarberRecommendations } from '@/lib/recommendations';
+import { trackProductEvent } from '@/lib/product-analytics';
 import {
   Search, SlidersHorizontal, MapPin, Star, Clock, Car,
   Scissors, BadgeCheck, Zap, TrendingUp, ChevronLeft, X,
@@ -290,7 +291,10 @@ export default function BookingTab() {
               <button
                 key={recommendation.barber.id}
                 type="button"
-                onClick={() => navigate('barber-detail', { barberId: recommendation.barber.id })}
+                onClick={() => {
+                  trackProductEvent('Barber Viewed', { source: 'recommendation', barberId: recommendation.barber.id, score: recommendation.score });
+                  navigate('barber-detail', { barberId: recommendation.barber.id });
+                }}
                 className="min-w-[220px] p-3 rounded-2xl border text-right"
                 style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.accent + '50' }}
               >
@@ -439,6 +443,7 @@ export default function BookingTab() {
                         navigate('login', { redirectScreen: 'booking-flow', barberId: barber.id });
                         return;
                       }
+                      trackProductEvent('Booking Started', { source: 'discovery', barberId: barber.id });
                       navigate('booking-flow', { barberId: barber.id });
                     }}
                     className="flex-1 h-10 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90"
@@ -455,7 +460,10 @@ export default function BookingTab() {
                     <Globe size={18} />
                   </button>
                   <button
-                    onClick={() => navigate('barber-detail', { barberId: barber.id })}
+                    onClick={() => {
+                      trackProductEvent('Barber Viewed', { source: 'discovery', barberId: barber.id });
+                      navigate('barber-detail', { barberId: barber.id });
+                    }}
                     className="h-10 w-10 flex items-center justify-center rounded-xl border transition-all"
                     style={{ borderColor: themeConfig.colors.border, color: themeConfig.colors.textMuted }}
                   >

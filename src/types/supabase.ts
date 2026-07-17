@@ -1365,6 +1365,7 @@ export type Database = {
           payment_provider: string | null
           payment_reference: string | null
           plan_id: string
+          rejection_reason: string | null
           reviewed_by: string | null
           starts_at: string | null
           status: string
@@ -1378,6 +1379,7 @@ export type Database = {
           payment_provider?: string | null
           payment_reference?: string | null
           plan_id: string
+          rejection_reason?: string | null
           reviewed_by?: string | null
           starts_at?: string | null
           status?: string
@@ -1391,6 +1393,7 @@ export type Database = {
           payment_provider?: string | null
           payment_reference?: string | null
           plan_id?: string
+          rejection_reason?: string | null
           reviewed_by?: string | null
           starts_at?: string | null
           status?: string
@@ -1509,6 +1512,10 @@ export type Database = {
       }
       redeem_loyalty_reward: { Args: { reward: string }; Returns: string }
       review_id_verification: {
+        Args: { approve: boolean; reason?: string; request_id: string }
+        Returns: undefined
+      }
+      review_subscription_request: {
         Args: { approve: boolean; reason?: string; request_id: string }
         Returns: undefined
       }

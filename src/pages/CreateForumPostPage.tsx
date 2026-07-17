@@ -9,6 +9,7 @@ import { uploadForumImage } from '@/supabase/storage';
 import { forumPostSchema } from '@/lib/validation';
 import type { ForumPostFormData } from '@/lib/validation';
 import type { ForumCategory as DatabaseForumCategory } from '@/types/supabase-aliases';
+import { trackProductEvent } from '@/lib/product-analytics';
 
 export default function CreateForumPostPage() {
   const { themeConfig, goBack, refreshData } = useApp();
@@ -70,6 +71,10 @@ export default function CreateForumPostPage() {
         type: 'discussion',
         is_pinned: false,
         is_locked: false,
+      });
+      trackProductEvent('Forum Post Created', {
+        categoryId: data.categoryId,
+        hasImage: Boolean(imageUrl),
       });
       await refreshData();
       goBack();

@@ -23,6 +23,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { bookingStep3Schema } from '@/lib/validation';
 import type { BookingStep3FormData } from '@/lib/validation';
 import { preferredBookingHour, rankAvailableSlots } from '@/lib/scheduling';
+import { trackProductEvent } from '@/lib/product-analytics';
 
 const ALL_TIME_SLOTS = [
   '08:00', '08:30', '09:00', '09:30', '10:00', '10:30',
@@ -299,10 +300,26 @@ export default function BookingFlowPage() {
   }
 
   const toggleService = (svcId: string) => {
+    const selecting = !selectedServices.includes(svcId);
     setSelectedServices(prev =>
       prev.includes(svcId) ? prev.filter(id => id !== svcId) : [...prev, svcId]
     );
+    trackProductEvent('Booking Services Selected', {
+      barberId: barber.id,
+      serviceId: svcId,
+      selected: selecting,
+    });
     setSelectedTime(''); // Reset time when services change (duration changes)
+  };
+
+  const chooseTime = (time: string, source: 'optimized' | 'grid') => {
+    setSelectedTime(time);
+    trackProductEvent('Booking Time Selected', {
+      barberId: barber.id,
+      date: selectedDate,
+      time,
+      source,
+    });
   };
 
   const selectedServicesData = barber.services.filter((s: Service) => selectedServices.includes(s.id));
@@ -363,6 +380,13 @@ export default function BookingFlowPage() {
       });
 
       if (saved) {
+        trackProductEvent('Booking Submitted', {
+          barberId: barber.id,
+          serviceCount: selectedServicesData.length,
+          paymentMethod: data.paymentMethod,
+          total: saved.total_price,
+          usedVoucher: Boolean(selectedVoucher),
+        });
         // If card payment selected, redirect to Stripe Checkout
         if (data.paymentMethod === 'card') {
           const baseUrl = window.location.origin;
@@ -682,7 +706,7 @@ export default function BookingFlowPage() {
                         <button
                           key={`optimized-${slot.time}`}
                           type="button"
-                          onClick={() => setSelectedTime(slot.time)}
+                          onClick={() => chooseTime(slot.time, 'optimized')}
                           className="rounded-xl border p-2 text-center"
                           style={{
                             backgroundColor: selectedTime === slot.time ? themeConfig.colors.accent : themeConfig.colors.accent + '10',
@@ -701,7 +725,7 @@ export default function BookingFlowPage() {
                   {timeSlots.map(slot => {
                     const isSelected = selectedTime === slot;
                     return (
-                      <button key={slot} type="button" onClick={() => setSelectedTime(slot)}
+                      <button key={slot} type="button" onClick={() => chooseTime(slot, 'grid')}
                         className="h-10 rounded-xl text-xs font-bold border transition-all"
                         style={{ backgroundColor: isSelected ? themeConfig.colors.primary : themeConfig.colors.surface, borderColor: isSelected ? themeConfig.colors.primary : themeConfig.colors.border, color: isSelected ? '#fff' : themeConfig.colors.text }}>
                         {slot}
@@ -751,7 +775,10 @@ export default function BookingFlowPage() {
               <div className="space-y-2">
                 <button type="button" onClick={() => setSelectedVoucherId('')} className="w-full p-3 rounded-xl border text-right text-xs" style={{ backgroundColor: !selectedVoucherId ? themeConfig.colors.primary + '08' : themeConfig.colors.surface, borderColor: !selectedVoucherId ? themeConfig.colors.primary : themeConfig.colors.border, color: themeConfig.colors.text }}>بدون قسيمة</button>
                 {availableVouchers.map(voucher => (
-                  <button key={voucher.id} type="button" onClick={() => setSelectedVoucherId(voucher.id)} className="w-full p-3 rounded-xl border flex items-center justify-between" style={{ backgroundColor: selectedVoucherId === voucher.id ? themeConfig.colors.success + '10' : themeConfig.colors.surface, borderColor: selectedVoucherId === voucher.id ? themeConfig.colors.success : themeConfig.colors.border }}>
+                  <button key={voucher.id} type="button" onClick={() => {
+                    setSelectedVoucherId(voucher.id);
+                    trackProductEvent('Loyalty Voucher Selected', { discountPercent: voucher.discountPercent });
+                  }} className="w-full p-3 rounded-xl border flex items-center justify-between" style={{ backgroundColor: selectedVoucherId === voucher.id ? themeConfig.colors.success + '10' : themeConfig.colors.surface, borderColor: selectedVoucherId === voucher.id ? themeConfig.colors.success : themeConfig.colors.border }}>
                     <div className="text-right"><p className="text-xs font-bold" style={{ color: themeConfig.colors.text }}>{voucher.title}</p><p className="text-[9px] font-mono mt-0.5" style={{ color: themeConfig.colors.textMuted }}>{voucher.code}</p></div>
                     <span className="text-xs font-bold" style={{ color: themeConfig.colors.success }}>خصم {voucher.discountPercent}%</span>
                   </button>
@@ -765,7 +792,10 @@ export default function BookingFlowPage() {
             <p className="text-xs font-bold mb-2" style={{ color: themeConfig.colors.text }}>طريقة الدفع</p>
             <div className="grid grid-cols-4 gap-2">
               {[{ key: 'card' as const, label: 'بطاقة', icon: CreditCard, disabled: false }, { key: 'cash' as const, label: 'نقداً', icon: Banknote, disabled: false }, { key: 'ccp' as const, label: 'CCP', icon: CreditCard, disabled: !ccpConfigured }, { key: 'baridi-mob' as const, label: 'بريدي موب', icon: Wallet, disabled: !ccpConfigured }].map(pm => (
-                <button key={pm.key} type="button" disabled={pm.disabled} onClick={() => registerStep3('paymentMethod').onChange({ target: { value: pm.key } })}
+                <button key={pm.key} type="button" disabled={pm.disabled} onClick={() => {
+                  registerStep3('paymentMethod').onChange({ target: { value: pm.key } });
+                  trackProductEvent('Payment Method Selected', { method: pm.key, barberId: barber.id });
+                }}
                   className="flex flex-col items-center gap-1 p-3 rounded-xl border transition-all disabled:opacity-40"
                   title={pm.disabled ? 'يتطلب إعداد حساب التحصيل التجاري' : undefined}
                   style={{ backgroundColor: watchedPaymentMethod === pm.key ? themeConfig.colors.primary + '08' : themeConfig.colors.surface, borderColor: watchedPaymentMethod === pm.key ? themeConfig.colors.primary : themeConfig.colors.border }}>

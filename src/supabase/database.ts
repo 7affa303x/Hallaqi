@@ -1065,3 +1065,63 @@ export async function adminReviewIdVerification(
   });
   if (error) throw new Error(error.message);
 }
+
+export async function adminListPendingSubscriptions() {
+  guard();
+  const { data, error } = await supabase
+    .from('subscription_requests')
+    .select('*, profiles(full_name), subscription_plans(name_ar, price_dzd)')
+    .eq('status', 'pending')
+    .order('created_at', { ascending: true });
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+export async function adminReviewSubscription(
+  requestId: string,
+  approved: boolean,
+  reason?: string
+) {
+  guard();
+  const { error } = await supabase.rpc('review_subscription_request', {
+    request_id: requestId,
+    approve: approved,
+    reason: reason || undefined,
+  });
+  if (error) throw new Error(error.message);
+}
+
+export async function adminListPendingReports() {
+  guard();
+  const [forum, professionals] = await Promise.all([
+    supabase
+      .from('forum_reports')
+      .select('*, profiles!forum_reports_reporter_id_fkey(full_name), forum_posts(title)')
+      .eq('status', 'pending')
+      .order('created_at', { ascending: true }),
+    supabase
+      .from('professional_reports')
+      .select('*, profiles!professional_reports_reporter_id_fkey(full_name), professionals(business_name)')
+      .eq('status', 'pending')
+      .order('created_at', { ascending: true }),
+  ]);
+  if (forum.error) throw new Error(forum.error.message);
+  if (professionals.error) throw new Error(professionals.error.message);
+  return { forum: forum.data || [], professionals: professionals.data || [] };
+}
+
+export async function adminResolveReport(
+  reportType: 'forum' | 'professional',
+  reportId: string,
+  accepted: boolean
+) {
+  guard();
+  const status = accepted ? 'reviewed' : 'dismissed';
+  const { error } = reportType === 'forum'
+    ? await supabase.from('forum_reports').update({ status }).eq('id', reportId)
+    : await supabase.from('professional_reports').update({
+        status,
+        updated_at: new Date().toISOString(),
+      }).eq('id', reportId);
+  if (error) throw new Error(error.message);
+}

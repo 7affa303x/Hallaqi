@@ -38,6 +38,7 @@ import {
   getPushSubscription,
   isWebPushSupported,
 } from '@/lib/push-notifications';
+import { trackProductEvent } from '@/lib/product-analytics';
 
 interface UserStats {
   totalBookings?: number;
@@ -655,6 +656,7 @@ function NotificationsSettings({ onBack }: { onBack: () => void }) {
         await enableWebPush(appUser.id);
         setPushSubscribed(true);
         updateSettings({ notifications: { ...settings.notifications, pushEnabled: true } });
+        trackProductEvent('Push Enabled', { platform: navigator.platform || 'web' });
         setPushMessage('تم تفعيل الإشعارات الفورية بنجاح');
       }
     } catch (err) {
