@@ -29,6 +29,7 @@ export default function SellerCatalogPage() {
   const [price, setPrice] = useState('');
   const [externalUrl, setExternalUrl] = useState('');
   const [busy, setBusy] = useState(false);
+  const [success, setSuccess] = useState('');
 
   const reload = async () => {
     if (!appUser?.id) return;
@@ -66,6 +67,7 @@ export default function SellerCatalogPage() {
     if (!appUser?.id || !title.trim()) return;
     setBusy(true);
     setError('');
+    setSuccess('');
     try {
       await createMarketplaceProduct({
         ownerType,
@@ -83,6 +85,7 @@ export default function SellerCatalogPage() {
       setPrice('');
       setExternalUrl('');
       await reload();
+      setSuccess('تمت إضافة المنتج بنجاح');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'تعذر الإضافة — تحقق من سقف العناصر (≤99)');
     } finally {
@@ -111,6 +114,11 @@ export default function SellerCatalogPage() {
           <p className="text-[11px]" style={{ color: themeConfig.colors.textMuted }}>
             {products.length} / {cap} (سقف بريميوم 99 — ليس unlimited)
           </p>
+          {products.length / Math.max(cap, 1) >= 0.8 && (
+            <p className="text-[10px] font-bold" style={{ color: themeConfig.colors.warning }}>
+              اقتربت من السقف ({Math.round((products.length / cap) * 100)}%) — فكّر بالترقية للظهور الأفضل
+            </p>
+          )}
         </div>
         <button type="button" onClick={() => navigate('seller-ai-tools')} className="p-2 rounded-xl" style={{ backgroundColor: `${themeConfig.colors.accent}14` }}>
           <Sparkles size={16} style={{ color: themeConfig.colors.accent }} />
@@ -152,6 +160,12 @@ export default function SellerCatalogPage() {
 
         {loading && <p className="text-sm" style={{ color: themeConfig.colors.textMuted }}>جاري التحميل...</p>}
         {error && <p className="text-sm" style={{ color: themeConfig.colors.error }}>{error}</p>}
+        {success && <p className="text-sm" style={{ color: themeConfig.colors.success }}>{success}</p>}
+        {!loading && products.length === 0 && (
+          <p className="text-sm text-center py-6" style={{ color: themeConfig.colors.textMuted }}>
+            لا منتجات بعد — أضف أول عنصر. ابدأ مجاناً وادفع كلما كبرت.
+          </p>
+        )}
 
         <div className="space-y-2">
           {products.map(p => (
@@ -163,7 +177,10 @@ export default function SellerCatalogPage() {
                     {p.price_dzd != null ? `${p.price_dzd} دج` : 'بدون سعر'} · {p.is_active ? 'نشط' : 'موقوف'}
                   </p>
                 </div>
-                <button type="button" onClick={() => void deleteMarketplaceProduct(p.id).then(reload).catch(e => setError(e instanceof Error ? e.message : 'فشل الحذف'))}
+                <button type="button" onClick={() => {
+                  if (!window.confirm('حذف هذا المنتج؟')) return;
+                  void deleteMarketplaceProduct(p.id).then(reload).catch(e => setError(e instanceof Error ? e.message : 'فشل الحذف'));
+                }}
                   className="p-2 rounded-xl" style={{ backgroundColor: `${themeConfig.colors.error}14` }}>
                   <Trash2 size={14} style={{ color: themeConfig.colors.error }} />
                 </button>

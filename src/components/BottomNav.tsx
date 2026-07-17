@@ -98,8 +98,8 @@ export default function BottomNav() {
   const radialItems: { id: RadialAction; label: string; icon: typeof Sparkles; angle: number }[] = [
     { id: 'ai', label: 'AI', icon: Sparkles, angle: -90 },
     { id: 'qr', label: 'QR', icon: QrCode, angle: -20 },
-    { id: 'camera', label: 'كاميرا', icon: Camera, angle: 40 },
-    { id: 'gallery', label: 'معرض', icon: ImageIcon, angle: 100 },
+    { id: 'camera', label: translate(settings.language, 'camera'), icon: Camera, angle: 40 },
+    { id: 'gallery', label: translate(settings.language, 'gallery'), icon: ImageIcon, angle: 100 },
   ];
 
   return (

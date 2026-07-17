@@ -1,5 +1,21 @@
 # Hallaqi Changelog
 
+## v12.2.0 — Monetization & Multi-Role Marketplace
+
+### Platform Expansion
+- Separate roles: store, company, doctor (plus existing client/barber/admin)
+- Marketplace discovery layer inside Discover (not a bottom tab)
+- Central AI button with long-press radial (AI / QR / Camera / Gallery)
+- Visit Store WebView with external browser fallback
+- Independent subscription catalogs per business type; premium capped at 99
+- Product of the Day as paid placement (admin-controlled)
+- Store/company analytics, seller catalog, barber service extras, AI listing assist
+- Admin queues for business approvals and placements
+
+See `docs/MONETIZATION_BACKLOG_100.md` for the 100+ follow-up roadmap.
+
+---
+
 ## v12.1.0 — Product Completion & Growth
 
 ### Customer Experience

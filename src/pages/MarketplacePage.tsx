@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useApp } from '@/contexts/useApp';
+import EmptyState from '@/components/EmptyState';
 import {
+  ALGERIA_WILAYAS,
   getMarketplaceCategories,
   getProductOfTheDay,
   searchMarketplaceProducts,
@@ -12,26 +14,39 @@ import {
   type StoreRow,
 } from '@/lib/marketplace';
 import {
-  Search, Filter, Star, BadgeCheck, Crown, Building2, Sparkles, ChevronLeft, ExternalLink,
+  Search, Filter, Star, BadgeCheck, Crown, Building2, Sparkles, ChevronLeft, ExternalLink, Store,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { translate } from '@/lib/i18n';
 
 export default function MarketplacePage() {
-  const { themeConfig, navigate, goBack } = useApp();
+  const { themeConfig, navigate, goBack, settings } = useApp();
+  const tx = (key: Parameters<typeof translate>[1]) => translate(settings.language, key);
   const [categories, setCategories] = useState<MarketplaceCategory[]>([]);
   const [products, setProducts] = useState<MarketplaceProduct[]>([]);
   const [featuredStores, setFeaturedStores] = useState<StoreRow[]>([]);
   const [potd, setPotd] = useState<ProductOfTheDayRow | null>(null);
+  const [qInput, setQInput] = useState('');
   const [q, setQ] = useState('');
   const [category, setCategory] = useState<string | null>(null);
-  const [sort, setSort] = useState<'popularity' | 'newest' | 'featured' | 'premium' | 'price_asc' | 'price_desc'>('popularity');
+  const [sort, setSort] = useState<'popularity' | 'newest' | 'featured' | 'premium' | 'price_asc' | 'price_desc'>('featured');
   const [showFilters, setShowFilters] = useState(false);
   const [featuredOnly, setFeaturedOnly] = useState(false);
   const [premiumOnly, setPremiumOnly] = useState(false);
   const [todayOnly, setTodayOnly] = useState(false);
   const [minRating, setMinRating] = useState(0);
+  const [wilaya, setWilaya] = useState<number | ''>('');
+  const [brand, setBrand] = useState('');
+  const [minPrice, setMinPrice] = useState('');
+  const [maxPrice, setMaxPrice] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  // Debounce search 250ms
+  useEffect(() => {
+    const t = window.setTimeout(() => setQ(qInput.trim()), 250);
+    return () => window.clearTimeout(t);
+  }, [qInput]);
 
   useEffect(() => {
     let cancelled = false;
@@ -68,6 +83,10 @@ export default function MarketplacePage() {
           featuredOnly: featuredOnly || undefined,
           premiumOnly: premiumOnly || undefined,
           minRating: minRating || undefined,
+          wilaya: wilaya === '' ? undefined : wilaya,
+          brand: brand.trim() || undefined,
+          minPrice: minPrice ? Number(minPrice) : undefined,
+          maxPrice: maxPrice ? Number(maxPrice) : undefined,
         });
         if (cancelled) return;
         if (todayOnly && potd?.marketplace_products) {
@@ -80,15 +99,14 @@ export default function MarketplacePage() {
       }
     })();
     return () => { cancelled = true; };
-  }, [q, category, sort, featuredOnly, premiumOnly, todayOnly, minRating, potd]);
+  }, [q, category, sort, featuredOnly, premiumOnly, todayOnly, minRating, potd, wilaya, brand, minPrice, maxPrice]);
 
   const potdProduct = potd?.marketplace_products as MarketplaceProduct | undefined;
-
   const filterChips = useMemo(() => ([
     { id: 'featured', label: 'مميز', active: featuredOnly, toggle: () => setFeaturedOnly(v => !v) },
     { id: 'premium', label: 'بريميوم', active: premiumOnly, toggle: () => setPremiumOnly(v => !v) },
-    { id: 'today', label: 'منتج اليوم', active: todayOnly, toggle: () => setTodayOnly(v => !v) },
-  ]), [featuredOnly, premiumOnly, todayOnly]);
+    { id: 'today', label: tx('productOfDay'), active: todayOnly, toggle: () => setTodayOnly(v => !v) },
+  ]), [featuredOnly, premiumOnly, todayOnly, settings.language]);
 
   return (
     <div className="min-h-screen pb-24" style={{ backgroundColor: themeConfig.colors.background }}>
@@ -100,8 +118,8 @@ export default function MarketplacePage() {
             <ChevronLeft size={18} style={{ color: themeConfig.colors.primary }} />
           </button>
           <div className="flex-1">
-            <h1 className="text-base font-black" style={{ color: themeConfig.colors.text }}>السوق</h1>
-            <p className="text-[11px]" style={{ color: themeConfig.colors.textMuted }}>اكتشف متاجر ومنتجات — الدفع على موقع التاجر</p>
+            <h1 className="text-base font-black" style={{ color: themeConfig.colors.text }}>{tx('marketplace')}</h1>
+            <p className="text-[11px]" style={{ color: themeConfig.colors.textMuted }}>{tx('marketplaceHint')} — {tx('startFree')}</p>
           </div>
         </div>
       </header>
@@ -112,15 +130,16 @@ export default function MarketplacePage() {
             style={{ borderColor: themeConfig.colors.border, backgroundColor: themeConfig.colors.surface }}>
             <Search size={16} style={{ color: themeConfig.colors.textMuted }} />
             <input
-              value={q}
-              onChange={e => setQ(e.target.value)}
-              placeholder="ابحث عن منتج، ماركة، متجر..."
+              value={qInput}
+              onChange={e => setQInput(e.target.value)}
+              placeholder={tx('searchPlaceholder')}
               className="flex-1 bg-transparent outline-none text-sm"
               style={{ color: themeConfig.colors.text }}
             />
           </div>
           <button type="button" onClick={() => setShowFilters(v => !v)} className="h-11 w-11 rounded-2xl border flex items-center justify-center"
-            style={{ borderColor: themeConfig.colors.border, backgroundColor: themeConfig.colors.surface }}>
+            style={{ borderColor: themeConfig.colors.border, backgroundColor: themeConfig.colors.surface }}
+            aria-label={tx('filters')}>
             <Filter size={16} style={{ color: themeConfig.colors.primary }} />
           </button>
         </div>
@@ -154,14 +173,31 @@ export default function MarketplacePage() {
                   }}>{chip.label}</button>
               ))}
             </div>
+            <div className="grid grid-cols-2 gap-2">
+              <select value={wilaya} onChange={e => setWilaya(e.target.value ? Number(e.target.value) : '')}
+                className="h-9 rounded-xl border px-2 text-xs"
+                style={{ borderColor: themeConfig.colors.border, backgroundColor: themeConfig.colors.background, color: themeConfig.colors.text }}>
+                <option value="">الولاية</option>
+                {ALGERIA_WILAYAS.map(w => <option key={w.code} value={w.code}>{w.nameAr}</option>)}
+              </select>
+              <input value={brand} onChange={e => setBrand(e.target.value)} placeholder="الماركة"
+                className="h-9 rounded-xl border px-2 text-xs outline-none"
+                style={{ borderColor: themeConfig.colors.border, backgroundColor: themeConfig.colors.background, color: themeConfig.colors.text }} />
+              <input value={minPrice} onChange={e => setMinPrice(e.target.value)} type="number" placeholder="أقل سعر"
+                className="h-9 rounded-xl border px-2 text-xs outline-none"
+                style={{ borderColor: themeConfig.colors.border, backgroundColor: themeConfig.colors.background, color: themeConfig.colors.text }} />
+              <input value={maxPrice} onChange={e => setMaxPrice(e.target.value)} type="number" placeholder="أعلى سعر"
+                className="h-9 rounded-xl border px-2 text-xs outline-none"
+                style={{ borderColor: themeConfig.colors.border, backgroundColor: themeConfig.colors.background, color: themeConfig.colors.text }} />
+            </div>
             <div className="flex items-center justify-between gap-2">
               <label className="text-xs font-bold" style={{ color: themeConfig.colors.textMuted }}>الترتيب</label>
               <select value={sort} onChange={e => setSort(e.target.value as typeof sort)}
                 className="text-xs rounded-xl border px-2 h-8"
                 style={{ borderColor: themeConfig.colors.border, backgroundColor: themeConfig.colors.background, color: themeConfig.colors.text }}>
+                <option value="featured">مميز ثم شعبي</option>
                 <option value="popularity">الأكثر شعبية</option>
                 <option value="newest">الأحدث</option>
-                <option value="featured">مميز</option>
                 <option value="premium">بريميوم</option>
                 <option value="price_asc">السعر ↑</option>
                 <option value="price_desc">السعر ↓</option>
@@ -198,7 +234,7 @@ export default function MarketplacePage() {
             <div className="p-4 space-y-2">
               <div className="flex items-center gap-2">
                 <Sparkles size={14} style={{ color: themeConfig.colors.accent }} />
-                <span className="text-[11px] font-black" style={{ color: themeConfig.colors.accent }}>منتج اليوم — مساحة إعلانية مدفوعة</span>
+                <span className="text-[11px] font-black" style={{ color: themeConfig.colors.accent }}>{tx('productOfDay')} — مساحة إعلانية مدفوعة</span>
               </div>
               <h2 className="text-lg font-black leading-snug" style={{ color: themeConfig.colors.text }}>
                 {potd?.headline_ar || potdProduct.title}
@@ -242,13 +278,12 @@ export default function MarketplacePage() {
         {error && <p className="text-sm text-center py-4" style={{ color: themeConfig.colors.error }}>{error}</p>}
 
         {!loading && products.length === 0 && (
-          <div className="rounded-2xl border p-6 text-center space-y-2"
-            style={{ borderColor: themeConfig.colors.border, backgroundColor: themeConfig.colors.surface }}>
-            <p className="text-sm font-bold" style={{ color: themeConfig.colors.text }}>لا توجد منتجات بعد</p>
-            <p className="text-xs" style={{ color: themeConfig.colors.textMuted }}>
-              السوق جاهز — بانتظار موافقة المتاجر وإضافة القوائم. قريبًا المزيد من العروض.
-            </p>
-          </div>
+          <EmptyState
+            icon={Store}
+            title="لا توجد منتجات بعد"
+            description="السوق جاهز — بانتظار موافقة المتاجر وإضافة القوائم."
+            themeConfig={themeConfig}
+          />
         )}
 
         <div className="grid grid-cols-2 gap-3">
@@ -286,7 +321,7 @@ export default function MarketplacePage() {
                   <p className="text-[11px] font-black" style={{ color: themeConfig.colors.primary }}>{product.price_dzd} دج</p>
                 )}
                 <span className="inline-flex items-center gap-1 text-[10px]" style={{ color: themeConfig.colors.textMuted }}>
-                  <ExternalLink size={10} /> زيارة المتجر
+                  <ExternalLink size={10} /> {tx('visitStore')}
                 </span>
               </div>
             </button>

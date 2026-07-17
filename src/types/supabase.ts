@@ -1564,6 +1564,77 @@ export type Database = {
           },
         ]
       }
+      marketplace_reviews: {
+        Row: {
+          comment: string | null
+          company_id: string | null
+          created_at: string
+          id: string
+          moderation_status: string
+          product_id: string | null
+          rating: number
+          reviewer_id: string
+          store_id: string | null
+          target_type: string
+          updated_at: string
+        }
+        Insert: {
+          comment?: string | null
+          company_id?: string | null
+          created_at?: string
+          id?: string
+          moderation_status?: string
+          product_id?: string | null
+          rating: number
+          reviewer_id: string
+          store_id?: string | null
+          target_type: string
+          updated_at?: string
+        }
+        Update: {
+          comment?: string | null
+          company_id?: string | null
+          created_at?: string
+          id?: string
+          moderation_status?: string
+          product_id?: string | null
+          rating?: number
+          reviewer_id?: string
+          store_id?: string | null
+          target_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketplace_reviews_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketplace_reviews_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketplace_reviews_reviewer_id_fkey"
+            columns: ["reviewer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketplace_reviews_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       messages: {
         Row: {
           content: string
