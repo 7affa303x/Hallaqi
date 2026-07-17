@@ -346,8 +346,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!appUser || !isSupabaseConfigured() || isDeveloperMode) return;
-    const channel = subscribeToNotifications(appUser.id, rows => {
-      setNotifications(rows.map(mapNotificationRow));
+    const channel = subscribeToNotifications(appUser.id, row => {
+      const incoming = mapNotificationRow(row);
+      setNotifications(current => current.some(item => item.id === incoming.id)
+        ? current
+        : [incoming, ...current]);
     });
     return () => { void channel.unsubscribe(); };
   }, [appUser]);

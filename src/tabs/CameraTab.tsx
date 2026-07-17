@@ -6,7 +6,7 @@ import {
   Aperture, Share2, Download, Copy, Check
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
-import { BrowserQRCodeReader, type IScannerControls } from '@zxing/browser';
+import type { IScannerControls } from '@zxing/browser';
 
 type CameraMode = 'scanner' | 'generator' | 'camera';
 
@@ -81,6 +81,7 @@ export default function CameraTab() {
     if (!videoRef.current) return;
     stopCamera();
     try {
+      const { BrowserQRCodeReader } = await import('@zxing/browser');
       const reader = new BrowserQRCodeReader(undefined, { delayBetweenScanAttempts: 250 });
       scannerControlsRef.current = await reader.decodeFromConstraints(
         { video: { facingMode: frontCamera ? 'user' : { ideal: 'environment' } } },

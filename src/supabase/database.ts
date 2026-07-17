@@ -97,6 +97,8 @@ export async function getProfessionals(filters?: { city?: string; search?: strin
   let query = supabase
     .from('professionals')
     .select('*, profiles(full_name, avatar_url, city, phone_number, user_role, verification_status), services(*), availability_schedules(*)')
+    .eq('is_active', true)
+    .limit(50)
     .order('average_rating', { ascending: false });
 
   if (filters?.city) {
@@ -919,12 +921,12 @@ export function subscribeToTable(table: string, callback: (payload: Record<strin
   ).subscribe();
 }
 
-export function subscribeToNotifications(userId: string, callback: (notifications: Notification[]) => void) {
+export function subscribeToNotifications(userId: string, callback: (notification: Notification) => void) {
   guard();
-  return supabase.channel('user-notifications').on(
+  return supabase.channel(`user-notifications-${userId}`).on(
     'postgres_changes' as never,
-    { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` },
-    () => { getUserNotifications(userId).then(callback); }
+    { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` },
+    (payload: { new: Notification }) => callback(payload.new)
   ).subscribe();
 }
 

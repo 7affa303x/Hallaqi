@@ -45,9 +45,9 @@ function TabContent({ tab }: { tab: string }) {
 
 function ScreenRouter() {
   const { screen, screenParams, activeTab } = useApp();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, appUser } = useAuth();
 
-  const authRequiredScreens = ['booking-flow', 'chat-room', 'create-post'];
+  const authRequiredScreens = ['booking-flow', 'chat-room', 'create-post', 'admin-dashboard'];
   const needsAuth = authRequiredScreens.includes(screen) && !isAuthenticated;
 
   if (needsAuth) {
@@ -82,7 +82,9 @@ function ScreenRouter() {
     case 'payment-success':
       return <Suspense fallback={<LoadingFallback />}><PaymentSuccessPage /></Suspense>;
     case 'admin-dashboard':
-      return <Suspense fallback={<LoadingFallback />}><AdminDashboard /></Suspense>;
+      return appUser?.user_role === 'admin'
+        ? <Suspense fallback={<LoadingFallback />}><AdminDashboard /></Suspense>
+        : <Suspense fallback={<LoadingFallback />}><ComingSoonPage title="غير مصرح" description="هذه الصفحة مخصصة لإدارة Hallaqi." /></Suspense>;
     case 'ai-advisor':
       return <Suspense fallback={<LoadingFallback />}><AIAdvisorPage /></Suspense>;
     default: {
