@@ -11,7 +11,7 @@ import { rankBarberRecommendations } from '@/lib/recommendations';
 import { trackProductEvent } from '@/lib/product-analytics';
 import { translate, type TranslationKey } from '@/lib/i18n';
 import {
-  Search, SlidersHorizontal, MapPin, Star, Clock, Car,
+  Search, SlidersHorizontal, MapPin, Star, Clock, Car, Heart,
   Scissors, BadgeCheck, Zap, TrendingUp, ChevronLeft, X,
   Filter, Navigation, Globe, Sparkles
 } from 'lucide-react';
@@ -51,6 +51,7 @@ export default function BookingTab() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTags, setSelectedTags] = useState<BarberTag[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [onlyFavorites, setOnlyFavorites] = useState(false);
   const [selectedWilaya, setSelectedWilaya] = useState(() => localStorage.getItem('hallaqi-discovery-wilaya') || '');
   const [showFilters, setShowFilters] = useState(false);
   const [sortBy, setSortBy] = useState<'rating' | 'distance' | 'price' | 'newest'>('rating');
@@ -109,6 +110,9 @@ export default function BookingTab() {
     if (selectedWilaya) {
       filtered = filtered.filter(barber => barber.wilaya === selectedWilaya);
     }
+    if (onlyFavorites) {
+      filtered = filtered.filter(barber => barber.isFollowing);
+    }
     switch (sortBy) {
       case 'rating': filtered.sort((a, b) => b.rating - a.rating); break;
       case 'distance': filtered.sort((a, b) => (distances.get(a.id) ?? Number.POSITIVE_INFINITY) - (distances.get(b.id) ?? Number.POSITIVE_INFINITY)); break;
@@ -122,7 +126,7 @@ export default function BookingTab() {
       case 'newest': filtered.sort((a, b) => (b.tags.includes('new') ? 1 : 0) - (a.tags.includes('new') ? 1 : 0)); break;
     }
     return filtered;
-  }, [barbers, distances, searchQuery, selectedTags, selectedCategory, selectedWilaya, sortBy]);
+  }, [barbers, distances, onlyFavorites, searchQuery, selectedTags, selectedCategory, selectedWilaya, sortBy]);
 
   const recommendations = useMemo(() => {
     return rankBarberRecommendations(barbers, {
@@ -211,6 +215,13 @@ export default function BookingTab() {
 
         {/* Quick Tags */}
         <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+          <button onClick={() => {
+            if (!isAuthenticated) {
+              navigate('login', { redirectScreen: 'home', redirectTab: 'booking' });
+              return;
+            }
+            setOnlyFavorites(value => !value);
+          }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all" style={{ backgroundColor: onlyFavorites ? '#EF444420' : themeConfig.colors.surface, color: onlyFavorites ? '#EF4444' : themeConfig.colors.textMuted, border: `1.5px solid ${onlyFavorites ? '#EF4444' : themeConfig.colors.border}` }}><Heart size={12} className={onlyFavorites ? 'fill-current' : ''} />المفضلة</button>
           {barberTags.slice(0, 6).map(tag => {
             const isSelected = selectedTags.includes(tag.key as BarberTag);
             const Icon = tagIcons[tag.key] || Zap;
@@ -508,7 +519,7 @@ export default function BookingTab() {
           title="لا توجد نتائج مطابقة"
           description="جرب تغيير كلمات البحث أو الفلاتر"
           actionLabel="إعادة تعيين الفلاتر"
-          onAction={() => { setSearchQuery(''); setSelectedTags([]); setSelectedCategory(null); setSelectedWilaya(''); localStorage.removeItem('hallaqi-discovery-wilaya'); }}
+          onAction={() => { setSearchQuery(''); setSelectedTags([]); setSelectedCategory(null); setSelectedWilaya(''); setOnlyFavorites(false); localStorage.removeItem('hallaqi-discovery-wilaya'); }}
           themeConfig={themeConfig}
         />
       )}
