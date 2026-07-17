@@ -196,7 +196,10 @@ export async function updateService(serviceId: string, updates: Partial<Service>
 
 export async function deleteService(serviceId: string) {
   guard();
-  const { error } = await supabase.from('services').delete().eq('id', serviceId);
+  const { error } = await supabase
+    .from('services')
+    .update({ is_active: false, updated_at: new Date().toISOString() })
+    .eq('id', serviceId);
   if (error) throw new Error(error.message);
 }
 
