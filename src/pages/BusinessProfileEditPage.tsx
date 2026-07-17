@@ -61,19 +61,32 @@ export default function BusinessProfileEditPage() {
     setError('');
     setMessage('');
     try {
-      const patch: Record<string, unknown> = {
-        [nameKey]: name.trim(),
-        short_description: shortDescription.trim() || null,
-        about: about.trim() || null,
-        website_url: websiteUrl.trim() || null,
-        logo_url: logoUrl.trim() || null,
-        cover_url: coverUrl.trim() || null,
-        city: city.trim() || null,
-        updated_at: new Date().toISOString(),
-      };
-      if (!isCompany) patch.contact_phone = contactPhone.trim() || null;
-      const { error: err } = await supabase.from(table).update(patch).eq('id', appUser.id);
-      if (err) throw err;
+      if (isCompany) {
+        const { error: err } = await supabase.from('companies').update({
+          company_name: name.trim(),
+          short_description: shortDescription.trim() || null,
+          about: about.trim() || null,
+          website_url: websiteUrl.trim() || null,
+          logo_url: logoUrl.trim() || null,
+          cover_url: coverUrl.trim() || null,
+          city: city.trim() || null,
+          updated_at: new Date().toISOString(),
+        }).eq('id', appUser.id);
+        if (err) throw err;
+      } else {
+        const { error: err } = await supabase.from('stores').update({
+          store_name: name.trim(),
+          short_description: shortDescription.trim() || null,
+          about: about.trim() || null,
+          website_url: websiteUrl.trim() || null,
+          logo_url: logoUrl.trim() || null,
+          cover_url: coverUrl.trim() || null,
+          city: city.trim() || null,
+          contact_phone: contactPhone.trim() || null,
+          updated_at: new Date().toISOString(),
+        }).eq('id', appUser.id);
+        if (err) throw err;
+      }
       setMessage('تم الحفظ — CTA زيارة المتجر يعتمد على رابط الموقع');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'فشل الحفظ');
