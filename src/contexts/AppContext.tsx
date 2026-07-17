@@ -333,15 +333,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [settings.accessibility, settings.language]);
 
   const updateSettings = useCallback((newSettings: Partial<AppSettings>) => {
+    if (newSettings.theme) useStore.getState().setTheme(newSettings.theme);
+    if (newSettings.animationStyle) useStore.getState().setAnimationStyle(newSettings.animationStyle);
+    if (newSettings.language) useStore.getState().setLanguage(newSettings.language);
     setSettings(prev => {
       const updated = { ...prev, ...newSettings };
-      if (newSettings.theme) useStore.getState().setTheme(newSettings.theme);
-      if (newSettings.animationStyle) useStore.getState().setAnimationStyle(newSettings.animationStyle);
-      if (newSettings.language) useStore.getState().setLanguage(newSettings.language);
       if (appUser && isSupabaseConfigured() && !isDeveloperMode) {
-        void upsertUserSettings(appUser.id, updated).catch(err => {
-          console.error('[AppContext] Failed to persist settings:', err);
-          setDataError('تعذر حفظ الإعدادات. حاول مرة أخرى.');
+        queueMicrotask(() => {
+          void upsertUserSettings(appUser.id, updated).catch(err => {
+            console.error('[AppContext] Failed to persist settings:', err);
+            setDataError('تعذر حفظ الإعدادات. حاول مرة أخرى.');
+          });
         });
       }
       return updated;
