@@ -386,6 +386,7 @@ export type ScreenName =
   | 'register'
   | 'forgot-password'
   | 'reset-password'
+  | 'mfa-challenge'
   | 'payment-success'
   | 'admin-dashboard'
   | 'ai-advisor'

@@ -67,7 +67,7 @@ const iconMap: Record<string, LucideIcon> = {
 type ProfileSubPage = 'main' | 'theme' | 'animation' | 'language' | 'notifications' |
   'privacy' | 'account' | 'subscription' | 'payment' | 'id-verification' |
   'linked-accounts' | 'help' | 'about' | 'badges' | 'stats' | 'edit-profile' | 'services' | 'loyalty' |
-  'accessibility' | 'privacy-policy' | 'terms' | 'licenses';
+  'accessibility' | 'privacy-policy' | 'terms' | 'licenses' | 'security';
 
 export default function ProfileTab() {
   const { themeConfig, navigate, unreadCount, bookings, barbers } = useApp();
@@ -143,6 +143,7 @@ export default function ProfileTab() {
   if (subPage === 'about') return <InformationPage onBack={() => setSubPage('main')} kind="about" />;
   if (subPage === 'loyalty') return <LoyaltyPage onBack={() => setSubPage('main')} />;
   if (subPage === 'accessibility') return <AccessibilitySettings onBack={() => setSubPage('main')} />;
+  if (subPage === 'security') return <SecuritySettings onBack={() => setSubPage('main')} />;
   if (subPage === 'privacy-policy') return <LegalPage onBack={() => setSubPage('main')} kind="privacy" />;
   if (subPage === 'terms') return <LegalPage onBack={() => setSubPage('main')} kind="terms" />;
   if (subPage === 'licenses') return <LegalPage onBack={() => setSubPage('main')} kind="licenses" />;
@@ -158,7 +159,20 @@ export default function ProfileTab() {
     rank: ({ bronze: 'برونزي', silver: 'فضي', gold: 'ذهبي', platinum: 'بلاتيني' } as Record<string, string>)[loyaltySummary.tier] || 'برونزي',
   };
   const badges = (appUser as unknown as { badges?: UserBadge[] })?.badges || [];
-  const followers = barbers.find(barber => barber.id === appUser?.id)?.followers || 0;
+  const ownProfessional = barbers.find(barber => barber.id === appUser?.id);
+  const followers = ownProfessional?.followers || 0;
+  const onboardingSteps = ownProfessional ? [
+    { label: 'معلومات العمل', complete: Boolean(ownProfessional.name && ownProfessional.bio), page: 'edit-profile' as ProfileSubPage },
+    { label: 'الخدمات والأسعار', complete: ownProfessional.services.length > 0, page: 'services' as ProfileSubPage },
+    { label: 'صورة الغلاف', complete: !ownProfessional.coverImage.endsWith('/logo-wordmark.png'), page: 'edit-profile' as ProfileSubPage },
+    { label: 'معرض الأعمال', complete: ownProfessional.portfolio.length > 0, page: 'edit-profile' as ProfileSubPage },
+    { label: 'توثيق الهوية', complete: ownProfessional.idCardVerified || ownProfessional.isVerified, page: 'id-verification' as ProfileSubPage },
+  ] : [];
+  const onboardingComplete = onboardingSteps.filter(step => step.complete).length;
+  const onboardingPercent = onboardingSteps.length
+    ? Math.round(onboardingComplete / onboardingSteps.length * 100)
+    : 0;
+  const nextOnboardingStep = onboardingSteps.find(step => !step.complete);
 
   return (
     <div className="pb-20">
@@ -219,6 +233,17 @@ export default function ProfileTab() {
           </div>
         </div>
       </div>
+
+      {(userRole === 'barber' || userRole === 'specialist') && onboardingPercent < 100 && (
+        <div className="px-4 mt-4">
+          <div className="p-4 rounded-2xl border" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.primary + '40' }}>
+            <div className="flex items-center justify-between"><div><p className="text-sm font-bold" style={{ color: themeConfig.colors.text }}>أكمل ملفك المهني</p><p className="text-[10px]" style={{ color: themeConfig.colors.textMuted }}>الملفات المكتملة تحصل على حجوزات أكثر</p></div><span className="text-sm font-black" style={{ color: themeConfig.colors.primary }}>{onboardingPercent}%</span></div>
+            <div className="h-2 rounded-full overflow-hidden mt-3" style={{ backgroundColor: themeConfig.colors.border }}><div className="h-full rounded-full transition-all" style={{ width: `${onboardingPercent}%`, backgroundColor: themeConfig.colors.primary }} /></div>
+            <div className="flex flex-wrap gap-1.5 mt-3">{onboardingSteps.map(step => <span key={step.label} className="text-[9px] px-2 py-1 rounded-full" style={{ backgroundColor: step.complete ? themeConfig.colors.success + '15' : themeConfig.colors.background, color: step.complete ? themeConfig.colors.success : themeConfig.colors.textMuted }}>{step.complete ? '✓ ' : ''}{step.label}</span>)}</div>
+            {nextOnboardingStep && <button onClick={() => setSubPage(nextOnboardingStep.page)} className="w-full h-9 rounded-xl text-xs font-bold text-white mt-3" style={{ backgroundColor: themeConfig.colors.primary }}>إكمال: {nextOnboardingStep.label}</button>}
+          </div>
+        </div>
+      )}
 
       {appUser?.user_role === 'admin' && (
         <div className="px-4 mt-4">
@@ -315,14 +340,13 @@ export default function ProfileTab() {
                   if (item.id === 'contactUs') { window.location.href = 'mailto:support@hallaqi.app'; return; }
                   if (item.id === 'reportBug') { window.location.href = 'mailto:support@hallaqi.app?subject=Hallaqi%20Bug%20Report'; return; }
                   if (item.id === 'featureRequest') { window.location.href = 'mailto:support@hallaqi.app?subject=Hallaqi%20Feature%20Request'; return; }
-                  if (item.id === 'twoFactor') { setActionMessage('المصادقة الثنائية ستُفعّل من صفحة أمان الحساب في التحديث القادم'); return; }
                   const pageMap: Record<string, ProfileSubPage> = {
                     theme: 'theme', animation: 'animation', language: 'language', fontSize: 'accessibility',
                     pushNotifications: 'notifications', emailNotifications: 'notifications', smsNotifications: 'notifications',
                     bookingReminders: 'notifications', promotions: 'notifications', forumReplies: 'notifications',
                     competitionUpdates: 'notifications', newFollowers: 'notifications',
                     profileVisible: 'privacy', showLocation: 'privacy', showBookings: 'privacy', allowMessages: 'privacy', blockList: 'privacy',
-                    editProfile: 'edit-profile', subscription: 'subscription', paymentMethods: 'payment', baridiMob: 'payment',
+                    editProfile: 'edit-profile', twoFactor: 'security', subscription: 'subscription', paymentMethods: 'payment', baridiMob: 'payment',
                     idVerification: 'id-verification', linkedAccounts: 'linked-accounts', helpCenter: 'help', aboutApp: 'about',
                     services: 'services', privacyPolicy: 'privacy-policy', termsOfService: 'terms', licenses: 'licenses',
                   };
@@ -352,6 +376,126 @@ export default function ProfileTab() {
 // ====== SUB PAGE COMPONENTS ======
 
 type LoyaltyData = Awaited<ReturnType<typeof getLoyaltyDashboard>>;
+
+function SecuritySettings({ onBack }: { onBack: () => void }) {
+  const { themeConfig } = useApp();
+  const [verifiedFactorId, setVerifiedFactorId] = useState('');
+  const [enrollment, setEnrollment] = useState<{ id: string; qrCode: string; secret: string } | null>(null);
+  const [code, setCode] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
+
+  const loadFactors = useCallback(async () => {
+    const { data, error: listError } = await supabase.auth.mfa.listFactors();
+    if (listError) {
+      setError(listError.message);
+    } else {
+      setVerifiedFactorId(data.totp.find(factor => factor.status === 'verified')?.id || '');
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { void loadFactors(); }, [loadFactors]);
+
+  const enroll = async () => {
+    setError('');
+    setMessage('');
+    setLoading(true);
+    try {
+      const { data: factors } = await supabase.auth.mfa.listFactors();
+      await Promise.all((factors?.totp || [])
+        .filter(factor => factor.status === 'unverified')
+        .map(factor => supabase.auth.mfa.unenroll({ factorId: factor.id })));
+      const { data, error: enrollError } = await supabase.auth.mfa.enroll({
+        factorType: 'totp',
+        friendlyName: 'Hallaqi Authenticator',
+      });
+      if (enrollError) throw enrollError;
+      setEnrollment({
+        id: data.id,
+        qrCode: data.totp.qr_code,
+        secret: data.totp.secret,
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'تعذر بدء المصادقة الثنائية');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const verifyEnrollment = async () => {
+    if (!enrollment || !/^\d{6}$/.test(code)) return;
+    setLoading(true);
+    setError('');
+    try {
+      const { data: challenge, error: challengeError } = await supabase.auth.mfa.challenge({
+        factorId: enrollment.id,
+      });
+      if (challengeError) throw challengeError;
+      const { error: verifyError } = await supabase.auth.mfa.verify({
+        factorId: enrollment.id,
+        challengeId: challenge.id,
+        code,
+      });
+      if (verifyError) throw verifyError;
+      setEnrollment(null);
+      setCode('');
+      setMessage('تم تفعيل المصادقة الثنائية بنجاح');
+      await loadFactors();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'رمز التحقق غير صحيح');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const disable = async () => {
+    if (!verifiedFactorId || !window.confirm('هل تريد إيقاف المصادقة الثنائية؟')) return;
+    setLoading(true);
+    setError('');
+    const { error: unenrollError } = await supabase.auth.mfa.unenroll({
+      factorId: verifiedFactorId,
+    });
+    if (unenrollError) setError(unenrollError.message);
+    else {
+      setVerifiedFactorId('');
+      setMessage('تم إيقاف المصادقة الثنائية');
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div className="pb-20">
+      <div className="sticky top-0 z-30 flex items-center gap-3 px-4 py-3 border-b" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
+        <button onClick={onBack} aria-label="رجوع" className="w-9 h-9 rounded-xl flex items-center justify-center"><ArrowLeft size={20} style={{ color: themeConfig.colors.text }} /></button>
+        <h2 className="text-base font-bold" style={{ color: themeConfig.colors.text }}>أمان الحساب</h2>
+      </div>
+      <div className="p-4">
+        <div className="rounded-2xl border p-5 text-center" style={{ backgroundColor: themeConfig.colors.surface, borderColor: verifiedFactorId ? themeConfig.colors.success : themeConfig.colors.border }}>
+          <Shield size={34} className="mx-auto" style={{ color: verifiedFactorId ? themeConfig.colors.success : themeConfig.colors.primary }} />
+          <h3 className="text-sm font-bold mt-2" style={{ color: themeConfig.colors.text }}>{verifiedFactorId ? 'المصادقة الثنائية مفعلة' : 'احمِ حسابك بتطبيق مصادقة'}</h3>
+          <p className="text-xs mt-1 leading-5" style={{ color: themeConfig.colors.textMuted }}>استخدم Google Authenticator أو أي تطبيق TOTP لإضافة رمز عند تسجيل الدخول.</p>
+          {!verifiedFactorId && !enrollment && <button onClick={() => void enroll()} disabled={loading} className="w-full h-10 rounded-xl text-xs font-bold text-white mt-4 disabled:opacity-50" style={{ backgroundColor: themeConfig.colors.primary }}>بدء الإعداد</button>}
+          {verifiedFactorId && <button onClick={() => void disable()} disabled={loading} className="w-full h-10 rounded-xl text-xs font-bold mt-4 disabled:opacity-50" style={{ backgroundColor: themeConfig.colors.error + '10', color: themeConfig.colors.error }}>إيقاف المصادقة الثنائية</button>}
+        </div>
+
+        {enrollment && (
+          <div className="rounded-2xl border p-4 mt-4 text-center" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.primary }}>
+            <p className="text-xs font-bold" style={{ color: themeConfig.colors.text }}>امسح الرمز بتطبيق المصادقة</p>
+            <img src={enrollment.qrCode} alt="رمز إعداد المصادقة الثنائية" className="w-48 h-48 mx-auto mt-3 bg-white rounded-xl" />
+            <p className="text-[10px] mt-2" style={{ color: themeConfig.colors.textMuted }}>أو أدخل المفتاح يدوياً</p>
+            <code className="block text-[10px] break-all p-2 rounded-lg mt-1" style={{ backgroundColor: themeConfig.colors.background, color: themeConfig.colors.text }}>{enrollment.secret}</code>
+            <input value={code} onChange={event => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))} inputMode="numeric" autoComplete="one-time-code" placeholder="000000" aria-label="رمز التحقق" className="w-full h-12 rounded-xl border text-center text-xl font-mono tracking-[0.4em] mt-3" style={{ backgroundColor: themeConfig.colors.background, borderColor: themeConfig.colors.border, color: themeConfig.colors.text }} />
+            <button onClick={() => void verifyEnrollment()} disabled={loading || code.length !== 6} className="w-full h-10 rounded-xl text-xs font-bold text-white mt-3 disabled:opacity-50" style={{ backgroundColor: themeConfig.colors.primary }}>تأكيد الرمز</button>
+          </div>
+        )}
+        {message && <p role="status" className="text-xs p-3 rounded-xl mt-3" style={{ backgroundColor: themeConfig.colors.success + '10', color: themeConfig.colors.success }}>{message}</p>}
+        {error && <p role="alert" className="text-xs p-3 rounded-xl mt-3" style={{ backgroundColor: themeConfig.colors.error + '10', color: themeConfig.colors.error }}>{error}</p>}
+      </div>
+    </div>
+  );
+}
 
 function AccessibilitySettings({ onBack }: { onBack: () => void }) {
   const { themeConfig, settings, updateSettings } = useApp();

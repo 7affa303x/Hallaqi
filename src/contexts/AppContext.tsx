@@ -23,6 +23,7 @@ import { AppContext } from './context';
 import { themes } from '@/data/themes';
 import { mockCurrentUser, mockBarbers, mockBookings, mockForumPosts, mockNotifications } from '@/data/mockData';
 import { mapBookingRow, mapForumPost, mapNotificationRow } from '@/lib/mappers';
+import { requiresMfaChallenge } from '@/lib/mfa';
 import type { Barber, Booking, Chat, ForumPost, AppNotification, TabName, ThemeName, AnimationStyle, AppSettings, ScreenName, ScreenParams, User } from '@/types';
 import type { Database } from '@/types/supabase';
 import type { Profile } from '@/types/supabase-aliases';
@@ -164,6 +165,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
       // Ignore malformed, user-controlled session storage.
     }
   }, [appUser, navigate, setActiveTab]);
+
+  useEffect(() => {
+    if (!appUser || screen === 'mfa-challenge') return;
+    void requiresMfaChallenge().then(required => {
+      if (required) {
+        setScreen('mfa-challenge');
+        setScreenParams(undefined);
+        setHistory(previous => [...previous, { screen: 'mfa-challenge' }]);
+        window.history.replaceState({}, '', '/?screen=mfa-challenge');
+      }
+    });
+  }, [appUser, screen]);
 
   /* ---- Theme ---- */
   const [currentTheme, setCurrentTheme] = useState<ThemeName>(globalTheme || 'hallaqi');
