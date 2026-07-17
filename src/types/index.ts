@@ -399,6 +399,7 @@ export type ScreenName =
   | 'seller-catalog'
   | 'barber-extras'
   | 'doctor-profile'
+  | 'business-profile-edit'
   | 'coming-soon';
 
 export interface ScreenParams {

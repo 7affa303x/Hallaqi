@@ -332,6 +332,18 @@ export default function ProfileTab() {
           </button>
           <button
             type="button"
+            onClick={() => navigate('business-profile-edit')}
+            className="col-span-2 flex items-center gap-2 p-3 rounded-2xl border text-right"
+            style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}
+          >
+            <Settings size={16} style={{ color: themeConfig.colors.primary }} />
+            <span>
+              <span className="block text-xs font-bold" style={{ color: themeConfig.colors.text }}>تعديل صفحة المتجر</span>
+              <span className="block text-[10px]" style={{ color: themeConfig.colors.textMuted }}>شعار · غلاف · Visit Store</span>
+            </span>
+          </button>
+          <button
+            type="button"
             onClick={() => navigate('marketplace')}
             className="col-span-2 flex items-center gap-2 p-3 rounded-2xl border text-right"
             style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}
