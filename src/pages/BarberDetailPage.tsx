@@ -12,6 +12,7 @@ import {
   getProfessionalById,
   getProfessionalSchedules,
   getProfessionalExceptions,
+  getProfessionalMetrics,
   getPortfolioItems,
   getOrCreateConversation,
   reportProfessional,
@@ -50,6 +51,11 @@ export default function BarberDetailPage() {
   const [reportSent, setReportSent] = useState(false);
   const [availabilitySchedule, setAvailabilitySchedule] = useState<Array<{ day_of_week: number; start_time: string; end_time: string; is_active: boolean }>>([]);
   const [availabilityExceptions, setAvailabilityExceptions] = useState<Array<{ date: string; type: string; reason: string }>>([]);
+  const [professionalMetrics, setProfessionalMetrics] = useState({
+    average_response_minutes: 0,
+    acceptance_rate: 0,
+    completed_bookings: 0,
+  });
 
   const listedBarber = barbers.find(b => b.id === screenParams?.barberId);
   const [barber, setBarber] = useState<Barber | undefined>(listedBarber);
@@ -96,6 +102,11 @@ export default function BarberDetailPage() {
       }
     };
     fetchAvailability();
+    void getProfessionalMetrics(barberId).then(metrics => setProfessionalMetrics({
+      average_response_minutes: Number(metrics.average_response_minutes || 0),
+      acceptance_rate: Number(metrics.acceptance_rate || 0),
+      completed_bookings: Number(metrics.completed_bookings || 0),
+    })).catch(() => {});
   }, [listedBarber, screenParams?.barberId]);
 
   useEffect(() => {
@@ -276,9 +287,9 @@ export default function BarberDetailPage() {
         <div className="flex gap-3">
           {[
             { icon: Clock, label: `${barber.yearsOfExperience} سنة`, sub: 'خبرة' },
-            { icon: MapPin, label: barber.distance, sub: 'المسافة' },
+            { icon: Clock, label: professionalMetrics.average_response_minutes > 0 ? `${professionalMetrics.average_response_minutes} د` : 'جديد', sub: 'متوسط الرد' },
             { icon: barber.isMobile ? Car : Scissors, label: barber.isMobile ? 'متنقل' : 'في الصالون', sub: 'نوع الخدمة' },
-            { icon: Star, label: `${barber.rating}`, sub: 'التقييم' },
+            { icon: Star, label: professionalMetrics.acceptance_rate > 0 ? `${professionalMetrics.acceptance_rate}%` : `${barber.rating}`, sub: professionalMetrics.acceptance_rate > 0 ? 'نسبة القبول' : 'التقييم' },
           ].map((stat, i) => (
             <div key={i} className="flex-1 rounded-xl p-2.5 text-center border" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
               <stat.icon size={16} style={{ color: themeConfig.colors.primary }} className="mx-auto mb-1" />
@@ -298,6 +309,11 @@ export default function BarberDetailPage() {
              tag === 'new' ? 'جديد' : tag === 'top-rated' ? 'الأعلى تقييماً' : tag === 'quick' ? 'سريع' : 'فاخر'}
           </span>
         ))}
+        {professionalMetrics.completed_bookings > 0 && (
+          <span className="px-2.5 py-1 rounded-full text-[10px] font-bold" style={{ backgroundColor: themeConfig.colors.success + '12', color: themeConfig.colors.success }}>
+            {professionalMetrics.completed_bookings} موعد مكتمل
+          </span>
+        )}
       </div>
 
       {/* === BIO === */}

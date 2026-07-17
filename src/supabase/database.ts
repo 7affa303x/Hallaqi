@@ -150,6 +150,19 @@ export async function getProfessionalWithProfile(proId: string) {
   return data;
 }
 
+export async function getProfessionalMetrics(proId: string) {
+  guard();
+  const { data, error } = await supabase.rpc('get_professional_metrics', {
+    professional: proId,
+  });
+  if (error) throw new Error(error.message);
+  return data?.[0] || {
+    average_response_minutes: 0,
+    acceptance_rate: 0,
+    completed_bookings: 0,
+  };
+}
+
 export async function getProfileById(userId: string) {
   guard();
   const { data, error } = await supabase

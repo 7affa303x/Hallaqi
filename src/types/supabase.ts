@@ -170,6 +170,45 @@ export type Database = {
           },
         ]
       }
+      booking_status_events: {
+        Row: {
+          booking_id: string
+          changed_by: string | null
+          created_at: string
+          id: string
+          status: Database["public"]["Enums"]["booking_status"]
+        }
+        Insert: {
+          booking_id: string
+          changed_by?: string | null
+          created_at?: string
+          id?: string
+          status: Database["public"]["Enums"]["booking_status"]
+        }
+        Update: {
+          booking_id?: string
+          changed_by?: string | null
+          created_at?: string
+          id?: string
+          status?: Database["public"]["Enums"]["booking_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "booking_status_events_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_status_events_changed_by_fkey"
+            columns: ["changed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bookings: {
         Row: {
           booking_end_time: string
@@ -1681,6 +1720,14 @@ export type Database = {
       get_or_create_conversation: {
         Args: { user1_id: string; user2_id: string }
         Returns: string
+      }
+      get_professional_metrics: {
+        Args: { professional: string }
+        Returns: {
+          acceptance_rate: number
+          average_response_minutes: number
+          completed_bookings: number
+        }[]
       }
       get_user_conversations: {
         Args: never
