@@ -197,6 +197,18 @@ export default function StoreDetailPage() {
             {tx('visitStore')}
             <ExternalLink size={14} />
           </button>
+          <button
+            type="button"
+            className="mt-2 w-full h-10 rounded-2xl text-xs font-bold border"
+            style={{ borderColor: themeConfig.colors.border, color: themeConfig.colors.text }}
+            onClick={() => {
+              const url = `${window.location.origin}/?screen=store-detail&storeId=${store.id}`;
+              if (navigator.share) void navigator.share({ title: store.store_name, url });
+              else void navigator.clipboard.writeText(url);
+            }}
+          >
+            مشاركة صفحة المتجر
+          </button>
           {!store.website_url && (
             <p className="text-[11px] mt-2 text-center" style={{ color: themeConfig.colors.textMuted }}>
               رابط المتجر غير متوفر بعد — قريبًا

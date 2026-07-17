@@ -42,6 +42,22 @@ export default function MarketplacePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('hallaqi-mp-filters');
+      if (!raw) return;
+      const saved = JSON.parse(raw) as Record<string, unknown>;
+      if (typeof saved.category === 'string') setCategory(saved.category);
+      if (typeof saved.sort === 'string') setSort(saved.sort as typeof sort);
+      if (typeof saved.wilaya === 'number') setWilaya(saved.wilaya);
+      if (typeof saved.brand === 'string') setBrand(saved.brand);
+    } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('hallaqi-mp-filters', JSON.stringify({ category, sort, wilaya, brand }));
+  }, [category, sort, wilaya, brand]);
+
   // Debounce search 250ms
   useEffect(() => {
     const t = window.setTimeout(() => setQ(qInput.trim()), 250);

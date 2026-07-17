@@ -156,6 +156,13 @@ export default function SellerCatalogPage() {
             style={{ backgroundColor: themeConfig.colors.primary }}>
             <Plus size={16} /> إضافة منتج
           </button>
+          {products.length >= cap && (
+            <button type="button" onClick={() => navigate('home')}
+              className="w-full h-10 rounded-xl text-xs font-bold border"
+              style={{ borderColor: themeConfig.colors.accent, color: themeConfig.colors.accent }}>
+              وصلت للسقف — ترقّ للاشتراك من الحساب (ابدأ مجاناً وادفع كلما كبرت)
+            </button>
+          )}
         </div>
 
         {loading && <p className="text-sm" style={{ color: themeConfig.colors.textMuted }}>جاري التحميل...</p>}

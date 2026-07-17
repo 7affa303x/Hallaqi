@@ -125,14 +125,15 @@ export default function BottomNav() {
                 const x = Math.cos(rad) * 72;
                 const y = Math.sin(rad) * 56;
                 const Icon = item.icon;
+                const reduceMotion = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
                 return (
                   <motion.button
                     key={item.id}
                     type="button"
-                    initial={{ scale: 0, opacity: 0 }}
+                    initial={reduceMotion ? false : { scale: 0, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1, x, y }}
-                    exit={{ scale: 0, opacity: 0 }}
-                    transition={{ type: 'spring', stiffness: 380, damping: 22 }}
+                    exit={reduceMotion ? undefined : { scale: 0, opacity: 0 }}
+                    transition={reduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 380, damping: 22 }}
                     onClick={() => runRadial(item.id)}
                     className="absolute left-1/2 top-1/2 -ml-7 -mt-7 w-14 h-14 rounded-full border flex flex-col items-center justify-center gap-0.5 shadow-lg"
                     style={{

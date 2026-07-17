@@ -229,6 +229,9 @@ export default function BookingTab() {
           </div>
           <span className="text-[10px] font-bold px-2 py-1 rounded-lg text-white" style={{ backgroundColor: themeConfig.colors.primary }}>استكشف</span>
         </button>
+        <p className="text-[10px] mb-3 px-1" style={{ color: themeConfig.colors.textMuted }}>
+          نصيحة: اضغط مطولًا على زر AI في الأسفل لفتح QR / كاميرا / معرض بسرعة
+        </p>
 
         {/* Quick Tags */}
         <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">

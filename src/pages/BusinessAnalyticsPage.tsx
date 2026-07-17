@@ -81,6 +81,18 @@ export default function BusinessAnalyticsPage() {
             );
           })}
         </div>
+        <div className="rounded-2xl border p-3" style={{ borderColor: themeConfig.colors.border, backgroundColor: themeConfig.colors.surface }}>
+          <p className="text-xs font-bold mb-1" style={{ color: themeConfig.colors.text }}>قمع التحويل (تقريبي)</p>
+          <p className="text-[11px] leading-5" style={{ color: themeConfig.colors.textMuted }}>
+            ظهور بحث {stats.search_impressions} → نقرات {stats.clicks} → زيارة متجر {stats.visit_store}
+            {stats.search_impressions > 0 && (
+              <> · CTR {(100 * stats.clicks / stats.search_impressions).toFixed(1)}%</>
+            )}
+            {stats.clicks > 0 && (
+              <> · Visit rate {(100 * stats.visit_store / stats.clicks).toFixed(1)}%</>
+            )}
+          </p>
+        </div>
         <p className="text-[11px] leading-5" style={{ color: themeConfig.colors.textMuted }}>
           مؤشرات التحويل التفصيلية حسب الولاية والفئة · قريبًا مع نمو البيانات.
         </p>

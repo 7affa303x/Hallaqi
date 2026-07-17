@@ -8,7 +8,7 @@ Generated during monetization expansion. Items marked `[done]` were applied in t
 3. [done] Central AI long-press radial
 4. [done] Gallery mode from AI radial
 5. Deep-link `/?screen=marketplace`
-6. Persist last Discover filters in localStorage
+6. [done] Persist last Discover filters in localStorage
 7. Tab haptic feedback on mobile
 8. Swipe between Discover sections
 9. Badge count for pending business approvals (admin)
@@ -30,7 +30,7 @@ Generated during monetization expansion. Items marked `[done]` were applied in t
 23. [done] EmptyState component usage
 24. Map view of stores by wilaya
 25. Recently viewed products
-26. Share marketplace product link
+26. [done] Share marketplace product link
 27. Compare up to 3 products
 28. “Sponsored” badge clarity copy
 
@@ -80,14 +80,14 @@ Generated during monetization expansion. Items marked `[done]` were applied in t
 65. [done] Independent plan catalogs
 66. [done] Cap premium at 99
 67. [done] Soft warnings at 80%/95% item usage
-68. Upgrade CTA when cap reached
+68. [done] Upgrade CTA when cap reached
 69. Featured slot add-on SKU
 70. Banner add-on SKU
 71. POTD bid checkout (manual admin for now)
 72. Invoice PDF for subscription requests
 73. CCP receipt for store subscriptions
 74. Stripe recurring later (explicitly deferred)
-75. “Start free / pay as you grow” everywhere
+75. [done] “Start free / pay as you grow” everywhere
 76. Plan comparison table UI
 77. Trial Professional 7 days (optional)
 78. Downgrade safeguards (archive excess items)
@@ -100,7 +100,7 @@ Generated during monetization expansion. Items marked `[done]` were applied in t
 83. Featured slot CTR
 84. Export CSV
 85. Date range picker
-86. Funnel: impression → click → Visit Store
+86. [done] Funnel: impression → click → Visit Store
 87. Alerts when CTR drops
 88. Admin ecosystem health dashboard
 
@@ -121,7 +121,7 @@ Generated during monetization expansion. Items marked `[done]` were applied in t
 100. E2E smoke: Discover → Marketplace → Store → Visit
 101. Axe a11y pass on marketplace screens
 102. Focus traps in WebView header
-103. Reduce motion support for radial
+103. [done] Reduce motion support for radial
 104. Prefetch marketplace categories
 105. Image lazy-loading + blurhash
 106. Route-based code splitting audit
@@ -130,7 +130,7 @@ Generated during monetization expansion. Items marked `[done]` were applied in t
 109. Sentry/client-error tags for marketplace
 110. Lighthouse mobile score ≥ 80 target
 111. Prefers-color-scheme sync with theme
-112. RTL audit for new screens
+112. [done] RTL audit for new screens
 113. FR/EN parity for marketplace strings
 114. [done] ARCHITECTURE.md refresh
 115. [done] DATABASE.md monetization tables
@@ -157,7 +157,7 @@ Generated during monetization expansion. Items marked `[done]` were applied in t
 132. Highlight Premium badge on cards
 133. [done] Empty seller catalog illustration
 134. Doctor trusted badge animation
-135. Onboarding tip for AI long-press
+135. [done] Onboarding tip for AI long-press
 136. [done] Marketplace search debounce 250ms
 137. Hide zero-result filters gracefully
 138. Store rating stars component reuse
