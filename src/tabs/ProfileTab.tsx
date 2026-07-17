@@ -32,6 +32,12 @@ import {
 import { uploadIdCard } from '@/supabase/storage';
 import { supabase } from '@/supabase/client';
 import type { SubscriptionPlan } from '@/types/supabase-aliases';
+import {
+  disableWebPush,
+  enableWebPush,
+  getPushSubscription,
+  isWebPushSupported,
+} from '@/lib/push-notifications';
 
 interface UserStats {
   totalBookings?: number;
@@ -618,6 +624,46 @@ function LanguageSelector({ onBack }: { onBack: () => void }) {
 
 function NotificationsSettings({ onBack }: { onBack: () => void }) {
   const { themeConfig, settings, updateSettings } = useApp();
+  const { appUser } = useAuth();
+  const [pushBusy, setPushBusy] = useState(false);
+  const [pushMessage, setPushMessage] = useState('');
+
+  useEffect(() => {
+    if (!isWebPushSupported()) {
+      setPushMessage('الإشعارات الفورية غير مدعومة على هذا الجهاز');
+      return;
+    }
+    void getPushSubscription().then(subscription => {
+      if (subscription && !settings.notifications.pushEnabled) {
+        updateSettings({ notifications: { ...settings.notifications, pushEnabled: true } });
+      }
+    });
+  }, []);
+
+  const toggleNotification = async (key: keyof typeof settings.notifications, enabled: boolean) => {
+    setPushMessage('');
+    if (key !== 'pushEnabled') {
+      updateSettings({ notifications: { ...settings.notifications, [key]: !enabled } });
+      return;
+    }
+    if (!appUser) return;
+    setPushBusy(true);
+    try {
+      if (enabled) {
+        await disableWebPush();
+        updateSettings({ notifications: { ...settings.notifications, pushEnabled: false } });
+        setPushMessage('تم إيقاف الإشعارات على هذا الجهاز');
+      } else {
+        await enableWebPush(appUser.id);
+        updateSettings({ notifications: { ...settings.notifications, pushEnabled: true } });
+        setPushMessage('تم تفعيل الإشعارات الفورية بنجاح');
+      }
+    } catch (err) {
+      setPushMessage(err instanceof Error ? err.message : 'تعذر تحديث الإشعارات');
+    } finally {
+      setPushBusy(false);
+    }
+  };
   const items = [
     { key: 'pushEnabled', label: 'الإشعارات الفورية', icon: Bell }, { key: 'emailEnabled', label: 'إشعارات البريد', icon: Mail },
     { key: 'smsEnabled', label: 'إشعارات الرسائل', icon: MessageSquare }, { key: 'bookingReminders', label: 'تذكير المواعيد', icon: Calendar },
@@ -635,11 +681,13 @@ function NotificationsSettings({ onBack }: { onBack: () => void }) {
           <div key={item.key} className={`flex items-center gap-3 px-4 py-3.5 ${index < items.length - 1 ? 'border-b' : ''}`} style={{ borderColor: themeConfig.colors.border + '60' }}>
             <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: themeConfig.colors.primary + '08' }}><Icon size={16} style={{ color: themeConfig.colors.primary }} /></div>
             <div className="flex-1"><p className="text-xs font-bold" style={{ color: themeConfig.colors.text }}>{item.label}</p></div>
-            <button onClick={() => updateSettings({ notifications: { ...settings.notifications, [item.key]: !isEnabled } })} className="w-12 h-7 rounded-full transition-all relative flex-shrink-0" style={{ backgroundColor: isEnabled ? themeConfig.colors.primary : themeConfig.colors.border }}>
+            <button role="switch" aria-checked={isEnabled} disabled={pushBusy && item.key === 'pushEnabled'} onClick={() => void toggleNotification(item.key as keyof typeof settings.notifications, isEnabled)} className="w-12 h-7 rounded-full transition-all relative flex-shrink-0 disabled:opacity-50" style={{ backgroundColor: isEnabled ? themeConfig.colors.primary : themeConfig.colors.border }}>
               <div className="absolute top-0.5 w-6 h-6 rounded-full bg-white shadow-sm transition-all" style={{ right: isEnabled ? '2px' : 'auto', left: isEnabled ? 'auto' : '2px' }} />
             </button>
           </div>
-        ); })}</div></div>
+        ); })}</div>
+        {pushMessage && <p role="status" className="mt-3 text-[11px] p-3 rounded-xl" style={{ backgroundColor: themeConfig.colors.primary + '10', color: themeConfig.colors.text }}>{pushMessage}</p>}
+      </div>
     </div>
   );
 }

@@ -639,6 +639,31 @@ export async function markAllNotificationsRead(userId: string) {
   if (error) throw new Error(error.message);
 }
 
+export async function upsertPushSubscription(userId: string, subscription: PushSubscriptionJSON) {
+  guard();
+  if (!subscription.endpoint || !subscription.keys?.p256dh || !subscription.keys.auth) {
+    throw new Error('بيانات اشتراك الإشعارات غير مكتملة');
+  }
+  const { error } = await supabase.from('push_subscriptions').upsert({
+    user_id: userId,
+    endpoint: subscription.endpoint,
+    p256dh: subscription.keys.p256dh,
+    auth: subscription.keys.auth,
+    user_agent: navigator.userAgent,
+    last_seen_at: new Date().toISOString(),
+  }, { onConflict: 'endpoint' });
+  if (error) throw new Error(error.message);
+}
+
+export async function deletePushSubscription(endpoint: string) {
+  guard();
+  const { error } = await supabase
+    .from('push_subscriptions')
+    .delete()
+    .eq('endpoint', endpoint);
+  if (error) throw new Error(error.message);
+}
+
 export async function getUserSettings(userId: string): Promise<Partial<AppSettings> | null> {
   guard();
   const { data, error } = await supabase

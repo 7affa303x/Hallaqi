@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import webpush from 'npm:web-push@3.6.7'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -70,16 +71,68 @@ Deno.serve(async (req) => {
 
     if (!authorized) return json({ error: 'Not authorized for this recipient' }, 403)
 
-    const { error } = await adminClient.from('notifications').insert({
+    const { data: notification, error } = await adminClient.from('notifications').insert({
       user_id: userId,
       title,
       message,
       type,
       metadata,
       read: false,
-    })
+    }).select('id').single()
     if (error) throw error
-    return json({ success: true })
+
+    let delivered = 0
+    const vapidSubject = Deno.env.get('VAPID_SUBJECT')
+    const vapidPublicKey = Deno.env.get('VAPID_PUBLIC_KEY')
+    const vapidPrivateKey = Deno.env.get('VAPID_PRIVATE_KEY')
+    if (vapidSubject && vapidPublicKey && vapidPrivateKey) {
+      const { data: settings } = await adminClient
+        .from('user_settings')
+        .select('notification_preferences')
+        .eq('user_id', userId)
+        .maybeSingle()
+      const preferences = settings?.notification_preferences as { pushEnabled?: boolean } | null
+      if (preferences?.pushEnabled !== false) {
+        webpush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey)
+        const { data: subscriptions } = await adminClient
+          .from('push_subscriptions')
+          .select('id, endpoint, p256dh, auth')
+          .eq('user_id', userId)
+
+        const destination = typeof metadata.booking_id === 'string'
+          ? '/?screen=notifications'
+          : typeof metadata.post_id === 'string'
+            ? `/post/${metadata.post_id}`
+            : '/?screen=notifications'
+        const payload = JSON.stringify({
+          title,
+          body: message,
+          tag: `hallaqi-${type}-${notification.id}`,
+          url: destination,
+        })
+
+        for (const subscription of subscriptions || []) {
+          try {
+            await webpush.sendNotification({
+              endpoint: subscription.endpoint,
+              keys: { p256dh: subscription.p256dh, auth: subscription.auth },
+            }, payload, { TTL: type === 'booking' ? 86400 : 3600 })
+            delivered += 1
+          } catch (pushError) {
+            const statusCode = typeof pushError === 'object' && pushError && 'statusCode' in pushError
+              ? Number(pushError.statusCode)
+              : 0
+            if (statusCode === 404 || statusCode === 410) {
+              await adminClient.from('push_subscriptions').delete().eq('id', subscription.id)
+            } else {
+              console.error('Web Push delivery failed', { subscriptionId: subscription.id, statusCode })
+            }
+          }
+        }
+      }
+    }
+
+    return json({ success: true, delivered })
   } catch (error) {
     console.error('send-notification failed', error)
     return json({ error: 'Unable to send notification' }, 500)

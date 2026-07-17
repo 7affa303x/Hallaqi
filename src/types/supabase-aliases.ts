@@ -14,6 +14,7 @@ export type Conversation = Database['public']['Tables']['conversations']['Row'];
 export type ConversationMember = Database['public']['Tables']['conversation_members']['Row'];
 export type Message = Database['public']['Tables']['messages']['Row'];
 export type Notification = Database['public']['Tables']['notifications']['Row'];
+export type PushSubscription = Database['public']['Tables']['push_subscriptions']['Row'];
 export type ForumPost = Database['public']['Tables']['forum_posts']['Row'];
 export type ForumComment = Database['public']['Tables']['forum_comments']['Row'];
 export type ForumCategory = Database['public']['Tables']['forum_categories']['Row'];

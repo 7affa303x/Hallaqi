@@ -11,9 +11,10 @@ export default defineConfig({
       registerType: "autoUpdate",
       injectRegister: "auto",
       manifest: false,
-      includeAssets: ["logo-icon.png", "logo-symbol.png", "logo-wordmark.png"],
+      includeAssets: ["logo-icon.png", "logo-symbol.png", "logo-wordmark.png", "push-handler.js"],
       workbox: {
         navigateFallback: "/index.html",
+        importScripts: ["/push-handler.js"],
         globPatterns: ["**/*.{js,css,html,png,svg,webp,woff2}"],
         runtimeCaching: [
           {

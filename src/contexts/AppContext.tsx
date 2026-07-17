@@ -95,6 +95,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } else if (queryScreen === 'booking-flow' && query.get('barberId')) {
       initialScreen = 'booking-flow';
       initialParams = { barberId: query.get('barberId') || undefined };
+    } else if (queryScreen === 'notifications') {
+      initialScreen = 'notifications';
+    } else if (queryScreen === 'ai-advisor') {
+      initialScreen = 'ai-advisor';
     }
 
     setScreen(initialScreen);
@@ -274,6 +278,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       } else if (query.get('screen') === 'payment-success') {
         setScreen('payment-success');
         setScreenParams({ bookingId: query.get('booking_id') || undefined });
+        return;
+      } else if (query.get('screen') === 'notifications') {
+        setScreen('notifications');
+        setScreenParams(undefined);
         return;
       } else {
         setScreen('home');
