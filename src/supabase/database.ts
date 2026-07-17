@@ -550,6 +550,36 @@ export async function getUserConversations() {
   return data || [];
 }
 
+export async function getBlockedUsers(userId: string) {
+  guard();
+  const { data, error } = await supabase
+    .from('user_blocks')
+    .select('blocked_id, created_at, profiles!user_blocks_blocked_id_fkey(full_name, avatar_url)')
+    .eq('blocker_id', userId)
+    .order('created_at', { ascending: false });
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+export async function blockUser(blockerId: string, blockedId: string) {
+  guard();
+  const { error } = await supabase.from('user_blocks').insert({
+    blocker_id: blockerId,
+    blocked_id: blockedId,
+  });
+  if (error && error.code !== '23505') throw new Error(error.message);
+}
+
+export async function unblockUser(blockerId: string, blockedId: string) {
+  guard();
+  const { error } = await supabase
+    .from('user_blocks')
+    .delete()
+    .eq('blocker_id', blockerId)
+    .eq('blocked_id', blockedId);
+  if (error) throw new Error(error.message);
+}
+
 export async function getConversationMessages(conversationId: string, limit = 50): Promise<Message[]> {
   guard();
   const { data, error } = await supabase

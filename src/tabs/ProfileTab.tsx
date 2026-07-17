@@ -28,6 +28,10 @@ import {
   exportUserData,
   getLoyaltyDashboard,
   redeemLoyaltyReward,
+  getUserConversations,
+  getBlockedUsers,
+  blockUser,
+  unblockUser,
 } from '@/supabase/database';
 import { uploadIdCard } from '@/supabase/storage';
 import { supabase } from '@/supabase/client';
@@ -837,6 +841,40 @@ function NotificationsSettings({ onBack }: { onBack: () => void }) {
 
 function PrivacySettings({ onBack }: { onBack: () => void }) {
   const { themeConfig, settings, updateSettings } = useApp();
+  const { appUser } = useAuth();
+  const [contacts, setContacts] = useState<Awaited<ReturnType<typeof getUserConversations>>>([]);
+  const [blocked, setBlocked] = useState<Awaited<ReturnType<typeof getBlockedUsers>>>([]);
+  const [privacyError, setPrivacyError] = useState('');
+
+  const loadPrivacy = useCallback(async () => {
+    if (!appUser) return;
+    try {
+      const [conversationRows, blockedRows] = await Promise.all([
+        getUserConversations(),
+        getBlockedUsers(appUser.id),
+      ]);
+      setContacts(conversationRows);
+      setBlocked(blockedRows);
+    } catch (err) {
+      setPrivacyError(err instanceof Error ? err.message : 'تعذر تحميل قائمة الحظر');
+    }
+  }, [appUser]);
+
+  useEffect(() => { void loadPrivacy(); }, [loadPrivacy]);
+
+  const setBlockedState = async (userId: string, shouldBlock: boolean) => {
+    if (!appUser) return;
+    setPrivacyError('');
+    try {
+      if (shouldBlock) await blockUser(appUser.id, userId);
+      else await unblockUser(appUser.id, userId);
+      await loadPrivacy();
+    } catch (err) {
+      setPrivacyError(err instanceof Error ? err.message : 'تعذر تحديث قائمة الحظر');
+    }
+  };
+
+  const blockedIds = new Set(blocked.map(item => item.blocked_id));
   return (
     <div className="pb-20">
       <div className="sticky top-0 z-30 flex items-center gap-3 px-4 py-3 backdrop-blur-lg border-b" style={{ backgroundColor: `${themeConfig.colors.background}ee`, borderColor: themeConfig.colors.border }}>
@@ -863,6 +901,31 @@ function PrivacySettings({ onBack }: { onBack: () => void }) {
               ))}
             </div>
           </div>
+        </div>
+        <div className="rounded-2xl border p-4" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
+          <h3 className="text-xs font-bold" style={{ color: themeConfig.colors.text }}>قائمة الحظر</h3>
+          <p className="text-[10px] mt-1" style={{ color: themeConfig.colors.textMuted }}>يمكنك حظر مستخدم سبق أن تواصلت معه. يمنع الحظر إنشاء محادثات جديدة.</p>
+          {blocked.length > 0 && <div className="space-y-2 mt-3">{blocked.map(item => (
+            <div key={item.blocked_id} className="flex items-center gap-2 p-2 rounded-xl" style={{ backgroundColor: themeConfig.colors.background }}>
+              {item.profiles?.avatar_url ? <img src={item.profiles.avatar_url} alt="" className="w-8 h-8 rounded-lg object-cover" /> : <UserIcon size={18} style={{ color: themeConfig.colors.textMuted }} />}
+              <span className="text-xs flex-1" style={{ color: themeConfig.colors.text }}>{item.profiles?.full_name || 'مستخدم'}</span>
+              <button onClick={() => void setBlockedState(item.blocked_id, false)} className="px-2 h-7 rounded-lg text-[10px] font-bold" style={{ backgroundColor: themeConfig.colors.success + '12', color: themeConfig.colors.success }}>إلغاء الحظر</button>
+            </div>
+          ))}</div>}
+          {contacts.some(contact => !blockedIds.has(contact.participant_id)) && (
+            <div className="mt-3 pt-3 border-t" style={{ borderColor: themeConfig.colors.border }}>
+              <p className="text-[10px] mb-2" style={{ color: themeConfig.colors.textMuted }}>جهات اتصال حديثة</p>
+              {contacts.filter(contact => !blockedIds.has(contact.participant_id)).map(contact => (
+                <div key={contact.participant_id} className="flex items-center gap-2 py-2">
+                  {contact.participant_avatar ? <img src={contact.participant_avatar} alt="" className="w-8 h-8 rounded-lg object-cover" /> : <UserIcon size={18} style={{ color: themeConfig.colors.textMuted }} />}
+                  <span className="text-xs flex-1" style={{ color: themeConfig.colors.text }}>{contact.participant_name}</span>
+                  <button onClick={() => void setBlockedState(contact.participant_id, true)} className="px-2 h-7 rounded-lg text-[10px] font-bold" style={{ backgroundColor: themeConfig.colors.error + '10', color: themeConfig.colors.error }}>حظر</button>
+                </div>
+              ))}
+            </div>
+          )}
+          {blocked.length === 0 && contacts.length === 0 && <p className="text-[10px] text-center py-4" style={{ color: themeConfig.colors.textMuted }}>لا توجد حسابات محظورة أو محادثات سابقة</p>}
+          {privacyError && <p role="alert" className="text-[10px] mt-2" style={{ color: themeConfig.colors.error }}>{privacyError}</p>}
         </div>
       </div>
     </div>

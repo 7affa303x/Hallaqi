@@ -24,6 +24,7 @@ export type ForumLike = Database['public']['Tables']['forum_likes']['Row'];
 export type ForumReport = Database['public']['Tables']['forum_reports']['Row'];
 export type Payment = Database['public']['Tables']['payments']['Row'];
 export type UserSettings = Database['public']['Tables']['user_settings']['Row'];
+export type UserBlock = Database['public']['Tables']['user_blocks']['Row'];
 export type IdVerificationRequest = Database['public']['Tables']['id_verification_requests']['Row'];
 export type ProfessionalReport = Database['public']['Tables']['professional_reports']['Row'];
 export type SubscriptionPlan = Database['public']['Tables']['subscription_plans']['Row'];
