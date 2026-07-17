@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useApp } from '@/contexts/useApp';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase, isSupabaseConfigured } from '@/supabase/client';
+import { ALGERIA_WILAYAS } from '@/lib/marketplace';
 import { ChevronLeft, Save } from 'lucide-react';
 
 /** Edit store/company discovery profile (website CTA, cover, about). */
@@ -19,6 +20,7 @@ export default function BusinessProfileEditPage() {
   const [logoUrl, setLogoUrl] = useState('');
   const [coverUrl, setCoverUrl] = useState('');
   const [city, setCity] = useState('');
+  const [wilayaCode, setWilayaCode] = useState<number | ''>('');
   const [contactPhone, setContactPhone] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -48,6 +50,7 @@ export default function BusinessProfileEditPage() {
         setLogoUrl(String(row.logo_url || ''));
         setCoverUrl(String(row.cover_url || ''));
         setCity(String(row.city || ''));
+        setWilayaCode(typeof row.wilaya_code === 'number' ? row.wilaya_code : '');
         if (!isCompany) setContactPhone(String(row.contact_phone || ''));
       }
       setLoading(false);
@@ -61,15 +64,21 @@ export default function BusinessProfileEditPage() {
     setError('');
     setMessage('');
     try {
+      if (!websiteUrl.trim()) {
+        setError('رابط الموقع مطلوب لتفعيل زر زيارة المتجر (Visit Store)');
+        return;
+      }
+      const wilayaValue = wilayaCode === '' ? null : wilayaCode;
       if (isCompany) {
         const { error: err } = await supabase.from('companies').update({
           company_name: name.trim(),
           short_description: shortDescription.trim() || null,
           about: about.trim() || null,
-          website_url: websiteUrl.trim() || null,
+          website_url: websiteUrl.trim(),
           logo_url: logoUrl.trim() || null,
           cover_url: coverUrl.trim() || null,
           city: city.trim() || null,
+          wilaya_code: wilayaValue,
           updated_at: new Date().toISOString(),
         }).eq('id', appUser.id);
         if (err) throw err;
@@ -78,10 +87,11 @@ export default function BusinessProfileEditPage() {
           store_name: name.trim(),
           short_description: shortDescription.trim() || null,
           about: about.trim() || null,
-          website_url: websiteUrl.trim() || null,
+          website_url: websiteUrl.trim(),
           logo_url: logoUrl.trim() || null,
           cover_url: coverUrl.trim() || null,
           city: city.trim() || null,
+          wilaya_code: wilayaValue,
           contact_phone: contactPhone.trim() || null,
           updated_at: new Date().toISOString(),
         }).eq('id', appUser.id);
@@ -130,7 +140,7 @@ export default function BusinessProfileEditPage() {
         {[
           { label: 'الاسم', value: name, set: setName },
           { label: 'وصف قصير', value: shortDescription, set: setShortDescription },
-          { label: 'الموقع (Visit Store)', value: websiteUrl, set: setWebsiteUrl },
+          { label: 'الموقع (Visit Store) *', value: websiteUrl, set: setWebsiteUrl },
           { label: 'شعار (URL)', value: logoUrl, set: setLogoUrl },
           { label: 'غلاف (URL)', value: coverUrl, set: setCoverUrl },
           { label: 'المدينة', value: city, set: setCity },
@@ -142,6 +152,25 @@ export default function BusinessProfileEditPage() {
               style={{ borderColor: themeConfig.colors.border, backgroundColor: themeConfig.colors.surface, color: themeConfig.colors.text }} />
           </label>
         ))}
+
+        <p className="text-[11px] leading-5 -mt-1" style={{ color: themeConfig.colors.textMuted }}>
+          زر Visit Store يظهر للزوار فقط عند وجود رابط موقع صالح.
+        </p>
+
+        <label className="block space-y-1">
+          <span className="text-[11px] font-bold" style={{ color: themeConfig.colors.textMuted }}>الولاية</span>
+          <select
+            value={wilayaCode === '' ? '' : String(wilayaCode)}
+            onChange={e => setWilayaCode(e.target.value ? Number(e.target.value) : '')}
+            className="w-full h-11 rounded-xl border px-3 text-sm outline-none"
+            style={{ borderColor: themeConfig.colors.border, backgroundColor: themeConfig.colors.surface, color: themeConfig.colors.text }}
+          >
+            <option value="">اختر الولاية</option>
+            {ALGERIA_WILAYAS.map(w => (
+              <option key={w.code} value={w.code}>{w.nameAr}</option>
+            ))}
+          </select>
+        </label>
 
         {!isCompany && (
           <label className="block space-y-1">

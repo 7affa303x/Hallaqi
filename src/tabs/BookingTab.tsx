@@ -224,8 +224,8 @@ export default function BookingTab() {
           }}
         >
           <div>
-            <p className="text-xs font-black" style={{ color: themeConfig.colors.text }}>سوق حلاقي</p>
-            <p className="text-[10px]" style={{ color: themeConfig.colors.textMuted }}>متاجر · شركات · منتج اليوم · فلاتر</p>
+            <p className="text-xs font-black" style={{ color: themeConfig.colors.text }}>{tx('marketplace')}</p>
+            <p className="text-[10px]" style={{ color: themeConfig.colors.textMuted }}>{tx('marketplaceHint')}</p>
           </div>
           <span className="text-[10px] font-bold px-2 py-1 rounded-lg text-white" style={{ backgroundColor: themeConfig.colors.primary }}>استكشف</span>
         </button>

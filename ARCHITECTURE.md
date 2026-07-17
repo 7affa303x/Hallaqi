@@ -97,8 +97,13 @@ src/
 ## Navigation
 
 Two-layer navigation:
-1. **Tab Navigation** — 5 bottom tabs (booking, appointments, camera, forum, profile)
-2. **Stack Navigation** — Screens pushed on top (barber-detail, booking-flow, etc.)
+1. **Tab Navigation** — Side tabs: booking (Discover), appointments, forum, profile. The center control is an **AI radial menu** (long-press / tap) that opens AI Advisor, QR, camera, or gallery — not a fifth “camera” tab alone.
+2. **Stack Navigation** — Screens pushed on top, including:
+   - Core: `barber-detail`, `booking-flow`, login/register, admin dashboard
+   - AI: `ai-advisor`, `seller-ai-tools`
+   - Marketplace: `marketplace`, `store-detail`, `company-detail`, `store-webview`, `seller-catalog`, `business-analytics`, `business-profile-edit`, `barber-extras`, `doctor-profile`
+
+**Roles (brief):** `client` · `barber` · `store` · `company` · `doctor` · `admin` (+ specialist/moderator). Store/company/doctor accounts go through admin approval; marketplace is discovery-only (Visit Store → merchant site, no in-app checkout commission in this phase).
 
 All pages use React.lazy for code splitting.
 

@@ -59,10 +59,21 @@ export default function RegisterScreen() {
   const [localError, setLocalError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [verificationEmail, setVerificationEmail] = useState('');
+  const [doctorSpecialty, setDoctorSpecialty] = useState<
+    'dermatologist' | 'trichologist' | 'aesthetic_medicine' | 'general'
+  >('dermatologist');
 
   const error = localError || authError || '';
   const password = watch('password', '');
+  const accountType = watch('accountType', 'client');
   const strength = getPasswordStrength(password);
+
+  const doctorSpecialtyOptions = [
+    { value: 'dermatologist' as const, label: 'طبيب جلدية' },
+    { value: 'trichologist' as const, label: 'أخصائي شعر وفروة' },
+    { value: 'aesthetic_medicine' as const, label: 'طب تجميلي' },
+    { value: 'general' as const, label: 'عام' },
+  ];
 
   const clearErrors = useCallback(() => {
     setLocalError('');
@@ -86,7 +97,7 @@ export default function RegisterScreen() {
             ? { store_name: data.name.trim() }
             : data.accountType === 'company'
               ? { company_name: data.name.trim() }
-              : { display_name: data.name.trim(), specialty: 'dermatologist' };
+              : { display_name: data.name.trim(), specialty: doctorSpecialty };
         void submitBusinessAccountRequest(result.user.id, data.accountType, payload).catch(() => {});
       }
 
@@ -436,6 +447,29 @@ export default function RegisterScreen() {
             </fieldset>
           )}
         />
+
+        {accountType === 'doctor' && (
+          <label className="block space-y-1.5">
+            <span className="block text-xs font-bold px-0.5" style={{ color: themeConfig.colors.text }}>
+              التخصص
+            </span>
+            <select
+              value={doctorSpecialty}
+              onChange={e => setDoctorSpecialty(e.target.value as typeof doctorSpecialty)}
+              disabled={isSubmitting}
+              className="w-full h-[52px] px-3 text-sm rounded-2xl outline-none disabled:opacity-50"
+              style={{
+                backgroundColor: themeConfig.colors.surface,
+                color: themeConfig.colors.text,
+                border: `2px solid ${themeConfig.colors.border}`,
+              }}
+            >
+              {doctorSpecialtyOptions.map(option => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </label>
+        )}
 
         {/* Terms */}
         <Controller

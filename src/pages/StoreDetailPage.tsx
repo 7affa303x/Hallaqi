@@ -1,25 +1,51 @@
 import type { ReactNode } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import { useApp } from '@/contexts/useApp';
+import { useAuth } from '@/hooks/useAuth';
 import {
   getStoreById,
   getStoreProducts,
   openVisitStore,
   trackMarketplaceEvent,
+  listStoreReviews,
+  createStoreReview,
+  getMarketplaceCategories,
+  getProductOfTheDay,
+  type MarketplaceCategory,
   type MarketplaceProduct,
+  type ProductOfTheDayRow,
   type StoreRow,
 } from '@/lib/marketplace';
 import {
   BadgeCheck, Crown, ChevronLeft, ExternalLink, Globe, MapPin, Star, Sparkles,
 } from 'lucide-react';
+import { translate } from '@/lib/i18n';
+
+type StoreReviewRow = {
+  id: string;
+  rating: number;
+  comment: string | null;
+  created_at: string;
+  profiles?: { full_name: string | null; avatar_url: string | null } | null;
+};
 
 export default function StoreDetailPage() {
-  const { themeConfig, navigate, goBack, screenParams } = useApp();
+  const { themeConfig, navigate, goBack, screenParams, settings } = useApp();
+  const { appUser, isAuthenticated } = useAuth();
   const storeId = screenParams?.storeId || '';
+  const tx = (key: Parameters<typeof translate>[1]) => translate(settings.language, key);
+
   const [store, setStore] = useState<StoreRow | null>(null);
   const [products, setProducts] = useState<MarketplaceProduct[]>([]);
+  const [categories, setCategories] = useState<MarketplaceCategory[]>([]);
+  const [reviews, setReviews] = useState<StoreReviewRow[]>([]);
+  const [potd, setPotd] = useState<ProductOfTheDayRow | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [rating, setRating] = useState(5);
+  const [comment, setComment] = useState('');
+  const [submittingReview, setSubmittingReview] = useState(false);
+  const [reviewMessage, setReviewMessage] = useState('');
 
   useEffect(() => {
     if (!storeId) return;
@@ -27,10 +53,19 @@ export default function StoreDetailPage() {
     (async () => {
       try {
         setLoading(true);
-        const [s, p] = await Promise.all([getStoreById(storeId), getStoreProducts(storeId)]);
+        const [s, p, cats, revs, potdRow] = await Promise.all([
+          getStoreById(storeId),
+          getStoreProducts(storeId),
+          getMarketplaceCategories(),
+          listStoreReviews(storeId),
+          getProductOfTheDay(),
+        ]);
         if (cancelled) return;
         setStore(s);
         setProducts(p);
+        setCategories(cats);
+        setReviews(revs as StoreReviewRow[]);
+        setPotd(potdRow);
         trackMarketplaceEvent({ event_type: 'profile_visit', store_id: storeId });
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : 'تعذر تحميل المتجر');
@@ -40,6 +75,12 @@ export default function StoreDetailPage() {
     })();
     return () => { cancelled = true; };
   }, [storeId]);
+
+  const categoryNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const c of categories) map.set(c.id, c.name_ar);
+    return map;
+  }, [categories]);
 
   const featured = useMemo(() => products.filter(p => p.is_featured), [products]);
   const bestSellers = useMemo(() => products.filter(p => p.is_best_seller), [products]);
@@ -54,10 +95,41 @@ export default function StoreDetailPage() {
     return [...map.entries()];
   }, [products]);
 
+  const potdForStore = useMemo(() => {
+    if (!potd || !store) return null;
+    if (potd.store_id === store.id) return potd;
+    const product = potd.marketplace_products as MarketplaceProduct | undefined;
+    if (product?.store_id === store.id) return potd;
+    return null;
+  }, [potd, store]);
+
   const visit = () => {
     if (!store?.website_url) return;
     trackMarketplaceEvent({ event_type: 'visit_store_click', store_id: store.id });
     navigate('store-webview', { url: store.website_url, title: store.store_name });
+  };
+
+  const submitReview = async () => {
+    if (!appUser?.id || !storeId) return;
+    setSubmittingReview(true);
+    setReviewMessage('');
+    try {
+      await createStoreReview({
+        storeId,
+        reviewerId: appUser.id,
+        rating,
+        comment: comment.trim() || undefined,
+      });
+      const revs = await listStoreReviews(storeId);
+      setReviews(revs as StoreReviewRow[]);
+      setComment('');
+      setRating(5);
+      setReviewMessage('تم إرسال تقييمك');
+    } catch (e) {
+      setReviewMessage(e instanceof Error ? e.message : 'تعذر إرسال التقييم');
+    } finally {
+      setSubmittingReview(false);
+    }
   };
 
   if (loading) {
@@ -122,7 +194,7 @@ export default function StoreDetailPage() {
             style={{ backgroundColor: themeConfig.colors.primary }}
           >
             <Globe size={16} />
-            زيارة المتجر
+            {tx('visitStore')}
             <ExternalLink size={14} />
           </button>
           {!store.website_url && (
@@ -131,6 +203,28 @@ export default function StoreDetailPage() {
             </p>
           )}
         </div>
+
+        {potdForStore && (
+          <div className="rounded-2xl border p-3" style={{
+            borderColor: `${themeConfig.colors.accent}55`,
+            background: `linear-gradient(120deg, ${themeConfig.colors.accent}14, ${themeConfig.colors.primary}10)`,
+          }}>
+            <div className="flex items-center gap-2 mb-1">
+              <Sparkles size={14} style={{ color: themeConfig.colors.accent }} />
+              <p className="text-xs font-black" style={{ color: themeConfig.colors.text }}>{tx('productOfDay')}</p>
+            </div>
+            <p className="text-sm font-bold" style={{ color: themeConfig.colors.text }}>
+              {potdForStore.headline_ar
+                || (potdForStore.marketplace_products as MarketplaceProduct | undefined)?.title
+                || 'منتج مميز اليوم في هذا المتجر'}
+            </p>
+            {potdForStore.display_discount_percent != null && (
+              <p className="text-[11px] mt-1" style={{ color: themeConfig.colors.accent }}>
+                خصم معروض {potdForStore.display_discount_percent}%
+              </p>
+            )}
+          </div>
+        )}
 
         {featured.length > 0 && (
           <Section title="منتج مميز" theme={themeConfig}>
@@ -151,10 +245,84 @@ export default function StoreDetailPage() {
         )}
 
         {byCategory.map(([cat, rows]) => (
-          <Section key={cat} title={`قسم · ${cat}`} theme={themeConfig}>
+          <Section key={cat} title={`قسم · ${categoryNameById.get(cat) || cat}`} theme={themeConfig}>
             <ProductStrip products={rows} theme={themeConfig} />
           </Section>
         ))}
+
+        <Section title="التقييمات" theme={themeConfig}>
+          <div className="space-y-2">
+            {reviews.length === 0 && (
+              <p className="text-xs" style={{ color: themeConfig.colors.textMuted }}>لا توجد تقييمات بعد</p>
+            )}
+            {reviews.map(review => (
+              <div key={review.id} className="rounded-2xl border p-3"
+                style={{ borderColor: themeConfig.colors.border, backgroundColor: themeConfig.colors.surface }}>
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <p className="text-xs font-bold" style={{ color: themeConfig.colors.text }}>
+                    {review.profiles?.full_name || 'مستخدم'}
+                  </p>
+                  <div className="flex items-center gap-0.5">
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <Star key={i} size={10} className={i < review.rating ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'} />
+                    ))}
+                  </div>
+                </div>
+                {review.comment && (
+                  <p className="text-[11px] leading-5" style={{ color: themeConfig.colors.textMuted }}>{review.comment}</p>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {isAuthenticated ? (
+            <div className="mt-3 rounded-2xl border p-3 space-y-2"
+              style={{ borderColor: themeConfig.colors.border, backgroundColor: themeConfig.colors.surface }}>
+              <p className="text-xs font-bold" style={{ color: themeConfig.colors.text }}>أضف تقييمك</p>
+              <div className="flex gap-1">
+                {[1, 2, 3, 4, 5].map(value => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setRating(value)}
+                    className="w-9 h-9 rounded-xl border text-xs font-black"
+                    style={{
+                      borderColor: rating === value ? themeConfig.colors.primary : themeConfig.colors.border,
+                      backgroundColor: rating === value ? `${themeConfig.colors.primary}18` : themeConfig.colors.background,
+                      color: rating === value ? themeConfig.colors.primary : themeConfig.colors.textMuted,
+                    }}
+                  >
+                    {value}
+                  </button>
+                ))}
+              </div>
+              <textarea
+                value={comment}
+                onChange={e => setComment(e.target.value)}
+                rows={3}
+                placeholder="تعليق اختياري"
+                className="w-full rounded-xl border px-3 py-2 text-sm outline-none"
+                style={{ borderColor: themeConfig.colors.border, backgroundColor: themeConfig.colors.background, color: themeConfig.colors.text }}
+              />
+              <button
+                type="button"
+                disabled={submittingReview}
+                onClick={() => void submitReview()}
+                className="w-full h-10 rounded-xl text-xs font-black text-white disabled:opacity-50"
+                style={{ backgroundColor: themeConfig.colors.primary }}
+              >
+                إرسال التقييم
+              </button>
+              {reviewMessage && (
+                <p className="text-[11px]" style={{ color: themeConfig.colors.textMuted }}>{reviewMessage}</p>
+              )}
+            </div>
+          ) : (
+            <p className="text-[11px] mt-2" style={{ color: themeConfig.colors.textMuted }}>
+              سجّل الدخول لإضافة تقييم
+            </p>
+          )}
+        </Section>
 
         <Section title="عن المتجر" theme={themeConfig}>
           <p className="text-sm leading-7" style={{ color: themeConfig.colors.textMuted }}>
@@ -183,6 +351,24 @@ export default function StoreDetailPage() {
           </p>
         </div>
       </div>
+
+      {store.website_url && (
+        <div className="fixed bottom-0 inset-x-0 z-30 border-t px-4 py-3 backdrop-blur-xl"
+          style={{ borderColor: themeConfig.colors.border, backgroundColor: `${themeConfig.colors.surface}f2` }}>
+          <div className="max-w-lg mx-auto">
+            <button
+              type="button"
+              onClick={visit}
+              className="w-full h-12 rounded-2xl text-sm font-black text-white flex items-center justify-center gap-2"
+              style={{ backgroundColor: themeConfig.colors.primary }}
+            >
+              <Globe size={16} />
+              {tx('visitStore')}
+              <ExternalLink size={14} />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

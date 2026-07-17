@@ -522,10 +522,77 @@ export async function adminListStores() {
   return data || [];
 }
 
+export async function listStoreReviews(storeId: string) {
+  if (!isSupabaseConfigured()) return [];
+  const { data, error } = await supabase
+    .from('marketplace_reviews')
+    .select('*, profiles!marketplace_reviews_reviewer_id_fkey(full_name, avatar_url)')
+    .eq('store_id', storeId)
+    .eq('moderation_status', 'approved')
+    .order('created_at', { ascending: false })
+    .limit(30);
+  if (error) throw error;
+  return data || [];
+}
+
+export async function createStoreReview(input: {
+  storeId: string;
+  reviewerId: string;
+  rating: number;
+  comment?: string;
+}) {
+  if (!isSupabaseConfigured()) throw new Error('Supabase غير مُعد');
+  const { data, error } = await supabase.from('marketplace_reviews').insert({
+    target_type: 'store',
+    store_id: input.storeId,
+    reviewer_id: input.reviewerId,
+    rating: input.rating,
+    comment: input.comment?.trim() || null,
+    moderation_status: 'approved',
+  }).select('*').single();
+  if (error) throw error;
+  return data;
+}
+
+export async function getCompanyProducts(companyId: string): Promise<MarketplaceProduct[]> {
+  if (!isSupabaseConfigured()) return [];
+  const { data, error } = await supabase
+    .from('marketplace_products')
+    .select('*')
+    .eq('company_id', companyId)
+    .eq('is_active', true)
+    .order('is_featured', { ascending: false })
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data || []) as MarketplaceProduct[];
+}
+
+export function debounceMs<T extends (...args: never[]) => void>(fn: T, wait: number) {
+  let timer: number | null = null;
+  return (...args: Parameters<T>) => {
+    if (timer) window.clearTimeout(timer);
+    timer = window.setTimeout(() => fn(...args), wait);
+  };
+}
+
+export const ALGERIA_WILAYAS: { code: number; nameAr: string }[] = [
+  { code: 16, nameAr: 'الجزائر' },
+  { code: 31, nameAr: 'وهران' },
+  { code: 25, nameAr: 'قسنطينة' },
+  { code: 9, nameAr: 'البليدة' },
+  { code: 19, nameAr: 'سطيف' },
+  { code: 23, nameAr: 'عنابة' },
+  { code: 6, nameAr: 'بجاية' },
+  { code: 15, nameAr: 'تيزي وزو' },
+  { code: 5, nameAr: 'باتنة' },
+  { code: 17, nameAr: 'الجلفة' },
+];
+
 export async function getDoctorProfile(doctorId: string) {
   if (!isSupabaseConfigured()) return null;
   const { data, error } = await supabase.from('doctor_profiles').select('*').eq('id', doctorId).maybeSingle();
   if (error) throw error;
   return data;
 }
+
 
