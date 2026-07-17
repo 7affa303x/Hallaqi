@@ -2,15 +2,14 @@ import { supabase, isSupabaseConfigured } from './client';
 import type { Database } from '../types/supabase';
 
 import type {
-  Profile, Professional, Service, Booking, Review, Favorite,
+  Profile, Professional, Service, Review, Favorite,
   AvailabilitySchedule, AvailabilityException, PortfolioItem,
   Message, Notification,
   ForumPost, ForumComment, ForumCategory
 } from '@/types/supabase-aliases';
 import type { Json } from '@/types/supabase';
-import type { BookingStatus } from '@/types';
 import type { AppSettings } from '@/types';
-import { transformToBarber } from '@/lib/utils'; // Import app-level BookingStatus
+import { transformToBarber } from '@/lib/utils';
 
 function guard(): void {
   if (!isSupabaseConfigured()) throw new Error('Supabase غير مُعد');
@@ -242,7 +241,7 @@ export async function getProfessionalBookings(proId: string, statusFilter?: (Dat
   if (statusFilter?.length) query = query.in('status', statusFilter);
   const { data, error } = await query;
   if (error) throw new Error(error.message);
-  return (data || []) as (Booking & { profiles?: Profile; services?: Service; status: BookingStatus })[];
+  return data || [];
 }
 
 export async function createBooking(booking: Database['public']['Tables']['bookings']['Insert']) {
