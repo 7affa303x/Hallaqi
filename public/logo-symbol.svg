@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Hallaqi">
+  <defs>
+    <linearGradient id="hallaqi" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#159A8C"/>
+      <stop offset="0.55" stop-color="#0F766E"/>
+      <stop offset="1" stop-color="#164E63"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" rx="210" fill="#ffffff"/>
+  <g fill="none" stroke="url(#hallaqi)" stroke-width="118" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M470 212 214 468c-45 45-45 118 0 163l168 168c45 45 118 45 163 0l67-67"/>
+    <path d="m554 212 256 256c45 45 45 118 0 163L642 799c-45 45-118 45-163 0l-67-67"/>
+    <path d="m412 534 100-100 100 100"/>
+    <path d="m612 490-100 100-100-100"/>
+  </g>
+</svg>

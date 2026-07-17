@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useApp } from '@/contexts/useApp';
 import { SkeletonForumPost } from '@/components/Skeleton';
 import EmptyState from '@/components/EmptyState';
+import BrandLogo from '@/components/BrandLogo';
 import { motion } from 'framer-motion';
 import { forumCategories, mockCompetitions } from '@/data/mockData';
 import type { ForumCategory, ForumPost, ScreenName, ScreenParams } from '@/types';
@@ -22,6 +23,8 @@ export default function ForumTab() {
   const { forumPosts, themeConfig, navigate, isLoading } = useApp();
   const { isAuthenticated } = useAuth();
   const [selectedCategory, setSelectedCategory] = useState<ForumCategory | 'all'>('all');
+  const [showSort, setShowSort] = useState(false);
+  const [sortMode, setSortMode] = useState<'newest' | 'trending' | 'liked' | 'commented'>('newest');
   const [categories, setCategories] = useState<Array<{ key: string; label: string; color: string }>>(
     forumCategories.map(category => ({ ...category }))
   );
@@ -40,9 +43,20 @@ export default function ForumTab() {
       .catch(() => { /* static categories remain available */ });
   }, [themeConfig.colors.primary]);
 
-  const filteredPosts = selectedCategory === 'all'
-    ? forumPosts
-    : forumPosts.filter(p => p.category === selectedCategory);
+  const filteredPosts = useMemo(() => {
+    const posts = selectedCategory === 'all'
+      ? [...forumPosts]
+      : forumPosts.filter(p => p.category === selectedCategory);
+    return posts.sort((a, b) => {
+      if (sortMode === 'liked') return b.likes - a.likes;
+      if (sortMode === 'commented') return b.comments.length - a.comments.length;
+      if (sortMode === 'trending') {
+        const score = (post: ForumPost) => post.likes * 3 + post.comments.length * 5 + post.views * 0.05;
+        return score(b) - score(a);
+      }
+      return Date.parse(b.createdAt) - Date.parse(a.createdAt);
+    });
+  }, [forumPosts, selectedCategory, sortMode]);
   const pinnedPosts = filteredPosts.filter(p => p.isPinned);
   const regularPosts = filteredPosts.filter(p => !p.isPinned);
 
@@ -54,7 +68,7 @@ export default function ForumTab() {
       <div className="sticky top-0 z-30 px-4 pt-3 pb-3 backdrop-blur-lg" style={{ backgroundColor: `${themeConfig.colors.background}ee` }}>
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <img src="/logo-symbol.png" alt="Hallaqi" className="w-8 h-8 rounded-lg" />
+            <BrandLogo className="w-9 h-9 shadow-sm" priority />
             <div>
               <h1 className="text-lg font-bold leading-tight" style={{ color: themeConfig.colors.text }}>المنتدى</h1>
               <p className="text-[10px]" style={{ color: themeConfig.colors.textMuted }}>نقاشات، نصائح، ومسابقات</p>
@@ -71,10 +85,10 @@ export default function ForumTab() {
                 <Plus size={16} />
               </button>
             )}
-            <button className="w-9 h-9 rounded-xl flex items-center justify-center border" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border, color: themeConfig.colors.textMuted }}>
+            <button onClick={() => { setSortMode('trending'); setShowSort(false); }} aria-label="المنشورات الرائجة" className="w-9 h-9 rounded-xl flex items-center justify-center border" style={{ backgroundColor: sortMode === 'trending' ? themeConfig.colors.primary + '15' : themeConfig.colors.surface, borderColor: sortMode === 'trending' ? themeConfig.colors.primary : themeConfig.colors.border, color: sortMode === 'trending' ? themeConfig.colors.primary : themeConfig.colors.textMuted }}>
               <TrendingUp size={16} />
             </button>
-            <button className="w-9 h-9 rounded-xl flex items-center justify-center border" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border, color: themeConfig.colors.textMuted }}>
+            <button onClick={() => setShowSort(value => !value)} aria-label="ترتيب المنشورات" className="w-9 h-9 rounded-xl flex items-center justify-center border" style={{ backgroundColor: showSort ? themeConfig.colors.primary + '15' : themeConfig.colors.surface, borderColor: showSort ? themeConfig.colors.primary : themeConfig.colors.border, color: showSort ? themeConfig.colors.primary : themeConfig.colors.textMuted }}>
               <Filter size={16} />
             </button>
           </div>
@@ -93,6 +107,18 @@ export default function ForumTab() {
             >{cat.label}</button>
           ))}
         </div>
+        {showSort && (
+          <div className="grid grid-cols-4 gap-1.5 mt-2 p-2 rounded-xl border" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
+            {([
+              ['newest', 'الأحدث'],
+              ['trending', 'الرائج'],
+              ['liked', 'الأكثر إعجاباً'],
+              ['commented', 'الأكثر نقاشاً'],
+            ] as const).map(([key, label]) => (
+              <button key={key} onClick={() => { setSortMode(key); setShowSort(false); }} className="px-2 py-2 rounded-lg text-[10px] font-bold" style={{ backgroundColor: sortMode === key ? themeConfig.colors.primary : themeConfig.colors.background, color: sortMode === key ? '#fff' : themeConfig.colors.textMuted }}>{label}</button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Auth notice for posting */}
@@ -195,6 +221,14 @@ function ForumPostCard({ post, isPinned = false, navigate, themeConfig }: PostCa
   const { toggleLike } = useApp();
   const { isAuthenticated } = useAuth();
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isBookmarked, setIsBookmarked] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('hallaqi-forum-bookmarks') || '[]') as string[];
+      return saved.includes(post.id);
+    } catch {
+      return false;
+    }
+  });
   const RoleIcon = roleIcons[post.authorRole] || Users;
   const rColor = roleColors[post.authorRole] || '#6B7280';
   const catInfo = forumCategories.find(c => c.key === post.category);
@@ -204,10 +238,32 @@ function ForumPostCard({ post, isPinned = false, navigate, themeConfig }: PostCa
 
   const handleLike = () => {
     if (!isAuthenticated) {
-      // Could show a toast or redirect to login
+      nav('login', { redirectScreen: 'post-detail', postId: post.id });
       return;
     }
     toggleLike(post.id);
+  };
+
+  const toggleBookmark = () => {
+    try {
+      const saved = new Set(JSON.parse(localStorage.getItem('hallaqi-forum-bookmarks') || '[]') as string[]);
+      if (saved.has(post.id)) saved.delete(post.id);
+      else saved.add(post.id);
+      localStorage.setItem('hallaqi-forum-bookmarks', JSON.stringify([...saved]));
+      setIsBookmarked(saved.has(post.id));
+    } catch {
+      setIsBookmarked(value => !value);
+    }
+  };
+
+  const sharePost = async () => {
+    const url = `${window.location.origin}/post/${post.id}`;
+    try {
+      if (navigator.share) await navigator.share({ title: post.title, text: post.content.slice(0, 120), url });
+      else await navigator.clipboard.writeText(url);
+    } catch {
+      // Native share can be dismissed without an application error.
+    }
   };
 
   const handleComment = () => {
@@ -283,6 +339,7 @@ function ForumPostCard({ post, isPinned = false, navigate, themeConfig }: PostCa
         <p className="text-xs leading-relaxed" style={{ color: themeConfig.colors.textMuted }}>
           {isExpanded ? post.content : post.content.slice(0, 150) + (post.content.length > 150 ? '...' : '')}
         </p>
+        {post.image && <img src={post.image} alt="" className="w-full max-h-64 object-cover rounded-xl mt-2" />}
         {post.content.length > 150 && (
           <button onClick={() => setIsExpanded(!isExpanded)} className="text-[11px] font-medium mt-1" style={{ color: themeConfig.colors.primary }}>
             {isExpanded ? 'عرض أقل' : 'قراءة المزيد'}
@@ -311,8 +368,8 @@ function ForumPostCard({ post, isPinned = false, navigate, themeConfig }: PostCa
           <Eye size={16} style={{ color: themeConfig.colors.textMuted }} />
           <span className="text-[11px] font-medium" style={{ color: themeConfig.colors.textMuted }}>{post.views}</span>
         </div>
-        <button><Bookmark size={16} style={{ color: themeConfig.colors.textMuted }} /></button>
-        <button><Share2 size={16} style={{ color: themeConfig.colors.textMuted }} /></button>
+        <button onClick={toggleBookmark} aria-label={isBookmarked ? 'إزالة الحفظ' : 'حفظ المنشور'}><Bookmark size={16} className={isBookmarked ? 'fill-current' : ''} style={{ color: isBookmarked ? themeConfig.colors.primary : themeConfig.colors.textMuted }} /></button>
+        <button onClick={() => void sharePost()} aria-label="مشاركة المنشور"><Share2 size={16} style={{ color: themeConfig.colors.textMuted }} /></button>
       </div>
     </motion.div>
   );

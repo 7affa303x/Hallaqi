@@ -4,6 +4,7 @@ import { useApp } from '@/contexts/useApp';
 import { barberTags, serviceCategories } from '@/data/mockData';
 import { SkeletonBarberCard } from '@/components/Skeleton';
 import EmptyState from '@/components/EmptyState';
+import BrandLogo from '@/components/BrandLogo';
 import { motion } from 'framer-motion';
 import type { BarberTag, ServiceCategory } from '@/types';
 import { rankBarberRecommendations } from '@/lib/recommendations';
@@ -92,7 +93,7 @@ export default function BookingTab() {
         {/* Logo Row */}
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <img src="/logo-symbol.png" alt="Hallaqi" className="w-8 h-8 rounded-lg" />
+            <BrandLogo className="w-9 h-9 shadow-sm" priority />
             <div>
               <h1 className="text-lg font-bold leading-tight" style={{ color: themeConfig.colors.text }}>HALLAQI</h1>
               <p className="text-[10px]" style={{ color: themeConfig.colors.textMuted }}>حلاقي</p>

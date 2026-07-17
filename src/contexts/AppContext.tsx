@@ -288,6 +288,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => { setSettings(p => ({ ...p, language: globalLanguage })); }, [globalLanguage]);
 
+  useEffect(() => {
+    const root = document.documentElement;
+    root.dataset.fontSize = settings.accessibility.fontSize;
+    root.classList.toggle('hallaqi-high-contrast', settings.accessibility.highContrast);
+    root.classList.toggle('hallaqi-reduce-motion', settings.accessibility.reduceMotion);
+    root.lang = settings.language;
+    root.dir = settings.language === 'ar' ? 'rtl' : 'ltr';
+  }, [settings.accessibility, settings.language]);
+
   const updateSettings = useCallback((newSettings: Partial<AppSettings>) => {
     setSettings(prev => {
       const updated = { ...prev, ...newSettings };

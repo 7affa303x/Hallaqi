@@ -25,6 +25,9 @@ export default function CameraTab() {
   const [cameraError, setCameraError] = useState('');
 
   const selectedBarber = barbers.find(b => b.id === selectedBarberId);
+  const canonicalBarberUrl = selectedBarber
+    ? `https://www.hallaqi.app/barber/${selectedBarber.id}`
+    : '';
 
   useEffect(() => {
     if (!selectedBarberId && barbers[0]) setSelectedBarberId(barbers[0].id);
@@ -110,7 +113,7 @@ export default function CameraTab() {
     ? JSON.stringify({
         id: selectedBarber.id,
         name: selectedBarber.name,
-        url: `${window.location.origin}/barber/${selectedBarber.id}`,
+        url: canonicalBarberUrl,
         timestamp: Date.now(),
       })
     : '';
@@ -121,7 +124,7 @@ export default function CameraTab() {
 
   const shareQr = async () => {
     if (!selectedBarber) return;
-    const url = `${window.location.origin}/barber/${selectedBarber.id}`;
+    const url = canonicalBarberUrl;
     if (navigator.share) await navigator.share({ title: selectedBarber.name, url });
     else await navigator.clipboard.writeText(url);
   };
@@ -226,7 +229,7 @@ export default function CameraTab() {
             {/* Actions */}
             <div className="flex gap-3 mt-6">
               <button
-                onClick={() => copyToClipboard(qrData)}
+                onClick={() => copyToClipboard(canonicalBarberUrl)}
                 className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold"
                 style={{ backgroundColor: themeConfig.colors.primary + '10', color: themeConfig.colors.primary }}
               >
@@ -348,7 +351,7 @@ export default function CameraTab() {
         </div>
 
         {/* Action Buttons */}
-        <div className="flex items-center justify-center gap-8">
+        {mode !== 'generator' && <div className="flex items-center justify-center gap-8">
           <motion.button
             whileTap={{ scale: 0.85 }}
             onClick={() => void toggleFlash()}
@@ -386,7 +389,7 @@ export default function CameraTab() {
           >
             <FlipHorizontal size={22} className="text-white" />
           </motion.button>
-        </div>
+        </div>}
 
         {/* Barber Selector for Generator Mode */}
         {mode === 'generator' && (

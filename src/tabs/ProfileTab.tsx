@@ -3,7 +3,7 @@ import type { LucideIcon } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useApp } from '@/contexts/useApp';
 import { settingsSections } from '@/data/mockData';
-import type { ThemeName, AnimationStyle, LinkedAccount, User } from '@/types';
+import type { ThemeName, AnimationStyle } from '@/types';
 import { themes, animationStyles } from '@/data/themes';
 import {
   User as UserIcon, Shield, BadgeCheck, Crown, Settings, ChevronLeft,
@@ -30,6 +30,7 @@ import {
   redeemLoyaltyReward,
 } from '@/supabase/database';
 import { uploadIdCard } from '@/supabase/storage';
+import { supabase } from '@/supabase/client';
 import type { SubscriptionPlan } from '@/types/supabase-aliases';
 
 interface UserStats {
@@ -58,13 +59,23 @@ const iconMap: Record<string, LucideIcon> = {
 
 type ProfileSubPage = 'main' | 'theme' | 'animation' | 'language' | 'notifications' |
   'privacy' | 'account' | 'subscription' | 'payment' | 'id-verification' |
-  'linked-accounts' | 'help' | 'about' | 'badges' | 'stats' | 'edit-profile' | 'services' | 'loyalty';
+  'linked-accounts' | 'help' | 'about' | 'badges' | 'stats' | 'edit-profile' | 'services' | 'loyalty' |
+  'accessibility' | 'privacy-policy' | 'terms' | 'licenses';
 
 export default function ProfileTab() {
-  const { themeConfig, navigate, unreadCount } = useApp();
+  const { themeConfig, navigate, unreadCount, bookings, barbers } = useApp();
   const { isAuthenticated, appUser, user, logout, isLoading: authLoading } = useAuth();
   const [subPage, setSubPage] = useState<ProfileSubPage>('main');
   const [actionError, setActionError] = useState('');
+  const [actionMessage, setActionMessage] = useState('');
+  const [loyaltySummary, setLoyaltySummary] = useState<{ points: number; tier: string }>({ points: 0, tier: 'bronze' });
+
+  useEffect(() => {
+    if (!appUser) return;
+    void getLoyaltyDashboard(appUser.id).then(data => {
+      setLoyaltySummary({ points: data.account?.points || 0, tier: data.account?.tier || 'bronze' });
+    }).catch(() => {});
+  }, [appUser]);
 
   const handleLogout = async () => {
     try { await logout(); setSubPage('main'); } catch (err) { console.error('Logout error:', err); }
@@ -107,7 +118,7 @@ export default function ProfileTab() {
   const userPhone = appUser?.phone_number || '';
   const userAvatar = appUser?.avatar_url || '/logo-icon.png';
   const isVerified = appUser?.verification_status === 'verified' || appUser?.verification_status === 'premium';
-  const isIdVerified = false; // Not in profiles table
+  const isIdVerified = isVerified;
   const userRole = appUser?.user_role || 'client';
 
   if (subPage === 'theme') return <ThemeSelector onBack={() => setSubPage('main')} />;
@@ -124,12 +135,23 @@ export default function ProfileTab() {
   if (subPage === 'help') return <InformationPage onBack={() => setSubPage('main')} kind="help" />;
   if (subPage === 'about') return <InformationPage onBack={() => setSubPage('main')} kind="about" />;
   if (subPage === 'loyalty') return <LoyaltyPage onBack={() => setSubPage('main')} />;
+  if (subPage === 'accessibility') return <AccessibilitySettings onBack={() => setSubPage('main')} />;
+  if (subPage === 'privacy-policy') return <LegalPage onBack={() => setSubPage('main')} kind="privacy" />;
+  if (subPage === 'terms') return <LegalPage onBack={() => setSubPage('main')} kind="terms" />;
+  if (subPage === 'licenses') return <LegalPage onBack={() => setSubPage('main')} kind="licenses" />;
   if (subPage === 'edit-profile') return <EditBarberProfile onBack={() => setSubPage('main')} userRole={userRole} />;
   if (subPage === 'services') return <ServicesManagement onBack={() => setSubPage('main')} />;
 
-  const stats = (appUser as unknown as { stats?: UserStats })?.stats || { totalBookings: 0, totalSpent: 0, streakDays: 0, points: 0, rank: 'جديد' };
+  const storedStats = (appUser as unknown as { stats?: UserStats })?.stats;
+  const stats = {
+    totalBookings: bookings.length,
+    totalSpent: bookings.filter(booking => booking.status === 'completed').reduce((sum, booking) => sum + booking.totalPrice, 0),
+    streakDays: storedStats?.streakDays || 0,
+    points: loyaltySummary.points,
+    rank: ({ bronze: 'برونزي', silver: 'فضي', gold: 'ذهبي', platinum: 'بلاتيني' } as Record<string, string>)[loyaltySummary.tier] || 'برونزي',
+  };
   const badges = (appUser as unknown as { badges?: UserBadge[] })?.badges || [];
-  const followers = 0; // Not in profiles table
+  const followers = barbers.find(barber => barber.id === appUser?.id)?.followers || 0;
 
   return (
     <div className="pb-20">
@@ -226,6 +248,11 @@ export default function ProfileTab() {
           {actionError}
         </p>
       )}
+      {actionMessage && (
+        <p role="status" className="mx-4 mt-4 p-3 rounded-xl text-xs" style={{ backgroundColor: themeConfig.colors.success + '10', color: themeConfig.colors.success }}>
+          {actionMessage}
+        </p>
+      )}
 
       <div className="px-4 mt-4 space-y-4">
         {settingsSections.map(section => (
@@ -238,12 +265,14 @@ export default function ProfileTab() {
                 const isLast = index === section.items.length - 1;
                 const handleClick = async () => {
                   setActionError('');
+                  setActionMessage('');
                   if (item.id === 'logout') { handleLogout(); return; }
                   if (item.id === 'clearCache') {
                     if ('caches' in window) {
                       const keys = await caches.keys();
                       await Promise.all(keys.map(key => caches.delete(key)));
                     }
+                    setActionMessage('تم مسح الذاكرة المؤقتة بنجاح');
                     return;
                   }
                   if (item.id === 'exportData' && appUser) {
@@ -274,7 +303,21 @@ export default function ProfileTab() {
                     }
                     return;
                   }
-                  const pageMap: Record<string, ProfileSubPage> = { theme: 'theme', animation: 'animation', language: 'language', notifications: 'notifications', privacy: 'privacy', subscription: 'subscription', paymentMethods: 'payment', baridiMob: 'payment', idVerification: 'id-verification', linkedAccounts: 'linked-accounts', helpCenter: 'help', aboutApp: 'about', services: 'services' };
+                  if (item.id === 'changePassword') { navigate('forgot-password'); return; }
+                  if (item.id === 'contactUs') { window.location.href = 'mailto:support@hallaqi.app'; return; }
+                  if (item.id === 'reportBug') { window.location.href = 'mailto:support@hallaqi.app?subject=Hallaqi%20Bug%20Report'; return; }
+                  if (item.id === 'featureRequest') { window.location.href = 'mailto:support@hallaqi.app?subject=Hallaqi%20Feature%20Request'; return; }
+                  if (item.id === 'twoFactor') { setActionMessage('المصادقة الثنائية ستُفعّل من صفحة أمان الحساب في التحديث القادم'); return; }
+                  const pageMap: Record<string, ProfileSubPage> = {
+                    theme: 'theme', animation: 'animation', language: 'language', fontSize: 'accessibility',
+                    pushNotifications: 'notifications', emailNotifications: 'notifications', smsNotifications: 'notifications',
+                    bookingReminders: 'notifications', promotions: 'notifications', forumReplies: 'notifications',
+                    competitionUpdates: 'notifications', newFollowers: 'notifications',
+                    profileVisible: 'privacy', showLocation: 'privacy', showBookings: 'privacy', allowMessages: 'privacy', blockList: 'privacy',
+                    editProfile: 'edit-profile', subscription: 'subscription', paymentMethods: 'payment', baridiMob: 'payment',
+                    idVerification: 'id-verification', linkedAccounts: 'linked-accounts', helpCenter: 'help', aboutApp: 'about',
+                    services: 'services', privacyPolicy: 'privacy-policy', termsOfService: 'terms', licenses: 'licenses',
+                  };
                   const page = pageMap[item.id]; if (page) setSubPage(page);
                 };
                 return (
@@ -301,6 +344,91 @@ export default function ProfileTab() {
 // ====== SUB PAGE COMPONENTS ======
 
 type LoyaltyData = Awaited<ReturnType<typeof getLoyaltyDashboard>>;
+
+function AccessibilitySettings({ onBack }: { onBack: () => void }) {
+  const { themeConfig, settings, updateSettings } = useApp();
+  return (
+    <div className="pb-20">
+      <div className="sticky top-0 z-30 flex items-center gap-3 px-4 py-3 border-b" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
+        <button onClick={onBack} aria-label="رجوع" className="w-9 h-9 rounded-xl flex items-center justify-center"><ArrowLeft size={20} style={{ color: themeConfig.colors.text }} /></button>
+        <h2 className="text-base font-bold" style={{ color: themeConfig.colors.text }}>سهولة الاستخدام</h2>
+      </div>
+      <div className="p-4 space-y-4">
+        <div className="rounded-2xl border p-4" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
+          <p className="text-xs font-bold mb-3" style={{ color: themeConfig.colors.text }}>حجم الخط</p>
+          <div className="grid grid-cols-3 gap-2">
+            {([
+              ['small', 'صغير'],
+              ['medium', 'متوسط'],
+              ['large', 'كبير'],
+            ] as const).map(([value, label]) => (
+              <button key={value} onClick={() => updateSettings({ accessibility: { ...settings.accessibility, fontSize: value } })} className="h-10 rounded-xl text-xs font-bold" style={{ backgroundColor: settings.accessibility.fontSize === value ? themeConfig.colors.primary : themeConfig.colors.background, color: settings.accessibility.fontSize === value ? '#fff' : themeConfig.colors.text }}>{label}</button>
+            ))}
+          </div>
+        </div>
+        {([
+          ['highContrast', 'تباين مرتفع', 'ألوان أوضح للنصوص والعناصر'],
+          ['reduceMotion', 'تقليل الحركة', 'تقليل الانتقالات والمؤثرات'],
+          ['screenReader', 'تحسين قارئ الشاشة', 'إضافة وصف موسع للعناصر'],
+        ] as const).map(([key, label, description]) => {
+          const enabled = settings.accessibility[key];
+          return (
+            <div key={key} className="rounded-2xl border p-4 flex items-center gap-3" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
+              <div className="flex-1"><p className="text-xs font-bold" style={{ color: themeConfig.colors.text }}>{label}</p><p className="text-[10px]" style={{ color: themeConfig.colors.textMuted }}>{description}</p></div>
+              <button role="switch" aria-checked={enabled} onClick={() => updateSettings({ accessibility: { ...settings.accessibility, [key]: !enabled } })} className="w-12 h-7 rounded-full relative" style={{ backgroundColor: enabled ? themeConfig.colors.primary : themeConfig.colors.border }}><span className="absolute top-0.5 w-6 h-6 rounded-full bg-white shadow transition-all" style={{ right: enabled ? '2px' : '22px' }} /></button>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function LegalPage({ onBack, kind }: { onBack: () => void; kind: 'privacy' | 'terms' | 'licenses' }) {
+  const { themeConfig } = useApp();
+  const content = {
+    privacy: {
+      title: 'سياسة الخصوصية',
+      sections: [
+        ['البيانات التي نجمعها', 'بيانات الحساب والحجوزات والموقع الاختياري وملفات الدفع أو الهوية التي يرفعها المستخدم.'],
+        ['كيفية الاستخدام', 'نستخدم البيانات لتشغيل الحجز والدفع والتواصل ومنع الاحتيال وتحسين Hallaqi.'],
+        ['حقوقك', 'يمكنك تصدير بياناتك أو حذف حسابك من الإعدادات. وثائق الهوية وإيصالات الدفع خاصة ولا تظهر للعامة.'],
+      ],
+    },
+    terms: {
+      title: 'شروط الاستخدام',
+      sections: [
+        ['الحجوزات', 'يلتزم العميل بمعلومات صحيحة، ويلتزم الحلاق بتحديث التوفر والخدمات والأسعار.'],
+        ['المدفوعات', 'الدفع الإلكتروني أو اليدوي يخضع للتحقق. لا يُعد الإيصال قبولاً نهائياً حتى اعتماده.'],
+        ['السلوك', 'يُمنع الاحتيال والتحرش والمحتوى المضلل، ويحق للإدارة تعليق الحساب عند المخالفة.'],
+      ],
+    },
+    licenses: {
+      title: 'التراخيص مفتوحة المصدر',
+      sections: [
+        ['التقنيات', 'React وVite وSupabase وTailwind CSS وLucide وVercel AI SDK ومكتباتها وفق تراخيصها الأصلية.'],
+        ['العلامة', 'اسم وشعار Hallaqi وأصوله البصرية ملك للمنتج ولا تشملها تراخيص مكتبات البرمجيات.'],
+      ],
+    },
+  }[kind];
+  return (
+    <div className="pb-20">
+      <div className="sticky top-0 z-30 flex items-center gap-3 px-4 py-3 border-b" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
+        <button onClick={onBack} aria-label="رجوع" className="w-9 h-9 rounded-xl flex items-center justify-center"><ArrowLeft size={20} style={{ color: themeConfig.colors.text }} /></button>
+        <h2 className="text-base font-bold" style={{ color: themeConfig.colors.text }}>{content.title}</h2>
+      </div>
+      <div className="p-4 space-y-3">
+        {content.sections.map(([title, text]) => (
+          <section key={title} className="rounded-2xl border p-4" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
+            <h3 className="text-sm font-bold" style={{ color: themeConfig.colors.text }}>{title}</h3>
+            <p className="text-xs leading-6 mt-2" style={{ color: themeConfig.colors.textMuted }}>{text}</p>
+          </section>
+        ))}
+        <p className="text-[10px] text-center" style={{ color: themeConfig.colors.textMuted }}>آخر تحديث: يوليو 2026</p>
+      </div>
+    </div>
+  );
+}
 
 function LoyaltyPage({ onBack }: { onBack: () => void }) {
   const { themeConfig } = useApp();
@@ -748,8 +876,30 @@ function IDVerification({ onBack }: { onBack: () => void }) {
 }
 
 function LinkedAccounts({ onBack }: { onBack: () => void }) {
-  const { themeConfig, currentUser } = useApp();
+  const { themeConfig } = useApp();
+  const { user, googleSignIn } = useAuth();
+  const [error, setError] = useState('');
   const providers = [{ key: 'google', name: 'Google', color: '#EF4444' }, { key: 'facebook', name: 'Facebook', color: '#3B82F6' }, { key: 'apple', name: 'Apple', color: '#1F1F1F' }, { key: 'instagram', name: 'Instagram', color: '#EC4899' }];
+  const googleIdentity = user?.identities?.find(identity => identity.provider === 'google');
+
+  const handleGoogle = async () => {
+    setError('');
+    try {
+      if (googleIdentity) {
+        if ((user?.identities?.length || 0) <= 1) {
+          setError('لا يمكن فصل طريقة تسجيل الدخول الوحيدة للحساب');
+          return;
+        }
+        const { error: unlinkError } = await supabase.auth.unlinkIdentity(googleIdentity);
+        if (unlinkError) throw unlinkError;
+      } else {
+        await googleSignIn();
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'تعذر تحديث الحساب المرتبط');
+    }
+  };
+
   return (
     <div className="pb-20">
       <div className="sticky top-0 z-30 flex items-center gap-3 px-4 py-3 backdrop-blur-lg border-b" style={{ backgroundColor: `${themeConfig.colors.background}ee`, borderColor: themeConfig.colors.border }}>
@@ -757,13 +907,15 @@ function LinkedAccounts({ onBack }: { onBack: () => void }) {
         <h2 className="text-base font-bold" style={{ color: themeConfig.colors.text }}>الحسابات المرتبطة</h2>
       </div>
       <div className="px-4 mt-4 space-y-2">
-        {providers.map(provider => { const account = (currentUser as User)?.linkedAccounts?.find((a: LinkedAccount) => a.provider === provider.key); return (
+        {providers.map(provider => { const connected = provider.key === 'google' && !!googleIdentity; return (
           <div key={provider.key} className="flex items-center gap-3 p-3 rounded-2xl border" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
             <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: provider.color + '15' }}><LinkIcon size={20} style={{ color: provider.color }} /></div>
-            <div className="flex-1"><p className="text-sm font-bold" style={{ color: themeConfig.colors.text }}>{provider.name}</p><p className="text-[10px]" style={{ color: themeConfig.colors.textMuted }}>{account?.connected ? account.username || 'متصل' : 'غير متصل'}</p></div>
-            <button className="px-3 py-1.5 rounded-xl text-xs font-bold transition-all" style={{ backgroundColor: account?.connected ? themeConfig.colors.error + '10' : themeConfig.colors.primary, color: account?.connected ? themeConfig.colors.error : '#fff' }}>{account?.connected ? 'فصل' : 'ربط'}</button>
+            <div className="flex-1"><p className="text-sm font-bold" style={{ color: themeConfig.colors.text }}>{provider.name}</p><p className="text-[10px]" style={{ color: themeConfig.colors.textMuted }}>{connected ? user?.email || 'متصل' : provider.key === 'google' ? 'غير متصل' : 'قريباً'}</p></div>
+            <button disabled={provider.key !== 'google'} onClick={() => provider.key === 'google' && void handleGoogle()} className="px-3 py-1.5 rounded-xl text-xs font-bold transition-all disabled:opacity-45" style={{ backgroundColor: connected ? themeConfig.colors.error + '10' : themeConfig.colors.primary, color: connected ? themeConfig.colors.error : '#fff' }}>{provider.key !== 'google' ? 'قريباً' : connected ? 'فصل' : 'ربط'}</button>
           </div>
-        ); })}</div>
+        ); })}
+        {error && <p role="alert" className="text-xs p-3 rounded-xl" style={{ backgroundColor: themeConfig.colors.error + '10', color: themeConfig.colors.error }}>{error}</p>}
+      </div>
     </div>
   );
 }

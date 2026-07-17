@@ -132,7 +132,7 @@ export function transformToBarber(professional: RawProfessional): Barber {
     id: professional.id,
     name: professional.business_name || profile?.full_name || 'Unknown Barber',
     avatar: profile?.avatar_url || '/logo-icon.png',
-    coverImage: professional.cover_image_url || '/placeholder-cover.jpg',
+    coverImage: professional.cover_image_url || '/logo-wordmark.png',
     rating: professional.average_rating || 0,
     reviewCount: professional.review_count || 0,
     location: professional.business_address || profile?.city || 'Unknown Location',

@@ -7,6 +7,7 @@ import { isDeveloperMode } from '@/supabase/client';
 
 import ErrorBoundary from '@/components/ErrorBoundary';
 import BottomNav from '@/components/BottomNav';
+import BrandLogo from '@/components/BrandLogo';
 import BookingTab from '@/tabs/BookingTab';
 import './App.css';
 
@@ -162,7 +163,7 @@ function AppContent() {
     return (
       <div className="min-h-screen anim-modern flex items-center justify-center" style={{ ...cssVars, backgroundColor: themeConfig.colors.background }}>
         <div className="flex flex-col items-center gap-4">
-          <img src="/logo-icon.png" alt="Hallaqi" className="w-20 h-20 rounded-2xl animate-pulse" />
+          <BrandLogo variant="icon" className="w-20 h-20 rounded-2xl animate-pulse shadow-lg" priority />
           <p className="text-sm font-medium" style={{ color: themeConfig.colors.textMuted }}>جاري التحميل...</p>
         </div>
       </div>

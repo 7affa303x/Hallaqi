@@ -13,10 +13,12 @@ import {
   getProfessionalSchedules,
   getProfessionalExceptions,
   getPortfolioItems,
+  getOrCreateConversation,
   reportProfessional,
 } from '@/supabase/database';
 import type { PortfolioItem } from '@/types/supabase-aliases';
 import type { Barber } from '@/types';
+import BrandLogo from '@/components/BrandLogo';
 
 // Saturday=0, Sunday=1, Monday=2, Tuesday=3, Wednesday=4, Thursday=5, Friday=6
 const daysArSchedule = ['السبت', 'الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة'];
@@ -36,8 +38,8 @@ function viewOnMap(location: string, wilaya: string) {
 }
 
 export default function BarberDetailPage() {
-  const { themeConfig, screenParams, navigate, goBack } = useApp();
-  const { appUser } = useAuth();
+  const { themeConfig, screenParams, navigate, goBack, barbers, toggleFollow } = useApp();
+  const { appUser, isAuthenticated } = useAuth();
   const [activeSection, setActiveSection] = useState<'services' | 'reviews' | 'portfolio' | 'hours'>('services');
   const [portfolioItems, setPortfolioItems] = useState<PortfolioItem[]>([]);
   const [loadingPortfolio, setLoadingPortfolio] = useState(false);
@@ -49,7 +51,6 @@ export default function BarberDetailPage() {
   const [availabilitySchedule, setAvailabilitySchedule] = useState<Array<{ day_of_week: number; start_time: string; end_time: string; is_active: boolean }>>([]);
   const [availabilityExceptions, setAvailabilityExceptions] = useState<Array<{ date: string; type: string; reason: string }>>([]);
 
-  const { barbers } = useApp();
   const listedBarber = barbers.find(b => b.id === screenParams?.barberId);
   const [barber, setBarber] = useState<Barber | undefined>(listedBarber);
 
@@ -100,7 +101,7 @@ export default function BarberDetailPage() {
   if (!barber) {
     return (
       <div className="h-screen flex flex-col items-center justify-center" style={{ backgroundColor: themeConfig.colors.background }}>
-        <img src="/logo-icon.png" alt="Hallaqi" className="w-16 h-16 mb-4 opacity-30" />
+          <BrandLogo variant="icon" className="w-16 h-16 mb-4 opacity-60" />
         <p className="text-sm font-medium" style={{ color: themeConfig.colors.textMuted }}>المختص غير موجود</p>
         <button onClick={goBack} className="mt-4 px-4 py-2 rounded-xl text-xs font-bold text-white" style={{ backgroundColor: themeConfig.colors.primary }}>رجوع</button>
       </div>
@@ -131,6 +132,46 @@ export default function BarberDetailPage() {
     }
   };
 
+  const shareBarber = async () => {
+    const url = `${window.location.origin}/barber/${barber.id}`;
+    try {
+      if (navigator.share) await navigator.share({ title: barber.name, text: `احجز مع ${barber.name} عبر Hallaqi`, url });
+      else await navigator.clipboard.writeText(url);
+    } catch {
+      // The native share sheet may be dismissed by the user.
+    }
+  };
+
+  const startChat = async () => {
+    if (!appUser) {
+      navigate('login', { redirectScreen: 'barber-detail', barberId: barber.id });
+      return;
+    }
+    try {
+      const conversationId = await getOrCreateConversation(appUser.id, barber.id);
+      navigate('chat-room', {
+        conversationId,
+        participantId: barber.id,
+        participantName: barber.name,
+        participantAvatar: barber.avatar,
+      });
+    } catch {
+      // Chat errors are surfaced by the destination flow on retry.
+    }
+  };
+
+  const bookNow = () => {
+    if (!isAuthenticated) {
+      navigate('login', { redirectScreen: 'booking-flow', barberId: barber.id });
+      return;
+    }
+    navigate('booking-flow', { barberId: barber.id });
+  };
+
+  const mapSrc = barber.coordinates
+    ? `https://www.openstreetmap.org/export/embed.html?bbox=${barber.coordinates.lng - 0.03}%2C${barber.coordinates.lat - 0.02}%2C${barber.coordinates.lng + 0.03}%2C${barber.coordinates.lat + 0.02}&layer=mapnik&marker=${barber.coordinates.lat}%2C${barber.coordinates.lng}`
+    : null;
+
   return (
     <motion.div initial={{ opacity: 0, x: 300 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 300 }}
       transition={{ type: 'spring', damping: 25, stiffness: 200 }}
@@ -148,11 +189,11 @@ export default function BarberDetailPage() {
             <button onClick={() => setShowReport(true)} className="w-10 h-10 rounded-full bg-black/30 backdrop-blur-md flex items-center justify-center">
               <AlertTriangle size={18} className="text-white" />
             </button>
-            <button className="w-10 h-10 rounded-full bg-black/30 backdrop-blur-md flex items-center justify-center">
+            <button onClick={() => void shareBarber()} aria-label="مشاركة ملف الحلاق" className="w-10 h-10 rounded-full bg-black/30 backdrop-blur-md flex items-center justify-center">
               <Share2 size={18} className="text-white" />
             </button>
-            <button className="w-10 h-10 rounded-full bg-black/30 backdrop-blur-md flex items-center justify-center">
-              <Heart size={18} className="text-white" />
+            <button onClick={() => void toggleFollow(barber.id)} aria-label={barber.isFollowing ? 'إزالة من المفضلة' : 'إضافة إلى المفضلة'} className="w-10 h-10 rounded-full bg-black/30 backdrop-blur-md flex items-center justify-center">
+              <Heart size={18} className={barber.isFollowing ? 'fill-red-500 text-red-500' : 'text-white'} />
             </button>
           </div>
         </div>
@@ -217,18 +258,18 @@ export default function BarberDetailPage() {
 
       {/* === QUICK ACTIONS === */}
       <div className="px-4 mt-4 flex gap-2">
-        <button onClick={() => navigate('booking-flow', { barberId: barber.id })}
+        <button onClick={bookNow}
           className="flex-1 h-12 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2" style={{ backgroundColor: themeConfig.colors.primary }}>
           <Calendar size={18} /> احجز موعداً
         </button>
         <button onClick={() => setShowQR(true)}
           className="h-12 w-12 rounded-xl border flex items-center justify-center" style={{ borderColor: themeConfig.colors.border, color: themeConfig.colors.text }}>
-          <img src="/logo-symbol.png" alt="QR" className="w-5 h-5" />
+          <BrandLogo className="w-6 h-6" />
         </button>
-        <button className="h-12 w-12 rounded-xl border flex items-center justify-center" style={{ borderColor: themeConfig.colors.border, color: themeConfig.colors.text }}>
+        <button onClick={() => barber.phone && (window.location.href = `tel:${barber.phone}`)} disabled={!barber.phone} aria-label="الاتصال بالحلاق" className="h-12 w-12 rounded-xl border flex items-center justify-center disabled:opacity-40" style={{ borderColor: themeConfig.colors.border, color: themeConfig.colors.text }}>
           <Phone size={18} />
         </button>
-        <button className="h-12 w-12 rounded-xl border flex items-center justify-center" style={{ borderColor: themeConfig.colors.border, color: themeConfig.colors.text }}>
+        <button onClick={() => void startChat()} aria-label="مراسلة الحلاق" className="h-12 w-12 rounded-xl border flex items-center justify-center" style={{ borderColor: themeConfig.colors.border, color: themeConfig.colors.text }}>
           <MessageSquare size={18} />
         </button>
       </div>
@@ -238,11 +279,11 @@ export default function BarberDetailPage() {
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-6" onClick={() => setShowQR(false)}>
           <motion.div initial={{ scale: 0.8 }} animate={{ scale: 1 }} className="p-6 rounded-3xl bg-white max-w-xs w-full text-center" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-center gap-2 mb-4">
-              <img src="/logo-symbol.png" alt="Hallaqi" className="w-6 h-6" />
+              <BrandLogo className="w-7 h-7" />
               <span className="text-sm font-bold" style={{ color: themeConfig.colors.primary }}>HALLAQI</span>
             </div>
             <div className="p-3 rounded-2xl inline-block" style={{ backgroundColor: themeConfig.colors.background }}>
-              <QRCodeSVG value={`https://hallaqi.app/barber/${barber.id}`} size={180} bgColor="#FFFFFF" fgColor={themeConfig.colors.primary} level="H"
+              <QRCodeSVG value={`https://www.hallaqi.app/barber/${barber.id}`} size={180} bgColor="#FFFFFF" fgColor={themeConfig.colors.primary} level="H"
                 imageSettings={{ src: '/logo-symbol.png', height: 36, width: 36, excavate: true }} />
             </div>
             <h3 className="text-base font-bold mt-3" style={{ color: themeConfig.colors.text }}>{barber.name}</h3>
@@ -299,9 +340,15 @@ export default function BarberDetailPage() {
             <Navigation size={10} /> {barber.distance}
           </span>
         </div>
-        <div className="relative rounded-2xl overflow-hidden border aspect-[2/1]" style={{ borderColor: themeConfig.colors.border }}>
-          <iframe title={`خريطة ${barber.name}`} width="100%" height="100%" style={{ border: 0, minHeight: '160px' }} loading="lazy" allowFullScreen referrerPolicy="no-referrer-when-downgrade"
-            src={`https://www.openstreetmap.org/export/embed.html?bbox=2.9%2C36.68%2C3.25%2C36.85&layer=mapnik&marker=36.7538%2C3.0588`} />
+        <div className="relative rounded-2xl overflow-hidden border aspect-[2/1] flex items-center justify-center" style={{ borderColor: themeConfig.colors.border, backgroundColor: themeConfig.colors.surface }}>
+          {mapSrc ? (
+            <iframe title={`خريطة ${barber.name}`} width="100%" height="100%" style={{ border: 0, minHeight: '160px' }} loading="lazy" allowFullScreen referrerPolicy="no-referrer-when-downgrade" src={mapSrc} />
+          ) : (
+            <div className="text-center px-4">
+              <MapPin size={28} className="mx-auto mb-2" style={{ color: themeConfig.colors.primary }} />
+              <p className="text-xs" style={{ color: themeConfig.colors.textMuted }}>الإحداثيات غير مضافة بعد؛ استخدم زر الخريطة للبحث بالعنوان.</p>
+            </div>
+          )}
           <div className="absolute bottom-2 left-2 px-2 py-1 rounded-lg bg-white/90 backdrop-blur text-[10px] font-medium shadow-sm" style={{ color: themeConfig.colors.text }}>
             <MapPin size={10} className="inline ml-1" />{barber.location}, {barber.wilaya}
           </div>

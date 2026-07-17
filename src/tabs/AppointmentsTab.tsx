@@ -3,6 +3,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useApp } from '@/contexts/useApp';
 import { SkeletonBookingCard } from '@/components/Skeleton';
 import EmptyState from '@/components/EmptyState';
+import BrandLogo from '@/components/BrandLogo';
 import { motion } from 'framer-motion';
 import type { Booking, BookingStatus } from '@/types';
 import type { Database } from '@/types/supabase';
@@ -57,7 +58,7 @@ function openDirections(location: string) {
 }
 
 export default function AppointmentsTab() {
-  const { bookings, themeConfig, cancelBooking, navigate, isLoading, refreshData } = useApp();
+  const { bookings, themeConfig, cancelBooking, navigate, setActiveTab, isLoading, refreshData } = useApp();
   const { isAuthenticated, appUser } = useAuth();
   const [activeFilter, setActiveFilter] = useState('upcoming');
   const [reviewBooking, setReviewBooking] = useState<Booking | null>(null);
@@ -147,7 +148,7 @@ export default function AppointmentsTab() {
       {/* Header */}
       <div className="sticky top-0 z-30 px-4 pt-3 pb-3 backdrop-blur-lg" style={{ backgroundColor: `${themeConfig.colors.background}ee` }}>
         <div className="flex items-center gap-2 mb-3">
-          <img src="/logo-symbol.png" alt="Hallaqi" className="w-8 h-8 rounded-lg" />
+          <BrandLogo className="w-9 h-9 shadow-sm" priority />
           <div>
             <h1 className="text-lg font-bold leading-tight" style={{ color: themeConfig.colors.text }}>مواعيدي</h1>
             <p className="text-[10px]" style={{ color: themeConfig.colors.textMuted }}>إدارة حجوزاتك والتواصل</p>
@@ -290,6 +291,13 @@ export default function AppointmentsTab() {
                         <Star size={14} /> تقييم
                       </button>
                     )}
+                    {booking.status === 'completed' && (
+                      <button onClick={() => navigate('booking-flow', { barberId: booking.barberId })}
+                        className="flex-1 flex items-center justify-center gap-1.5 h-9 rounded-xl text-xs font-bold transition-all"
+                        style={{ backgroundColor: themeConfig.colors.primary + '10', color: themeConfig.colors.primary }}>
+                        <CalendarDays size={14} /> حجز مجدداً
+                      </button>
+                    )}
                     {booking.status === 'cancelled' && (
                       <button onClick={() => navigate('booking-flow', { barberId: booking.barberId })}
                         className="flex-1 flex items-center justify-center gap-1.5 h-9 rounded-xl text-xs font-bold transition-all"
@@ -311,7 +319,7 @@ export default function AppointmentsTab() {
           title={`لا توجد مواعيد ${activeFilter === 'upcoming' ? 'قادمة' : activeFilter === 'past' ? 'سابقة' : 'ملغية'}`}
           description={activeFilter === 'upcoming' ? 'احجز موعداً جديداً من صفحة الحجز' : 'ستظهر هنا عند وجودها'}
           actionLabel={activeFilter === 'upcoming' ? 'اكتشف الحلاقين' : undefined}
-          onAction={activeFilter === 'upcoming' ? () => navigate('home') : undefined}
+          onAction={activeFilter === 'upcoming' ? () => { setActiveTab('booking'); navigate('home'); } : undefined}
           themeConfig={themeConfig}
         />
       )}

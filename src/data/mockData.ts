@@ -476,7 +476,7 @@ export const settingsSections = [
   {
     title: 'حول',
     items: [
-      { id: 'aboutApp', label: 'عن التطبيق', icon: 'Info', description: 'BarberApp Dz v1.0.0', type: 'link' },
+      { id: 'aboutApp', label: 'عن التطبيق', icon: 'Info', description: 'Hallaqi v12 — العناية الشخصية الموثوقة', type: 'link' },
       { id: 'privacyPolicy', label: 'سياسة الخصوصية', icon: 'FileText', description: 'قراءة سياسة الخصوصية', type: 'link' },
       { id: 'termsOfService', label: 'شروط الاستخدام', icon: 'FileText', description: 'قراءة الشروط والأحكام', type: 'link' },
       { id: 'licenses', label: 'التراخيص', icon: 'FileCode', description: 'تراخيص مفتوحة المصدر', type: 'link' },
