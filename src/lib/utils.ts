@@ -150,7 +150,7 @@ export function transformToBarber(professional: RawProfessional): Barber {
     yearsOfExperience: professional.years_of_experience || 0,
     bio: professional.bio || 'No bio provided.',
     portfolio: portfolio.map((item: RawPortfolioItem) => (typeof item === 'string' ? item : item.url || '')).filter(Boolean),
-    phone: professional.business_phone || profile?.phone_number || undefined,
+    phone: professional.business_phone || undefined,
     hasIdCard: professional.has_id_card || false,
     idCardVerified: professional.id_card_verified || false,
     isSubscribed: professional.is_subscribed || false,

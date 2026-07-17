@@ -20,6 +20,9 @@ function guard(): void {
 
 export async function getProfile(userId: string): Promise<Profile | null> {
   guard();
+  const ownProfile = await supabase.rpc('get_own_profile');
+  if (!ownProfile.error) return ownProfile.data?.id === userId ? ownProfile.data : null;
+  // Safe rollout fallback: removed after the privacy migration is deployed.
   const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
   if (error) return null;
   return data;
@@ -33,14 +36,12 @@ type EditableProfile = Pick<
 
 export async function updateProfile(userId: string, updates: Partial<EditableProfile>) {
   guard();
-  const { data, error } = await supabase
+  const { error } = await supabase
     .from('profiles')
     .update({ ...updates, updated_at: new Date().toISOString() })
-    .eq('id', userId)
-    .select()
-    .single();
+    .eq('id', userId);
   if (error) throw new Error(error.message);
-  return data;
+  return getProfile(userId);
 }
 
 export async function exportUserData(userId: string) {
@@ -55,7 +56,7 @@ export async function exportUserData(userId: string) {
     forumPosts,
     forumComments,
   ] = await Promise.all([
-    supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
+    getProfile(userId),
     supabase.from('bookings').select('*').eq('client_id', userId),
     supabase.from('reviews').select('*').eq('reviewer_id', userId),
     supabase.from('favorites').select('*').eq('user_id', userId),
@@ -64,12 +65,12 @@ export async function exportUserData(userId: string) {
     supabase.from('forum_posts').select('*').eq('author_id', userId),
     supabase.from('forum_comments').select('*').eq('author_id', userId),
   ]);
-  const error = [profile, bookings, reviews, favorites, notifications, settings, forumPosts, forumComments]
+  const error = [bookings, reviews, favorites, notifications, settings, forumPosts, forumComments]
     .find(result => result.error)?.error;
   if (error) throw new Error(error.message);
   return {
     exported_at: new Date().toISOString(),
-    profile: profile.data,
+    profile,
     bookings: bookings.data || [],
     reviews: reviews.data || [],
     favorites: favorites.data || [],
@@ -96,7 +97,7 @@ export async function getProfessionals(filters?: { city?: string; search?: strin
   guard();
   let query = supabase
     .from('professionals')
-    .select('*, profiles(full_name, avatar_url, city, phone_number, user_role, verification_status), services(*), availability_schedules(*)')
+    .select('*, profiles(full_name, avatar_url, city, user_role, verification_status), services(*), availability_schedules(*)')
     .eq('is_active', true)
     .limit(50)
     .order('average_rating', { ascending: false });
@@ -114,7 +115,7 @@ export async function getProfessionalById(id: string) {
   guard();
   const { data, error } = await supabase
     .from('professionals')
-    .select('*, profiles(*), services(*), portfolio_items(*), availability_schedules(*), reviews(*, profiles!reviews_reviewer_id_fkey(full_name, avatar_url, user_role, verification_status))')
+    .select('*, profiles(id, username, full_name, avatar_url, website, city, country, user_role, user_status, verification_status, updated_at), services(*), portfolio_items(*), availability_schedules(*), reviews(*, profiles!reviews_reviewer_id_fkey(full_name, avatar_url, user_role, verification_status))')
     .eq('id', id)
     .single();
   if (error) return null;
@@ -143,7 +144,7 @@ export async function getProfessionalWithProfile(proId: string) {
   guard();
   const { data, error } = await supabase
     .from('professionals')
-    .select('id, business_name, profiles(full_name, phone_number)')
+    .select('id, business_name, profiles(full_name)')
     .eq('id', proId)
     .single();
   if (error) return null;
@@ -167,7 +168,7 @@ export async function getProfileById(userId: string) {
   guard();
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, full_name, avatar_url, phone_number')
+    .select('id, full_name, avatar_url')
     .eq('id', userId)
     .single();
   if (error) return null;
@@ -235,7 +236,7 @@ export async function getProfessionalBookings(proId: string, statusFilter?: (Dat
   guard();
   let query = supabase
     .from('bookings')
-    .select('*, profiles(*), services!bookings_service_id_fkey(*), booking_services(*, services!booking_services_service_id_fkey(*))')
+    .select('*, profiles(id, full_name, avatar_url, city, user_role, user_status, verification_status), services!bookings_service_id_fkey(*), booking_services(*, services!booking_services_service_id_fkey(*))')
     .eq('professional_id', proId)
     .order('booking_start_time', { ascending: false });
   if (statusFilter?.length) query = query.in('status', statusFilter);

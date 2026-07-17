@@ -1721,6 +1721,10 @@ export type Database = {
         Args: { user1_id: string; user2_id: string }
         Returns: string
       }
+      get_own_profile: {
+        Args: never
+        Returns: Database["public"]["Tables"]["profiles"]["Row"]
+      }
       get_professional_metrics: {
         Args: { professional: string }
         Returns: {

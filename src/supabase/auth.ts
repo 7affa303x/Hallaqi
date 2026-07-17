@@ -91,27 +91,23 @@ export async function resetPassword(email: string) {
 export async function fetchUserProfile(userId: string): Promise<Profile | null> {
   if (!isSupabaseConfigured()) return null;
 
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', userId)
-    .single();
-  if (error || !data) return null;
-  return data;
+  const ownProfile = await supabase.rpc('get_own_profile');
+  if (!ownProfile.error) return ownProfile.data?.id === userId ? ownProfile.data : null;
+  // Safe rollout fallback until the profile privacy migration is applied.
+  const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
+  return error ? null : data;
 }
 
 /* ========== UPDATE PROFILE ========== */
 export async function updateUserProfile(userId: string, updates: Partial<Profile>) {
   if (!isSupabaseConfigured()) throw new Error('Supabase غير مُعد');
 
-  const { data, error } = await supabase
+  const { error } = await supabase
     .from('profiles')
     .update({ ...updates, updated_at: new Date().toISOString() })
-    .eq('id', userId)
-    .select()
-    .single();
+    .eq('id', userId);
   if (error) throw new Error(getAuthErrorMessage(error));
-  return data;
+  return fetchUserProfile(userId);
 }
 
 export { supabase };
