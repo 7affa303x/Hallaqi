@@ -5,14 +5,15 @@
 ## Features
 
 - **Barber Discovery** — Search, filter, and browse barbers by location, rating, and services
-- **Online Booking** — Book appointments with real-time availability
-- **Forum** — Community discussions, tips, and competitions
+- **Online Booking** — Atomic multi-service appointments with real-time availability
+- **Forum** — Community discussions, likes, bookmarks, reports, and live competitions
 - **QR Code** — Generate and scan barber QR codes
 - **Smart Matching** — Explainable barber recommendations and optimized appointment times
 - **Loyalty** — Booking points, tiers, rewards, and redemption vouchers
 - **AI Advisor** — Secure AI Gateway-ready grooming and hairstyle assistance
 - **Authentication** — Email/password and Google OAuth via Supabase Auth
-- **Real-time** — Live notifications and chat
+- **Security** — Optional TOTP two-factor authentication and administrator AAL2
+- **Real-time** — Live in-app notifications, Web Push, and a conversation inbox
 - **Arabic Interface** — Full RTL Arabic support
 - **PWA** — Installable app shell with offline asset caching
 
@@ -83,6 +84,7 @@ npm run build      # Production build
 | `VITE_STRIPE_PUBLISHABLE_KEY` | For card payments | Stripe publishable key |
 | `VITE_CCP_ACCOUNT_NUMBER` | For manual payments | Approved merchant CCP account |
 | `VITE_CCP_CARD_NUMBER` | For manual payments | Approved merchant card number |
+| `VITE_VAPID_PUBLIC_KEY` | For Web Push | Public VAPID key; private key remains server-side |
 
 ## Scripts
 

@@ -1,5 +1,31 @@
 # Hallaqi Changelog
 
+## v12.1.0 — Product Completion & Growth
+
+### Customer Experience
+- Atomic multi-service bookings with trusted server prices, durations, overlap protection, rebooking, and loyalty vouchers
+- Geolocation distance sorting, wilaya filters, favorites discovery, actionable notifications, and a returning chat inbox
+- End-to-end Web Push with VAPID, deep links, preference sync, and expired-subscription cleanup
+- Arabic/French/English primary navigation plus working accessibility controls
+
+### Barber & Community
+- Working phone, chat, share, favorite, QR, and coordinate-aware map actions
+- Real forum sorting, bookmarks, comment likes, competitions, and participation
+- Professional onboarding score and lifecycle-derived response, acceptance, and completion metrics
+
+### Trust, Admin & Security
+- TOTP MFA with AAL2 enforcement for enrolled administrators
+- User block lists and database-enforced messaging preferences
+- Admin queues for subscriptions, reports, bookings, payments, reviews, and identity
+- CSP/HSTS/permissions headers, restricted Edge CORS, AI quotas, client-error intake, and CI
+
+### Platform
+- Rebuilt valid PNG/SVG branding and PWA icons
+- Dynamic sitemap and HairSalon structured data
+- Unified custom routing, lazy QR decoder, optimized assets, and Vercel funnel analytics
+
+---
+
 ## v12.0.0 — Verified Production Foundation
 
 ### Product

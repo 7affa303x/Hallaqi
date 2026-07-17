@@ -307,6 +307,13 @@ The production foundation migrations also provide:
 - `id_verification_requests` with administrator review RPC
 - `professional_reports`
 - `subscription_plans` and `subscription_requests`
+- `booking_services` and atomic multi-service booking RPC
+- `push_subscriptions` for browser Web Push
+- `booking_status_events` and professional response metrics
+- `competitions` and `competition_entries`
+- `user_blocks` and messaging privacy enforcement
+- `ai_usage_daily` with server-enforced quotas
+- loyalty voucher reservations and checkout discounts
 - database-level non-overlapping booking constraints
 - protected profile/review moderation fields
 - administrator booking, review, payment, report, and identity policies

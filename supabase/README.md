@@ -23,6 +23,16 @@ Supabase backend configuration for the official Hallaqi production project
 | `storage/policies.sql` | Legacy bootstrap policies; migrations are authoritative |
 | `functions/` | Secured payment, notification, webhook, and account functions |
 
+## Edge Function Secrets
+
+Configure private values with `supabase secrets set`, never in Vite variables:
+
+- `STRIPE_SECRET_KEY`
+- `STRIPE_WEBHOOK_SECRET` (required before enabling Stripe webhook completion)
+- `VAPID_SUBJECT`
+- `VAPID_PUBLIC_KEY`
+- `VAPID_PRIVATE_KEY`
+
 ## Environment Variables (Frontend)
 
 ```env

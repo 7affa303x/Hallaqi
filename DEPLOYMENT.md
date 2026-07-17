@@ -45,6 +45,7 @@ Add these in Project Settings → Environment Variables:
 VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_ANON_KEY=your-anon-key
 VITE_STRIPE_PUBLISHABLE_KEY=your-stripe-publishable-key
+VITE_VAPID_PUBLIC_KEY=your-vapid-public-key
 ```
 
 ### 2.3 Deploy
@@ -62,6 +63,9 @@ After deployment, verify:
 - [ ] Profile page loads
 - [ ] Cash booking completes and appears in appointments
 - [ ] Edge Functions reject unauthenticated calls
+- [ ] Web Push subscription persists and a test notification is delivered
+- [ ] TOTP enrollment/challenge works for an administrator test account
+- [ ] `/sitemap.xml` returns active barber and forum URLs
 - [ ] No console errors
 
 ## Local Development
