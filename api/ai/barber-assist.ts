@@ -1,4 +1,4 @@
-import { APICallError, generateText, Output } from 'ai';
+import { APICallError } from 'ai';
 import { z } from 'zod';
 import { authenticateSupabaseRequest, consumeAiQuota } from '../_lib/auth.js';
 import {
@@ -6,6 +6,7 @@ import {
   getTextModel,
   isAiGenerationEnabled,
 } from '../_lib/ai-provider.js';
+import { generateStructuredObject } from '../_lib/ai-structured.js';
 
 const requestSchema = z.object({
   intent: z.enum([
@@ -61,8 +62,11 @@ export async function POST(request: Request) {
   };
 
   try {
-    const { output, usage } = await generateText({
+    const { object, usage } = await generateStructuredObject({
       model: textModel,
+      schema: responseSchema,
+      schemaName: 'hallaqi_barber_assist',
+      schemaDescription: '{"answer":"string","suggestedActions":["string"],"messageDraft":"string optional"}',
       instructions: [
         'You are Hallaqi Barber Copilot — an assistant for Algerian barbers and salon professionals.',
         'Respond in clear Arabic (Darija OK when natural). Be practical and respectful.',
@@ -74,19 +78,19 @@ export async function POST(request: Request) {
         question: parsed.data.question,
         context: parsed.data.context || {},
       }),
-      output: Output.object({
-        name: 'hallaqi_barber_assist',
-        description: 'Operational help for a barber between appointments.',
-        schema: responseSchema,
-      }),
       maxOutputTokens: 700,
+      plainTextFallback: text => ({
+        answer: text.slice(0, 1400),
+        suggestedActions: [],
+      }),
     });
 
-    return Response.json({ assist: output, usage });
+    return Response.json({ assist: object, usage });
   } catch (error) {
     console.error('AI barber assist failed', {
       userId: user.id,
       statusCode: APICallError.isInstance(error) ? error.statusCode : undefined,
+      message: error instanceof Error ? error.message : String(error),
     });
     if (APICallError.isInstance(error) && error.statusCode === 429) {
       return Response.json({ code: 'AI_RATE_LIMITED' }, { status: 429 });

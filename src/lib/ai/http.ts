@@ -32,6 +32,9 @@ async function authHeaders(): Promise<Record<string, string>> {
 }
 
 function mapAiError(code?: string, fallback = 'تعذر تنفيذ الطلب حالياً'): never {
+  if (code === 'UNAUTHORIZED') {
+    throw new Error('يجب تسجيل الدخول لاستخدام المساعد');
+  }
   if (code === 'AI_NOT_CONFIGURED') {
     throw new Error('المساعد النصي يحتاج إعداد GROQ_API_KEY على الخادم');
   }
@@ -40,6 +43,9 @@ function mapAiError(code?: string, fallback = 'تعذر تنفيذ الطلب ح
   }
   if (code === 'AI_RATE_LIMITED') {
     throw new Error('وصلت للحد اليومي للمساعد. جرّب غداً.');
+  }
+  if (code === 'AI_UNAVAILABLE') {
+    throw new Error('المساعد غير متاح مؤقتاً. حاول مرة أخرى بعد لحظات.');
   }
   throw new Error(fallback);
 }
