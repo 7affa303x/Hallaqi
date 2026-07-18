@@ -2,16 +2,38 @@ import { APICallError } from 'ai';
 import { z } from 'zod';
 import { authenticateSupabaseRequest, consumeAiQuota } from '../_lib/auth.js';
 import {
+  buildHallaqiAiContext,
+  toHallaqiSystemPrompt,
+  type ClientSiteContext,
+} from '../_lib/ai-context.js';
+import {
   aiUnavailableMessage,
   getTextModel,
   isAiGenerationEnabled,
 } from '../_lib/ai-provider.js';
 import { generateStructuredObject } from '../_lib/ai-structured.js';
 
+const clientBarberHintSchema = z.object({
+  id: z.string().min(1).max(80),
+  name: z.string().trim().min(1).max(120),
+  city: z.string().trim().max(80).optional(),
+  rating: z.number().min(0).max(5).optional(),
+  services: z.array(z.string().trim().max(80)).max(6).optional(),
+  reasons: z.array(z.string().trim().max(120)).max(4).optional(),
+});
+
+const clientSiteContextSchema = z.object({
+  wilaya: z.string().trim().max(80).optional(),
+  preferredCategory: z.string().trim().max(40).optional(),
+  topBarbers: z.array(clientBarberHintSchema).max(6).optional(),
+  recentBarberNames: z.array(z.string().trim().max(120)).max(6).optional(),
+}).optional();
+
 const requestSchema = z.object({
   question: z.string().trim().min(5).max(500),
   hairType: z.string().trim().max(80).optional(),
   desiredStyle: z.string().trim().max(120).optional(),
+  siteContext: clientSiteContextSchema,
 });
 
 const responseSchema = z.object({
@@ -40,6 +62,10 @@ export async function POST(request: Request) {
     return Response.json({ code: 'AI_RATE_LIMITED' }, { status: 429 });
   }
 
+  const siteContext = parsed.data.siteContext as ClientSiteContext | undefined;
+  const hallaqiContext = await buildHallaqiAiContext(user, siteContext);
+  const identityBlock = toHallaqiSystemPrompt(hallaqiContext, 'advice');
+
   try {
     const { object, usage } = await generateStructuredObject({
       model: textModel,
@@ -47,15 +73,18 @@ export async function POST(request: Request) {
       schemaName: 'hallaqi_grooming_advice',
       schemaDescription: '{"answer":"string","suggestedServices":["string"],"cautions":["string"]}',
       instructions: [
-        'You are Hallaqi, a concise Algerian barbering and grooming advisor.',
-        'Answer in Arabic (Algerian dialect welcome when natural). Give practical, conservative advice.',
-        'Do not diagnose medical conditions. Recommend a clinician for scalp disease, injury, or unexplained hair loss.',
-        'Never claim certainty about a style without an in-person consultation.',
-        'suggestedServices: up to 4 short salon service names in Arabic.',
+        identityBlock,
+        'Give practical grooming advice grounded in Hallaqi context above.',
+        'When relevant, suggest booking via تبويب الحجز or name a barber from the catalog list.',
+        'suggestedServices: up to 4 short salon service names in Arabic (prefer names from catalog when matching).',
         'cautions: up to 4 short safety notes in Arabic.',
-      ].join(' '),
-      prompt: JSON.stringify(parsed.data),
-      maxOutputTokens: 600,
+      ].join('\n'),
+      prompt: JSON.stringify({
+        question: parsed.data.question,
+        hairType: parsed.data.hairType,
+        desiredStyle: parsed.data.desiredStyle,
+      }),
+      maxOutputTokens: 700,
       plainTextFallback: text => ({
         answer: text.slice(0, 1200),
         suggestedServices: [],

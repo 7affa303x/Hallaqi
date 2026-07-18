@@ -1,4 +1,7 @@
 import { supabase } from '@/supabase/client';
+import type { ClientSiteContext } from '@/lib/ai/siteContext';
+
+export type { ClientSiteContext };
 
 export interface AICapabilities {
   deterministicRecommendations: boolean;
@@ -99,6 +102,7 @@ export async function requestGroomingAdvice(input: {
   question: string;
   hairType?: string;
   desiredStyle?: string;
+  siteContext?: ClientSiteContext;
 }): Promise<GroomingAdvice> {
   const response = await fetch('/api/ai/advice', {
     method: 'POST',

@@ -1,5 +1,6 @@
 import { APICallError, generateText } from 'ai';
 import { z } from 'zod';
+import { HALLAQI_IDENTITY } from '../_lib/ai-identity.js';
 import {
   aiUnavailableMessage,
   getTextModel,
@@ -53,7 +54,7 @@ export async function POST(request: Request) {
     const { text } = await generateText({
       model: textModel,
       instructions: [
-        'You are Hallaqi Marketplace Listing Copilot for Algerian sellers.',
+        `You are ${HALLAQI_IDENTITY.nameEn} (${HALLAQI_IDENTITY.nameAr}) Marketplace Listing Copilot for Algerian sellers on ${HALLAQI_IDENTITY.siteUrl}.`,
         'Respond in clear Arabic. Be concise and commercial.',
         'Never invent medical diagnoses. Never invent prices as facts.',
         'Do not mention commissions or in-app checkout.',
