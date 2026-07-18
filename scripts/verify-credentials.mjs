@@ -26,6 +26,7 @@ const supabaseUrl = process.env.VITE_SUPABASE_URL?.replace(/\/$/, '');
 const anonKey = process.env.VITE_SUPABASE_ANON_KEY;
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+const groqKey = process.env.GROQ_API_KEY;
 
 const results = [];
 
@@ -81,8 +82,26 @@ async function main() {
     );
   }
 
-  if (!geminiKey) {
-    await check('Gemini API key', false, 'GEMINI_API_KEY not set');
+  if (!groqKey && !geminiKey) {
+    await check('AI text provider', false, 'Set GROQ_API_KEY (free) or GEMINI_API_KEY');
+  } else if (groqKey) {
+    const genRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${groqKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'llama-3.3-70b-versatile',
+        messages: [{ role: 'user', content: 'قل مرحبا' }],
+        max_tokens: 10,
+      }),
+    });
+    await check(
+      'Groq API (free text AI)',
+      genRes.status === 200,
+      genRes.status === 200 ? 'generateContent OK' : `HTTP ${genRes.status}`,
+    );
   } else {
     const listRes = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models?key=${geminiKey}`,

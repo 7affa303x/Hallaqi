@@ -1,4 +1,17 @@
+import { createGroq } from '@ai-sdk/groq';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
+import type { LanguageModel } from 'ai';
+
+export type AiTextProviderName = 'groq' | 'gemini';
+
+const DEFAULT_GROQ_MODEL = 'llama-3.3-70b-versatile';
+const DEFAULT_GEMINI_TEXT_MODEL = 'gemini-2.0-flash';
+const DEFAULT_GEMINI_IMAGE_MODEL = 'gemini-2.0-flash-preview-image-generation';
+
+/** Resolve Groq API key (server-only, free tier friendly). */
+export function getGroqApiKey(): string | undefined {
+  return process.env.GROQ_API_KEY?.trim() || undefined;
+}
 
 /** Resolve Gemini API key from common env names (server-only). */
 export function getGeminiApiKey(): string | undefined {
@@ -8,11 +21,16 @@ export function getGeminiApiKey(): string | undefined {
     || undefined;
 }
 
+export function getActiveTextProviderName(): AiTextProviderName | null {
+  if (getGroqApiKey()) return 'groq';
+  if (getGeminiApiKey()) return 'gemini';
+  return null;
+}
+
 export function isAiGenerationEnabled(): boolean {
   if (process.env.AI_GENERATION_ENABLED === 'false') return false;
   if (process.env.AI_GENERATION_ENABLED === 'true') return true;
-  // Auto-enable when a Gemini key is present so preview/local deploys work.
-  return Boolean(getGeminiApiKey());
+  return Boolean(getGroqApiKey() || getGeminiApiKey());
 }
 
 export function getGoogleProvider() {
@@ -21,26 +39,44 @@ export function getGoogleProvider() {
   return createGoogleGenerativeAI({ apiKey });
 }
 
+/** Prefer Groq (free) for text; fall back to Gemini when configured. */
+export function getTextModel(): LanguageModel | null {
+  const groqKey = getGroqApiKey();
+  if (groqKey) {
+    return createGroq({ apiKey: groqKey })(getTextModelId());
+  }
+  const google = getGoogleProvider();
+  if (!google) return null;
+  return google(getTextModelId());
+}
+
 export function getTextModelId(): string {
   const configured = process.env.AI_TEXT_MODEL?.trim();
-  // Prefer direct Gemini ids; map legacy Gateway ids to Gemini Flash.
-  if (!configured || configured.includes('/')) {
-    return 'gemini-2.0-flash';
+  if (configured && !configured.includes('/')) {
+    if (getGroqApiKey() && configured.startsWith('gemini')) {
+      return DEFAULT_GROQ_MODEL;
+    }
+    return configured;
   }
-  return configured;
+  if (getGroqApiKey()) return DEFAULT_GROQ_MODEL;
+  return DEFAULT_GEMINI_TEXT_MODEL;
 }
 
 export function getImageModelId(): string {
   const configured = process.env.AI_IMAGE_MODEL?.trim();
   if (!configured || configured.includes('/')) {
-    return 'gemini-2.0-flash-preview-image-generation';
+    return DEFAULT_GEMINI_IMAGE_MODEL;
   }
   return configured;
 }
 
+export function hasImageGeneration(): boolean {
+  return isAiGenerationEnabled() && Boolean(getGeminiApiKey());
+}
+
 export function aiUnavailableMessage(): string {
-  if (!getGeminiApiKey()) {
-    return 'أضف GEMINI_API_KEY في متغيرات الخادم لتفعيل المساعد.';
+  if (!getGroqApiKey() && !getGeminiApiKey()) {
+    return 'أضف GROQ_API_KEY (مجاني) أو GEMINI_API_KEY في متغيرات الخادم لتفعيل المساعد.';
   }
   return 'المساعد غير متاح حالياً. حاول لاحقاً.';
 }

@@ -3,8 +3,7 @@ import { z } from 'zod';
 import { authenticateSupabaseRequest, consumeAiQuota } from '../_lib/auth.js';
 import {
   aiUnavailableMessage,
-  getGoogleProvider,
-  getTextModelId,
+  getTextModel,
   isAiGenerationEnabled,
 } from '../_lib/ai-provider.js';
 
@@ -42,8 +41,8 @@ export async function POST(request: Request) {
     return Response.json({ code: 'INVALID_INPUT' }, { status: 400 });
   }
 
-  const google = getGoogleProvider();
-  if (!isAiGenerationEnabled() || !google) {
+  const textModel = getTextModel();
+  if (!isAiGenerationEnabled() || !textModel) {
     return Response.json({
       code: 'AI_NOT_CONFIGURED',
       message: aiUnavailableMessage(),
@@ -63,7 +62,7 @@ export async function POST(request: Request) {
 
   try {
     const { output, usage } = await generateText({
-      model: google(getTextModelId()),
+      model: textModel,
       instructions: [
         'You are Hallaqi Barber Copilot — an assistant for Algerian barbers and salon professionals.',
         'Respond in clear Arabic (Darija OK when natural). Be practical and respectful.',

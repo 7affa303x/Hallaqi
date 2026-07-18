@@ -43,6 +43,7 @@
 | Supabase publishable (`sb_publishable_…`) | **يعمل** |
 | Supabase service (`sb_secret_…`) | **يعمل** — للخادم فقط |
 | Gemini API | **المفتاح صالح** لكن `generateContent` يرجع **429** (حصة مجانية منتهية) |
+| **Groq API** | **✅ يعمل مجاناً** — `llama-3.3-70b-versatile` للنصوص |
 | مخطط السوق على Supabase | **غير متوافق** — جداول قديمة (`store_id`/`company_id`) بدون `marketplace_sellers` |
 
 ### خطوات إصلاح Supabase
@@ -57,10 +58,11 @@
 VITE_SUPABASE_URL=https://cdwzbtjwqybnahhbhldy.supabase.co
 VITE_SUPABASE_ANON_KEY=<anon JWT أو publishable>
 SUPABASE_SERVICE_ROLE_KEY=<sb_secret — خادم فقط>
-GEMINI_API_KEY=<مفتاح Gemini>
+GROQ_API_KEY=<gsk_... — مجاني للنصوص>
 AI_GENERATION_ENABLED=true
-AI_TEXT_MODEL=gemini-2.0-flash
-VITE_AI_PROVIDER=gemini
+AI_TEXT_MODEL=llama-3.3-70b-versatile
+VITE_AI_PROVIDER=groq
+GEMINI_API_KEY=<اختياري — لتوليد الصور فقط>
 ```
 
 ### ما زال ناقصاً (اختياري)

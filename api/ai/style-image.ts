@@ -2,10 +2,9 @@ import { APICallError, generateText } from 'ai';
 import { z } from 'zod';
 import { authenticateSupabaseRequest, consumeAiQuota } from '../_lib/auth.js';
 import {
-  aiUnavailableMessage,
   getGoogleProvider,
   getImageModelId,
-  isAiGenerationEnabled,
+  hasImageGeneration,
 } from '../_lib/ai-provider.js';
 
 const requestSchema = z.object({
@@ -20,10 +19,10 @@ export async function POST(request: Request) {
   if (!parsed.success) return Response.json({ code: 'INVALID_INPUT' }, { status: 400 });
 
   const google = getGoogleProvider();
-  if (!isAiGenerationEnabled() || !google) {
+  if (!hasImageGeneration() || !google) {
     return Response.json({
       code: 'AI_IMAGE_NOT_CONFIGURED',
-      message: aiUnavailableMessage(),
+      message: 'توليد الصور يتطلب GEMINI_API_KEY. النصوص تعمل عبر Groq مجاناً.',
     }, { status: 503 });
   }
   if (!await consumeAiQuota(user, 'style-image')) {
