@@ -21,6 +21,7 @@ import EditBarberProfile from '@/components/EditBarberProfile';
 import ServicesManagement from '@/components/ServicesManagement';
 import PausedFeatureBanner from '@/components/PausedFeatureBanner';
 import SavedItemsPage from '@/components/SavedItemsPage';
+import SuggestionsReportPage from '@/pages/SuggestionsReportPage';
 import { FEATURE_FLAGS, isWebPushConfigured, isWhatsAppSupportConfigured, PAUSED_LABEL, COMING_SOON_LABEL } from '@/lib/featureFlags';
 import { CANCEL_POLICY } from '@/lib/cancelPolicy';
 import {
@@ -77,7 +78,7 @@ const iconMap: Record<string, LucideIcon> = {
 
 type ProfileSubPage = 'main' | 'theme' | 'animation' | 'language' | 'country' | 'currency' | 'notifications' |
   'privacy' | 'account' | 'subscription' | 'payment' | 'id-verification' |
-  'linked-accounts' | 'help' | 'about' | 'badges' | 'stats' | 'edit-profile' | 'services' | 'loyalty' |
+  'linked-accounts' | 'help' | 'about' | 'suggestions-report' | 'badges' | 'stats' | 'edit-profile' | 'services' | 'loyalty' |
   'accessibility' | 'privacy-policy' | 'terms' | 'licenses' | 'security' | 'saves';
 
 export default function ProfileTab() {
@@ -88,6 +89,7 @@ export default function ProfileTab() {
     if (screenParams?.openLegal === 'privacy') return 'privacy-policy';
     if (screenParams?.openLegal === 'help') return 'help';
     if (screenParams?.openLegal === 'about') return 'about';
+    if (screenParams?.openLegal === 'suggestions') return 'suggestions-report';
     return 'main';
   });
   const [actionError, setActionError] = useState('');
@@ -99,6 +101,7 @@ export default function ProfileTab() {
     if (screenParams?.openLegal === 'privacy') setSubPage('privacy-policy');
     if (screenParams?.openLegal === 'help') setSubPage('help');
     if (screenParams?.openLegal === 'about') setSubPage('about');
+    if (screenParams?.openLegal === 'suggestions') setSubPage('suggestions-report');
   }, [screenParams?.openLegal]);
 
   useEffect(() => {
@@ -113,8 +116,9 @@ export default function ProfileTab() {
   };
 
   // Legal / about / help are public — available before login
-  if (subPage === 'help') return <InformationPage onBack={() => setSubPage('main')} kind="help" />;
-  if (subPage === 'about') return <InformationPage onBack={() => setSubPage('main')} kind="about" />;
+  if (subPage === 'help') return <InformationPage onBack={() => setSubPage('main')} kind="help" onOpenSuggestions={() => setSubPage('suggestions-report')} />;
+  if (subPage === 'about') return <InformationPage onBack={() => setSubPage('main')} kind="about" onOpenSuggestions={() => setSubPage('suggestions-report')} />;
+  if (subPage === 'suggestions-report') return <SuggestionsReportPage onBack={() => setSubPage('main')} />;
   if (subPage === 'privacy-policy') return <LegalPage onBack={() => setSubPage('main')} kind="privacy" />;
   if (subPage === 'terms') return <LegalPage onBack={() => setSubPage('main')} kind="terms" />;
   if (subPage === 'licenses') return <LegalPage onBack={() => setSubPage('main')} kind="licenses" />;
@@ -137,6 +141,17 @@ export default function ProfileTab() {
             </button>
           </div>
           <p className="text-[10px] mt-4" style={{ color: themeConfig.colors.textMuted }}>بالتسجيل، أنت توافق على شروط الاستخدام وسياسة الخصوصية</p>
+          <div className="mt-6 space-y-2 text-right">
+            <button type="button" onClick={() => setSubPage('help')} className="w-full text-xs font-medium py-2" style={{ color: themeConfig.colors.primary }}>
+              مركز المساعدة
+            </button>
+            <button type="button" onClick={() => setSubPage('suggestions-report')} className="w-full text-xs font-medium py-2" style={{ color: themeConfig.colors.primary }}>
+              تقرير 200 اقتراح تطوير
+            </button>
+            <button type="button" onClick={() => setSubPage('about')} className="w-full text-xs font-medium py-2" style={{ color: themeConfig.colors.textMuted }}>
+              عن حلاقي
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -507,7 +522,7 @@ export default function ProfileTab() {
                   if (item.id === 'changePassword') { navigate('forgot-password'); return; }
                   if (item.id === 'contactUs') { window.location.href = 'mailto:support@hallaqi.app'; return; }
                   if (item.id === 'reportBug') { window.location.href = 'mailto:support@hallaqi.app?subject=Hallaqi%20Bug%20Report'; return; }
-                  if (item.id === 'featureRequest') { window.location.href = 'mailto:support@hallaqi.app?subject=Hallaqi%20Feature%20Request'; return; }
+                  if (item.id === 'featureRequest') { setSubPage('suggestions-report'); return; }
                   const pageMap: Record<string, ProfileSubPage> = {
                     theme: 'theme', animation: 'animation', language: 'language', country: 'country', currency: 'currency', fontSize: 'accessibility',
                     pushNotifications: 'notifications', emailNotifications: 'notifications', smsNotifications: 'notifications',
@@ -845,7 +860,7 @@ function LoyaltyPage({ onBack }: { onBack: () => void }) {
   );
 }
 
-function InformationPage({ onBack, kind }: { onBack: () => void; kind: 'help' | 'about' }) {
+function InformationPage({ onBack, kind, onOpenSuggestions }: { onBack: () => void; kind: 'help' | 'about'; onOpenSuggestions?: () => void }) {
   const { themeConfig } = useApp();
   const isHelp = kind === 'help';
   return (
@@ -875,6 +890,18 @@ function InformationPage({ onBack, kind }: { onBack: () => void; kind: 'help' | 
               <h3 className="font-bold text-sm" style={{ color: themeConfig.colors.text }}>السوق</h3>
               <p className="text-xs mt-2 leading-relaxed" style={{ color: themeConfig.colors.textMuted }}>اكتشف منتجات ومتاجر ثم اشترِ عبر Visit Store (https). لا يوجد دفع منتجات داخل التطبيق عند الإطلاق.</p>
             </div>
+            <button
+              type="button"
+              onClick={() => onOpenSuggestions?.()}
+              className="w-full rounded-2xl border p-4 text-right"
+              style={{ backgroundColor: themeConfig.colors.primary + '08', borderColor: themeConfig.colors.primary + '30' }}
+            >
+              <h3 className="font-bold text-sm flex items-center gap-2" style={{ color: themeConfig.colors.text }}>
+                <Lightbulb size={16} style={{ color: themeConfig.colors.primary }} />
+                تقرير 200 اقتراح تطوير
+              </h3>
+              <p className="text-xs mt-2 leading-relaxed" style={{ color: themeConfig.colors.textMuted }}>خارطة طريق مقسّمة حسب أقسام التطبيق — متاحة داخل Hallaqi بدون تحميل ملف خارجي.</p>
+            </button>
           </>
         ) : (
           <>
@@ -899,6 +926,20 @@ function InformationPage({ onBack, kind }: { onBack: () => void; kind: 'help' | 
                 سياسة الخصوصية وشروط الاستخدام متاحة من الملف الشخصي. للاستفسارات القانونية: support@hallaqi.app.
               </p>
             </div>
+            {onOpenSuggestions && (
+              <button
+                type="button"
+                onClick={onOpenSuggestions}
+                className="w-full rounded-2xl border p-4 text-right"
+                style={{ backgroundColor: themeConfig.colors.primary + '08', borderColor: themeConfig.colors.primary + '30' }}
+              >
+                <h3 className="font-bold text-sm flex items-center gap-2" style={{ color: themeConfig.colors.text }}>
+                  <Lightbulb size={16} style={{ color: themeConfig.colors.primary }} />
+                  تقرير 200 اقتراح تطوير
+                </h3>
+                <p className="text-xs mt-2 leading-relaxed" style={{ color: themeConfig.colors.textMuted }}>اطّلع على خارطة الطريق الكاملة داخل التطبيق.</p>
+              </button>
+            )}
           </>
         )}
       </div>
