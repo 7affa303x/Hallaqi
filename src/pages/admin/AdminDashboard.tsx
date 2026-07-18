@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useApp } from '@/contexts/useApp';
 import { supabase } from '@/supabase/client';
@@ -14,7 +14,6 @@ import {
 import { ccpProvider } from '@/lib/payment/ccp-provider';
 import { getSignedUrl } from '@/supabase/storage';
 import type { Database } from '@/types/supabase';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
 import { Users, Scissors, Calendar, CreditCard, Clock, Star, DollarSign, TrendingUp, ChevronRight, Shield, Check, X, ArrowRight, Crown, Flag, ShoppingBag } from 'lucide-react';
 import { marketplaceProducts, marketplacePlacements } from '@/data/marketplaceSeed';
 import type { MarketplaceSeller, MarketplaceProduct, MarketplaceSectionConfig } from '@/types/marketplace';
@@ -35,6 +34,8 @@ import {
   writeMarketplaceSectionConfig,
   type MarketplaceReport,
 } from '@/lib/marketplace/sectionConfig';
+
+const AdminCharts = lazy(() => import('@/components/AdminCharts'));
 
 interface DashboardStats {
   totalUsers: number;
@@ -386,34 +387,9 @@ export default function AdminDashboard() {
           ))}
         </div>
 
-        {/* Charts */}
-        <div className="space-y-4">
-          <h3 className="text-base font-bold" style={{ color: themeConfig.colors.text }}>الحجوزات (آخر 7 أيام)</h3>
-          <div className="p-4 rounded-xl" style={{ backgroundColor: themeConfig.colors.surface, border: `1px solid ${themeConfig.colors.border}` }}>
-            <ResponsiveContainer width="100%" height={180}>
-              <BarChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke={themeConfig.colors.border} />
-                <XAxis dataKey="date" tick={{ fill: themeConfig.colors.textMuted, fontSize: 11 }} />
-                <YAxis tick={{ fill: themeConfig.colors.textMuted, fontSize: 11 }} />
-                <Tooltip contentStyle={{ backgroundColor: themeConfig.colors.surface, border: `1px solid ${themeConfig.colors.border}`, borderRadius: '8px' }} />
-                <Bar dataKey="bookings" fill={themeConfig.colors.primary} radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-
-          <h3 className="text-base font-bold" style={{ color: themeConfig.colors.text }}>الإيرادات (آخر 7 أيام)</h3>
-          <div className="p-4 rounded-xl" style={{ backgroundColor: themeConfig.colors.surface, border: `1px solid ${themeConfig.colors.border}` }}>
-            <ResponsiveContainer width="100%" height={180}>
-              <LineChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke={themeConfig.colors.border} />
-                <XAxis dataKey="date" tick={{ fill: themeConfig.colors.textMuted, fontSize: 11 }} />
-                <YAxis tick={{ fill: themeConfig.colors.textMuted, fontSize: 11 }} />
-                <Tooltip contentStyle={{ backgroundColor: themeConfig.colors.surface, border: `1px solid ${themeConfig.colors.border}`, borderRadius: '8px' }} />
-                <Line type="monotone" dataKey="revenue" stroke={themeConfig.colors.success} strokeWidth={2} dot={{ fill: themeConfig.colors.success }} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
+        <Suspense fallback={<p className="text-xs" style={{ color: themeConfig.colors.textMuted }}>جاري تحميل الرسوم...</p>}>
+          <AdminCharts data={chartData} colors={themeConfig.colors} />
+        </Suspense>
 
         {/* Quick Actions */}
         <div className="space-y-3">

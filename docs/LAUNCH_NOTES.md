@@ -39,6 +39,11 @@
 | تحليلات وهمية / mock | **متوقف** — أرقام حقيقية (قد تكون صفر) |
 | OG ديناميكي لكل مسار SPA | **متوقف** — OG ثابت في index |
 | E2E في CI | **متوقف** — typecheck/build يبقى |
+| ترجمة كاملة fr/en | **متوقف** — تنقل جزئي فقط (`fullI18nEnabled`) |
+| React Query | **متوقف** — Zustand/Context |
+| واتساب الدعم | **متوقف** — يحتاج `VITE_SUPPORT_WHATSAPP` |
+| توليد صور AI (Gemini) | **متوقف** — حصة منتهية |
+| قارئ شاشة متقدم | **متوقف** — حجم خط/تباين/تقليل حركة تعمل |
 
 ## بعد الإطلاق مباشرة
 
@@ -94,22 +99,33 @@ GEMINI_API_KEY=<اختياري — لتوليد الصور فقط>
 - حفظ/إشارات على الجهاز فقط
 - سجل تدقيق/مشرف متوقفان في الأدمن
 
-### دفعة P2 (بدأت)
+### دفعة P2 (مكتملة + إيقاف احترافي)
 
-- Soft onboarding أول زيارة (3 خطوات قابلة للتخطي)
-- Skip link + soft 404
-- Skeleton شبكة السوق
-- صفحات عن/مساعدة أوضح
-- تحليلات صادقة بدون mock
+- Soft onboarding أول زيارة (focus trap + Escape) + skip-to-content + soft 404
+- Skeleton شبكة السوق + debounce بحث السوق
+- صفحات عن/مساعدة أوضح + محفوظاتي (جهاز فقط)
+- تحليلات صادقة بدون mock + موافقة تحليلات ناعمة
 - ضغط صور وحدود حجم قبل الرفع
-- توضيح شارات الثقة (موثّق / بريميوم / طبيب موثوق)
+- توضيح شارات الثقة + lazy `<img>` لبطاقات السوق
+- احترام تقليل الحركة في EmptyState/ProductCard
+- i18n جزئي للتنقل؛ الترجمة الكاملة **متوقفة**
+- واتساب الدعم / قارئ شاشة متقدم / React Query **متوقفة**
+- توليد صور AI (Gemini) **متوقف**
+
+### دفعة P3 (بدأت)
+
+- تقسيم حزمة Recharts (lazy AdminCharts + manualChunks)
+- `/api/health` لفحص الجاهزية
+- اختبارات وحدة لـ debounce وحدود الرفع
+- موافقة الكوكيز/التحليلات قبل تحميل Vercel Analytics
 
 ### ما زال ناقصاً (اختياري / لاحقاً)
 
 - `VITE_STRIPE_PUBLISHABLE_KEY` + `STRIPE_SECRET_KEY` — دفع Stripe
 - `VITE_CCP_ACCOUNT_NUMBER` + `VITE_CCP_CARD_NUMBER` — دفع CCP
 - `VITE_VAPID_PUBLIC_KEY` — إشعارات الويب
-- i18n أوسع، React Query، تقسيم Recharts
+- `VITE_SUPPORT_WHATSAPP` — واتساب الدعم
+- ترجمة كاملة ar/fr/en، React Query، E2E CI، OG ديناميكي، APM كامل
 - كلمة مرور قاعدة البيانات أو `SUPABASE_ACCESS_TOKEN` لتشغيل `supabase db push`
 
 > **أمان:** لا تضع المفاتيح في المحادثة أو Git. غيّر المفاتيح إذا تسرّبت.
