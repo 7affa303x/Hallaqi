@@ -2,7 +2,8 @@
 
 **التاريخ:** 2026-07-18  
 **الفرع:** `cursor/marketplace-platform-93d3`  
-**النشر:** انظر رابط Vercel في نهاية التقرير
+**النشر:** https://hallaqi-git-cursor-marketplace-platform-93d3-souf303x.vercel.app  
+**PR:** https://github.com/7affa303x/hallaqi/pull/13
 
 ## مفتاح الحالة
 
