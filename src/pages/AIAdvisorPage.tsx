@@ -85,7 +85,12 @@ export default function AIAdvisorPage() {
           />
           {!enabled && (
             <p className="text-[11px] mt-2 p-2 rounded-lg" style={{ color: themeConfig.colors.warning, backgroundColor: themeConfig.colors.warning + '10' }}>
-              {capabilities.externalBlocker || 'المساعد التوليدي ينتظر إعداد GEMINI_API_KEY على الخادم.'}
+              {capabilities.externalBlocker || 'المساعد ينتظر إعداد GROQ_API_KEY (مجاني) على الخادم.'}
+            </p>
+          )}
+          {enabled && capabilities.provider === 'groq' && (
+            <p className="text-[11px] mt-2" style={{ color: themeConfig.colors.textMuted }}>
+              يعمل عبر Groq مجاناً (Llama).
             </p>
           )}
           {enabled && capabilities.provider === 'gemini' && (

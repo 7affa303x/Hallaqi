@@ -77,12 +77,21 @@ type ProfileSubPage = 'main' | 'theme' | 'animation' | 'language' | 'notificatio
   'accessibility' | 'privacy-policy' | 'terms' | 'licenses' | 'security';
 
 export default function ProfileTab() {
-  const { themeConfig, settings, navigate, setActiveTab, unreadCount, bookings, barbers } = useApp();
+  const { themeConfig, settings, navigate, setActiveTab, unreadCount, bookings, barbers, screenParams } = useApp();
   const { isAuthenticated, appUser, user, logout, isLoading: authLoading } = useAuth();
-  const [subPage, setSubPage] = useState<ProfileSubPage>('main');
+  const [subPage, setSubPage] = useState<ProfileSubPage>(() => {
+    if (screenParams?.openLegal === 'terms') return 'terms';
+    if (screenParams?.openLegal === 'privacy') return 'privacy-policy';
+    return 'main';
+  });
   const [actionError, setActionError] = useState('');
   const [actionMessage, setActionMessage] = useState('');
   const [loyaltySummary, setLoyaltySummary] = useState<{ points: number; tier: string }>({ points: 0, tier: 'bronze' });
+
+  useEffect(() => {
+    if (screenParams?.openLegal === 'terms') setSubPage('terms');
+    if (screenParams?.openLegal === 'privacy') setSubPage('privacy-policy');
+  }, [screenParams?.openLegal]);
 
   useEffect(() => {
     if (!appUser) return;
@@ -336,7 +345,7 @@ export default function ProfileTab() {
           </button>
           <button
             type="button"
-            onClick={() => navigate('ai-advisor')}
+            onClick={() => setActiveTab('ai-hub')}
             className="flex items-center gap-2 p-3 rounded-2xl border text-right"
             style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}
           >
@@ -349,7 +358,7 @@ export default function ProfileTab() {
         </div>
       )}
 
-      {FEATURE_FLAGS.loyaltyEnabled && (
+      {FEATURE_FLAGS.loyaltyEnabled ? (
         <div className="px-4 mt-4">
           <button
             type="button"
@@ -366,6 +375,24 @@ export default function ProfileTab() {
             </div>
             <ChevronLeft size={17} style={{ color: themeConfig.colors.textMuted }} />
           </button>
+        </div>
+      ) : (
+        <div className="px-4 mt-4">
+          <div
+            className="w-full flex items-center gap-3 p-4 rounded-2xl border text-right opacity-80"
+            style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}
+          >
+            <div className="w-11 h-11 rounded-xl flex items-center justify-center" style={{ backgroundColor: themeConfig.colors.primary + '12' }}>
+              <Gift size={21} style={{ color: themeConfig.colors.textMuted }} />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-bold" style={{ color: themeConfig.colors.text }}>برنامج الولاء</p>
+              <p className="text-[11px]" style={{ color: themeConfig.colors.textMuted }}>نقاط ومكافآت للحجوزات</p>
+            </div>
+            <span className="text-[10px] font-black px-2 py-1 rounded-full" style={{ backgroundColor: themeConfig.colors.warning + '22', color: themeConfig.colors.warning }}>
+              قريباً
+            </span>
+          </div>
         </div>
       )}
 
@@ -631,16 +658,22 @@ function LegalPage({ onBack, kind }: { onBack: () => void; kind: 'privacy' | 'te
     privacy: {
       title: 'سياسة الخصوصية',
       sections: [
-        ['البيانات التي نجمعها', 'بيانات الحساب والحجوزات والموقع الاختياري وملفات الدفع أو الهوية التي يرفعها المستخدم.'],
-        ['كيفية الاستخدام', 'نستخدم البيانات لتشغيل الحجز والدفع والتواصل ومنع الاحتيال وتحسين Hallaqi.'],
-        ['حقوقك', 'يمكنك تصدير بياناتك أو حذف حسابك من الإعدادات. وثائق الهوية وإيصالات الدفع خاصة ولا تظهر للعامة.'],
+        ['البيانات التي نجمعها', 'بيانات الحساب (الاسم، البريد، الهاتف)، الحجوزات، الموقع الاختياري، صور الملف/المحفظة، إيصالات الدفع، وبيانات الاستخدام لتحسين الخدمة.'],
+        ['كيفية الاستخدام', 'نشغّل الحجز والدفع والتواصل ومنع الاحتيال، ونفعّل مساعد AI عبر مزودين مثل Groq/Google عند تفعيل الميزة، دون بيع بياناتك الشخصية.'],
+        ['المدفوعات والوثائق', 'إيصالات CCP/بريدي والبطاقات والمستندات خاصة — تظهر فقط لصاحب الحساب والأدمن/الحلاق المعني بالموافقة.'],
+        ['السوق الخارجي', 'عند زيارة متجر خارجي (Visit Store) تغادر Hallaqi؛ سياسة ذلك الموقع منفصلة عنّا.'],
+        ['حقوقك', 'يمكنك طلب تصدير بياناتك أو حذف حسابك من الإعدادات. للاستفسار: عبر الدعم داخل التطبيق.'],
+        ['ملفات الارتباط والتحليلات', 'قد نستخدم أدوات تحليل (مثل Vercel Analytics) لقياس الأداء دون تحديد هوية شخصية قدر الإمكان.'],
       ],
     },
     terms: {
       title: 'شروط الاستخدام',
       sections: [
-        ['الحجوزات', 'يلتزم العميل بمعلومات صحيحة، ويلتزم الحلاق بتحديث التوفر والخدمات والأسعار.'],
-        ['المدفوعات', 'الدفع الإلكتروني أو اليدوي يخضع للتحقق. لا يُعد الإيصال قبولاً نهائياً حتى اعتماده.'],
+        ['الحسابات والأدوار', 'يختار المستخدم دوره (عميل، حلاق، متجر، شركة، طبيب). حسابات السوق قد تبقى معلّقة حتى موافقة الإدارة.'],
+        ['الحجوزات', 'يلتزم العميل بمعلومات صحيحة، ويلتزم الحلاق بتحديث التوفر والخدمات والأسعار. الإلغاء يخضع لسياسة الحلاق الظاهرة عند الحجز.'],
+        ['المدفوعات', 'الدفع الإلكتروني أو اليدوي (CCP) يخضع للتحقق. لا يُعد الإيصال قبولاً نهائياً حتى اعتماده. الحجوزات غير المدفوعة بالبطاقة قد تُلغى.'],
+        ['السوق', 'الشراء داخل التطبيق للمنتجات غير مفعّل عند الإطلاق؛ الروابط الخارجية على مسؤولية البائع والمشتري.'],
+        ['المساعد الذكي', 'محتوى AI استرشادي فقط وليس تشخيصاً طبياً. للمشاكل الجلدية أو تساقط غير مفسَّر راجع مختصاً.'],
         ['السلوك', 'يُمنع الاحتيال والتحرش والمحتوى المضلل، ويحق للإدارة تعليق الحساب عند المخالفة.'],
       ],
     },
@@ -1074,7 +1107,7 @@ function SubscriptionPage({ onBack }: { onBack: () => void }) {
           <div key={plan.id} onClick={() => setSelectedPlan(plan.id)} className="rounded-2xl border-2 overflow-hidden transition-all cursor-pointer" style={{ backgroundColor: selectedPlan === plan.id ? themeConfig.colors.primary + '05' : themeConfig.colors.surface, borderColor: selectedPlan === plan.id ? themeConfig.colors.primary : themeConfig.colors.border }}>
             <div className="p-4">
               <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2"><div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: plan.id === 'free' ? '#22C55E15' : plan.id === 'basic' ? '#3B82F615' : plan.id === 'pro' ? '#8B5CF615' : '#EAB30815' }}><Crown size={20} style={{ color: plan.id === 'free' ? '#22C55E' : plan.id === 'basic' ? '#3B82F6' : plan.id === 'pro' ? '#8B5CF6' : '#EAB308' }} /></div><div><h3 className="text-sm font-bold" style={{ color: themeConfig.colors.text }}>{plan.name_ar}</h3><p className="text-xs" style={{ color: themeConfig.colors.textMuted }}>{plan.billing_period === 'monthly' ? 'شهرياً' : plan.billing_period}</p></div></div>
+                <div className="flex items-center gap-2"><div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: plan.id === 'free' ? '#22C55E15' : plan.id === 'basic' ? '#3B82F615' : plan.id === 'pro' || plan.id === 'professional' ? '#8B5CF615' : '#EAB30815' }}><Crown size={20} style={{ color: plan.id === 'free' ? '#22C55E' : plan.id === 'basic' ? '#3B82F6' : plan.id === 'pro' || plan.id === 'professional' ? '#8B5CF6' : '#EAB308' }} /></div><div><h3 className="text-sm font-bold" style={{ color: themeConfig.colors.text }}>{plan.name_ar}</h3><p className="text-xs" style={{ color: themeConfig.colors.textMuted }}>{plan.billing_period === 'monthly' ? 'شهرياً' : plan.billing_period}</p></div></div>
                 <div className="text-right"><p className="text-lg font-bold" style={{ color: themeConfig.colors.primary }}>{plan.price_dzd === 0 ? 'مجاني' : `${plan.price_dzd} دج`}</p></div>
               </div>
               <div className="space-y-1.5">{features.map((feature, i) => (<div key={i} className="flex items-center gap-2"><Check size={14} className="text-green-500 flex-shrink-0" /><span className="text-xs" style={{ color: themeConfig.colors.textMuted }}>{feature}</span></div>))}</div>

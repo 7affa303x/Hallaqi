@@ -65,7 +65,7 @@ function ScreenRouter() {
   const { screen, screenParams, activeTab } = useApp();
   const { isAuthenticated, appUser } = useAuth();
 
-  const authRequiredScreens = ['booking-flow', 'chat-room', 'messages', 'create-post', 'admin-dashboard'];
+  const authRequiredScreens = ['booking-flow', 'chat-room', 'messages', 'create-post', 'admin-dashboard', 'seller-dashboard', 'seller-products', 'seller-placements', 'seller-profile-edit'];
   const needsAuth = authRequiredScreens.includes(screen) && !isAuthenticated;
 
   if (needsAuth) {
@@ -170,7 +170,8 @@ function NetworkStatusBar() {
 function AppContent() {
   const { themeConfig, animationStyle, screen, dataError, refreshData } = useApp();
   const { isLoading: authLoading } = useAuth();
-  const showNav = screen === 'home';
+  // Keep bottom nav on home tabs AND legacy ai-advisor route (prevents nav disappearing)
+  const showNav = screen === 'home' || screen === 'ai-advisor';
   const setIsOnline = useStore(s => s.setIsOnline);
 
   useEffect(() => {

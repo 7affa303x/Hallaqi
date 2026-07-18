@@ -13,6 +13,7 @@ import {
   getLoyaltyDashboard,
   isSlotAvailable,
   sendNotification,
+  updateBookingStatus,
 } from '@/supabase/database';
 import { usePayment } from '@/hooks/usePayment';
 import { useCCPPayment } from '@/hooks/useCCPPayment';
@@ -163,6 +164,21 @@ export default function BookingFlowPage() {
     }
     setInitializedFromParams(true);
   }, [barber, initializedFromParams, screenParams?.serviceIds]);
+
+  // Cancel orphan booking if user returned from Stripe cancel URL
+  useEffect(() => {
+    const cancelledId = screenParams?.cancelledBooking
+      || new URLSearchParams(window.location.search).get('cancelledBooking');
+    if (!cancelledId) return;
+    void updateBookingStatus(cancelledId, 'cancelled')
+      .then(() => {
+        setSaveError('تم إلغاء الحجز لأن الدفع لم يكتمل. يمكنك المحاولة مرة أخرى.');
+        const url = new URL(window.location.href);
+        url.searchParams.delete('cancelledBooking');
+        window.history.replaceState({}, '', url.toString());
+      })
+      .catch((err) => console.error('Failed to cancel unpaid booking:', err));
+  }, [screenParams?.cancelledBooking]);
 
   useEffect(() => {
     if (!FEATURE_FLAGS.loyaltyEnabled || !appUser) return;
@@ -399,24 +415,36 @@ export default function BookingFlowPage() {
             currency: 'dzd',
           }];
 
-          await initiatePayment('stripe', {
-            bookingId: saved.id,
-            clientId: appUser.id,
-            professionalId: barber.id,
-            lineItems,
-            totalAmount: saved.total_price,
-            currency: 'dzd',
-            metadata: {
-              barber_name: barber.name,
-              booking_date: selectedDate,
-              booking_time: selectedTime,
-            },
-            successUrl: `${baseUrl}/?screen=payment-success`,
-            cancelUrl: `${baseUrl}/?screen=booking-flow&barberId=${encodeURIComponent(barber.id)}`,
-            customerEmail: undefined, // email from auth session if needed
-          });
-          // User will be redirected to Stripe, no need to continue
-          return;
+          try {
+            await initiatePayment('stripe', {
+              bookingId: saved.id,
+              clientId: appUser.id,
+              professionalId: barber.id,
+              lineItems,
+              totalAmount: saved.total_price,
+              currency: 'dzd',
+              metadata: {
+                barber_name: barber.name,
+                booking_date: selectedDate,
+                booking_time: selectedTime,
+              },
+              successUrl: `${baseUrl}/?screen=payment-success&booking_id=${encodeURIComponent(saved.id)}`,
+              cancelUrl: `${baseUrl}/?screen=booking-flow&barberId=${encodeURIComponent(barber.id)}&cancelledBooking=${encodeURIComponent(saved.id)}`,
+              customerEmail: undefined,
+            });
+            // User will be redirected to Stripe
+            return;
+          } catch (payErr) {
+            // Avoid orphan pending bookings when Stripe session fails
+            try {
+              await updateBookingStatus(saved.id, 'cancelled');
+            } catch (cancelErr) {
+              console.error('Failed to cancel unpaid booking after Stripe error:', cancelErr);
+            }
+            setSaveError(payErr instanceof Error ? payErr.message : 'تعذر بدء الدفع بالبطاقة. ألغينا الحجز تلقائياً.');
+            setIsSaving(false);
+            return;
+          }
         }
 
         // For CCP/BaridiMob, create a payment record and show receipt upload
@@ -592,7 +620,7 @@ export default function BookingFlowPage() {
             تفاصيل المختص
           </button>
           <button
-            onClick={() => { setConfirmed(false); setActiveTab('appointments'); navigate('home'); }}
+            onClick={() => { setConfirmed(false); setActiveTab('appointments'); }}
             className="flex-1 h-12 rounded-xl text-sm font-bold text-white"
             style={{ backgroundColor: themeConfig.colors.primary }}
           >

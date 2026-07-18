@@ -17,11 +17,13 @@ import {
 import { formatDzd, discountPercent, flattenCategories } from '@/lib/marketplace/filters';
 import { trackMarketplaceEvent } from '@/lib/marketplace/analytics';
 import { mapBarberExtrasToMarketplace } from '@/lib/marketplace/barberExtras';
+import { readMarketplaceSectionConfig } from '@/lib/marketplace/sectionConfig';
 import type {
   MarketplaceCategory,
   MarketplaceFilters,
   MarketplacePlacement,
   MarketplaceProduct,
+  MarketplaceSectionConfig,
   MarketplaceSeller,
 } from '@/types/marketplace';
 
@@ -36,11 +38,16 @@ export default function MarketplaceTab() {
   const [showFilters, setShowFilters] = useState(false);
   const [expandedCats, setExpandedCats] = useState<Set<string>>(new Set());
   const [showExtras, setShowExtras] = useState(false);
+  const [sections, setSections] = useState<MarketplaceSectionConfig>(() => readMarketplaceSectionConfig());
 
   const [filters, setFilters] = useState<MarketplaceFilters>({
     query: '',
     sortBy: 'popularity',
   });
+
+  useEffect(() => {
+    setSections(readMarketplaceSectionConfig());
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -136,6 +143,11 @@ export default function MarketplaceTab() {
             <SlidersHorizontal size={18} />
           </button>
         </div>
+        {!loading && sellers.length === 0 && products.length === 0 && (
+          <p className="text-[10px] mb-2 px-2 py-1 rounded-lg text-center" style={{ backgroundColor: `${themeConfig.colors.warning}15`, color: themeConfig.colors.warning }}>
+            السوق جاهز — كن أول متجر أو شركة تنضم
+          </p>
+        )}
         <div className="relative">
           <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2" style={{ color: themeConfig.colors.textMuted }} />
           <input
@@ -149,7 +161,7 @@ export default function MarketplaceTab() {
       </header>
 
       {/* Product of the Day — advertising placement */}
-      {potd && !filters.productOfTheDayOnly && (
+      {sections.showProductOfTheDay && potd && !filters.productOfTheDayOnly && (
         <section className="px-4 mt-4">
           <button
             type="button"
@@ -191,7 +203,7 @@ export default function MarketplaceTab() {
       )}
 
       {/* Sponsored / banner placements */}
-      {banners.length > 0 && (
+      {sections.showBanners && banners.length > 0 && (
         <section className="px-4 mt-3 flex gap-2 overflow-x-auto no-scrollbar">
           {banners.map(banner => (
             <button
@@ -213,7 +225,7 @@ export default function MarketplaceTab() {
       )}
 
       {/* Barber service extras (not physical store products) */}
-      {barberExtras.length > 0 && (
+      {sections.showBarberExtras && barberExtras.length > 0 && (
         <section className="px-4 mt-4">
           <button
             type="button"
@@ -449,7 +461,7 @@ export default function MarketplaceTab() {
       )}
 
       {/* Featured strip */}
-      {featured.length > 0 && (
+      {sections.showFeaturedStrip && featured.length > 0 && (
         <section className="mt-5 px-4">
           <h3 className="text-sm font-black mb-2 flex items-center gap-1" style={{ color: themeConfig.colors.text }}>
             <Crown size={14} style={{ color: themeConfig.colors.accent }} /> مميز
@@ -480,7 +492,14 @@ export default function MarketplaceTab() {
       <section className="mt-4 px-4">
         <h3 className="text-sm font-black mb-2" style={{ color: themeConfig.colors.text }}>متاجر وشركات</h3>
         <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1">
-          {sellers.slice(0, 8).map(seller => (
+          {sellers
+            .filter(s =>
+              (s.sellerType === 'store')
+              || (s.sellerType === 'company' && sections.showCompanies)
+              || (s.sellerType === 'doctor' && sections.showDoctors)
+            )
+            .slice(0, 8)
+            .map(seller => (
             <button
               key={seller.id}
               type="button"
@@ -518,7 +537,12 @@ export default function MarketplaceTab() {
         {loading ? (
           <p className="text-sm py-8 text-center" style={{ color: themeConfig.colors.textMuted }}>جاري التحميل...</p>
         ) : products.length === 0 ? (
-          <EmptyState icon={Search} title="لا نتائج" description="جرّب تغيير الفلاتر أو البحث" themeConfig={themeConfig} />
+          <EmptyState
+            icon={Search}
+            title={sellers.length === 0 ? 'السوق فارغ حالياً' : 'لا نتائج'}
+            description={sellers.length === 0 ? 'سجّل كمتجر أو شركة لإضافة أول المنتجات' : 'جرّب تغيير الفلاتر أو البحث'}
+            themeConfig={themeConfig}
+          />
         ) : (
           <div className="grid grid-cols-2 gap-3">
             {products.map(p => (

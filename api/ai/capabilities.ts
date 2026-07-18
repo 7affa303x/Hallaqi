@@ -1,20 +1,24 @@
-import { getGeminiApiKey, getImageModelId, isAiGenerationEnabled } from '../_lib/ai-provider.js';
+import {
+  getActiveTextProviderName,
+  hasImageGeneration,
+  isAiGenerationEnabled,
+} from '../_lib/ai-provider.js';
 
 export function GET() {
   const generationEnabled = isAiGenerationEnabled();
-  const hasKey = Boolean(getGeminiApiKey());
-  const imageModel = getImageModelId();
+  const provider = getActiveTextProviderName();
+  const hasTextProvider = Boolean(provider);
 
   return Response.json({
     deterministicRecommendations: true,
     optimizedScheduling: true,
-    generativeAdvice: generationEnabled && hasKey,
-    hairstyleImageGeneration: generationEnabled && hasKey && Boolean(imageModel),
-    barberAssist: generationEnabled && hasKey,
-    provider: hasKey ? 'gemini' : null,
-    externalBlocker: generationEnabled && hasKey
+    generativeAdvice: generationEnabled && hasTextProvider,
+    hairstyleImageGeneration: hasImageGeneration(),
+    barberAssist: generationEnabled && hasTextProvider,
+    provider,
+    externalBlocker: generationEnabled && hasTextProvider
       ? null
-      : 'Set GEMINI_API_KEY (or GOOGLE_GENERATIVE_AI_API_KEY) on the server to enable generative AI.',
+      : 'Set GROQ_API_KEY (free) or GEMINI_API_KEY on the server to enable generative AI.',
   }, {
     headers: { 'Cache-Control': 'public, max-age=60' },
   });

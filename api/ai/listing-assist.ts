@@ -2,8 +2,7 @@ import { APICallError, generateText } from 'ai';
 import { z } from 'zod';
 import {
   aiUnavailableMessage,
-  getGoogleProvider,
-  getTextModelId,
+  getTextModel,
   isAiGenerationEnabled,
 } from '../_lib/ai-provider.js';
 
@@ -41,8 +40,8 @@ export async function POST(request: Request) {
     return Response.json({ code: 'INVALID_INPUT' }, { status: 400 });
   }
 
-  const google = getGoogleProvider();
-  if (!isAiGenerationEnabled() || !google) {
+  const textModel = getTextModel();
+  if (!isAiGenerationEnabled() || !textModel) {
     return Response.json({
       text: fallbackText(parsed.data.tool, parsed.data.prompt),
       fallback: true,
@@ -52,7 +51,7 @@ export async function POST(request: Request) {
 
   try {
     const { text } = await generateText({
-      model: google(getTextModelId()),
+      model: textModel,
       instructions: [
         'You are Hallaqi Marketplace Listing Copilot for Algerian sellers.',
         'Respond in clear Arabic. Be concise and commercial.',

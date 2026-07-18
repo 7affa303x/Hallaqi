@@ -6,8 +6,10 @@ import {
   ensureMarketplaceSellerProfile,
   getMarketplacePlans,
   requestMarketplaceSubscription,
+  requestDoctorFreeVerification,
 } from '@/supabase/marketplace';
 import { MARKETPLACE_PREMIUM_LISTING_CAP } from '@/types/marketplace';
+import { canAccessAiListingTools } from '@/lib/marketplace/planAccess';
 import type { MarketplacePlanTier, MarketplaceSeller, MarketplaceSubscriptionPlan } from '@/types/marketplace';
 
 /**
@@ -28,7 +30,7 @@ export default function SellerDashboardPage() {
 
   useEffect(() => {
     void (async () => {
-      const list = await getMarketplacePlans();
+      const list = await getMarketplacePlans(role);
       setPlans(list);
       const profile = await ensureMarketplaceSellerProfile({
         id: sellerId,
@@ -38,6 +40,11 @@ export default function SellerDashboardPage() {
       setSeller(profile);
       setSelected(profile.subscriptionPlan || 'free');
       if (profile.isTrustedDoctor || profile.isVerified) setDoctorVerified(true);
+      else {
+        try {
+          setDoctorVerified(localStorage.getItem(`hallaqi-doctor-verify-${sellerId}`) === 'requested');
+        } catch { /* ignore */ }
+      }
     })();
   }, [sellerId, role, appUser?.full_name]);
 
@@ -73,6 +80,14 @@ export default function SellerDashboardPage() {
       </div>
 
       <div className="rounded-2xl border p-4 mb-4" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
+        {seller?.approvalStatus === 'pending' || screenParams?.pendingApproval === '1' ? (
+          <div className="mb-3 rounded-xl p-3" style={{ backgroundColor: `${themeConfig.colors.warning}15` }}>
+            <p className="text-sm font-black" style={{ color: themeConfig.colors.warning }}>بانتظار موافقة الإدارة</p>
+            <p className="text-[11px] mt-1 leading-5" style={{ color: themeConfig.colors.textMuted }}>
+              يمكنك تجهيز ملفك ومنتجاتك الآن. الظهور العام في السوق يبدأ بعد الموافقة.
+            </p>
+          </div>
+        ) : null}
         <p className="text-sm font-black" style={{ color: themeConfig.colors.text }}>ابدأ مجاناً — ادفع مع نموّك</p>
         <p className="text-xs mt-1" style={{ color: themeConfig.colors.textMuted }}>
           Start free · Pay as you grow. الحد الأقصى للبريميوم {MARKETPLACE_PREMIUM_LISTING_CAP} منتج — ليس غير محدود.
@@ -85,7 +100,14 @@ export default function SellerDashboardPage() {
             <button
               type="button"
               disabled={doctorVerified}
-              onClick={() => setDoctorVerified(true)}
+              onClick={() => {
+                void requestDoctorFreeVerification(sellerId).then(r => {
+                  if (r.ok) {
+                    setDoctorVerified(true);
+                    setToast('تم إرسال طلب التوثيق المجاني للأدمن');
+                  } else setToast(r.error || 'فشل');
+                });
+              }}
               className="mt-2 w-full py-2 rounded-xl text-xs font-black flex items-center justify-center gap-1"
               style={{
                 backgroundColor: doctorVerified ? `${themeConfig.colors.success}18` : themeConfig.colors.primary,
@@ -131,7 +153,7 @@ export default function SellerDashboardPage() {
           type="button"
           className="rounded-2xl border p-3 text-right"
           style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}
-          onClick={() => navigate('marketplace-analytics', { sellerId, role })}
+          onClick={() => navigate('marketplace-analytics', { sellerId, role, plan: selected })}
         >
           <BarChart3 size={16} style={{ color: themeConfig.colors.primary }} />
           <p className="text-xs font-black mt-1" style={{ color: themeConfig.colors.text }}>التحليلات</p>
@@ -139,16 +161,28 @@ export default function SellerDashboardPage() {
         <button
           type="button"
           className="rounded-2xl border p-3 text-right col-span-2"
-          style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}
-          onClick={() => navigate('ai-listing-tools', { role })}
+          style={{
+            backgroundColor: themeConfig.colors.surface,
+            borderColor: themeConfig.colors.border,
+            opacity: canAccessAiListingTools(selected) ? 1 : 0.7,
+          }}
+          onClick={() => {
+            if (!canAccessAiListingTools(selected)) {
+              setToast('أدوات AI متاحة من الخطة الأساسية فما فوق');
+              return;
+            }
+            navigate('ai-listing-tools', { role, plan: selected });
+          }}
         >
           <Wand2 size={16} style={{ color: themeConfig.colors.accent }} />
-          <p className="text-xs font-black mt-1" style={{ color: themeConfig.colors.text }}>أدوات AI للقوائم</p>
+          <p className="text-xs font-black mt-1" style={{ color: themeConfig.colors.text }}>
+            أدوات AI للقوائم {canAccessAiListingTools(selected) ? '' : '(أساسي+)'}
+          </p>
         </button>
       </div>
 
       <h2 className="text-sm font-black mb-2 flex items-center gap-1" style={{ color: themeConfig.colors.text }}>
-        <Crown size={14} /> خطط الاشتراك
+        <Crown size={14} /> خطط الاشتراك {role === 'company' ? '(تسعير الشركات)' : ''}
       </h2>
       <div className="space-y-2">
         {plans.map(planItem => (
