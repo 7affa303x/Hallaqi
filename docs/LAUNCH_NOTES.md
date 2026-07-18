@@ -34,3 +34,40 @@
 1. ضبط `VITE_SUPABASE_URL` + anon key الحقيقية
 2. تطبيق migrations السوق
 3. تفعيل Gemini إن رغبت بأدوات AI الحية (يوجد fallback محلي)
+
+## حالة المفاتيح (تحقق 2026-07-18)
+
+| المفتاح | الحالة |
+|---------|--------|
+| Supabase URL + anon JWT | **يعمل** — `profiles` HTTP 200 |
+| Supabase publishable (`sb_publishable_…`) | **يعمل** |
+| Supabase service (`sb_secret_…`) | **يعمل** — للخادم فقط |
+| Gemini API | **المفتاح صالح** لكن `generateContent` يرجع **429** (حصة مجانية منتهية) |
+| مخطط السوق على Supabase | **غير متوافق** — جداول قديمة (`store_id`/`company_id`) بدون `marketplace_sellers` |
+
+### خطوات إصلاح Supabase
+
+1. Supabase Dashboard → **SQL Editor** → نفّذ `supabase/migrations/20260718140000_replace_legacy_marketplace.sql`
+2. ثم نفّذ بقية `20260718120000_marketplace_platform.sql` إن لزم (RPCs، اشتراكات، triggers)
+3. تحقق: `node scripts/verify-credentials.mjs`
+
+### متغيرات Vercel المطلوبة
+
+```
+VITE_SUPABASE_URL=https://cdwzbtjwqybnahhbhldy.supabase.co
+VITE_SUPABASE_ANON_KEY=<anon JWT أو publishable>
+SUPABASE_SERVICE_ROLE_KEY=<sb_secret — خادم فقط>
+GEMINI_API_KEY=<مفتاح Gemini>
+AI_GENERATION_ENABLED=true
+AI_TEXT_MODEL=gemini-2.0-flash
+VITE_AI_PROVIDER=gemini
+```
+
+### ما زال ناقصاً (اختياري)
+
+- `VITE_STRIPE_PUBLISHABLE_KEY` + `STRIPE_SECRET_KEY` — دفع Stripe
+- `VITE_CCP_ACCOUNT_NUMBER` + `VITE_CCP_CARD_NUMBER` — دفع CCP
+- `VITE_VAPID_PUBLIC_KEY` — إشعارات الويب
+- كلمة مرور قاعدة البيانات أو `SUPABASE_ACCESS_TOKEN` لتشغيل `supabase db push`
+
+> **أمان:** لا تضع المفاتيح في المحادثة أو Git. غيّر المفاتيح إذا تسرّبت.
