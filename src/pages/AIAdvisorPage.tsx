@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { ArrowRight, Image, Send, Sparkles, WandSparkles } from 'lucide-react';
+import { ArrowRight, Image, LogIn, Send, Sparkles, WandSparkles } from 'lucide-react';
 import { useApp } from '@/contexts/useApp';
+import { useAuth } from '@/hooks/useAuth';
 import PausedFeatureBanner from '@/components/PausedFeatureBanner';
 import { FEATURE_FLAGS, PAUSED_LABEL } from '@/lib/featureFlags';
 import {
@@ -16,11 +17,12 @@ const fallbackCapabilities: AICapabilities = {
   optimizedScheduling: true,
   generativeAdvice: false,
   hairstyleImageGeneration: false,
-  externalBlocker: 'AI Gateway must be enabled with budgets and model access.',
+  externalBlocker: 'المساعد ينتظر إعداد GROQ_API_KEY على الخادم.',
 };
 
 export default function AIAdvisorPage() {
-  const { themeConfig, goBack } = useApp();
+  const { themeConfig, goBack, navigate } = useApp();
+  const { isAuthenticated } = useAuth();
   const [capabilities, setCapabilities] = useState(fallbackCapabilities);
   const [mode, setMode] = useState<'advice' | 'image'>('advice');
   const [question, setQuestion] = useState('');
@@ -36,10 +38,14 @@ export default function AIAdvisorPage() {
   }, []);
 
   const imagePaused = !FEATURE_FLAGS.aiImageGenerationEnabled;
-  const effectiveMode = mode === 'image' && imagePaused ? 'advice' : mode;
 
   const submit = async () => {
     if (question.trim().length < 5) return;
+    if (!isAuthenticated) {
+      setError('يجب تسجيل الدخول لاستخدام المساعد الذكي');
+      navigate('login', { redirectScreen: 'ai-advisor' });
+      return;
+    }
     if (mode === 'image' && imagePaused) {
       setError(`توليد صور التسريحات ${PAUSED_LABEL} — حصة Gemini غير متاحة حالياً`);
       return;
@@ -53,15 +59,20 @@ export default function AIAdvisorPage() {
         setStyleImage(await requestStyleImage(question.trim()));
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'الخدمة غير متاحة');
+      const message = err instanceof Error ? err.message : 'الخدمة غير متاحة';
+      if (message.includes('تسجيل الدخول')) {
+        navigate('login', { redirectScreen: 'ai-advisor' });
+      }
+      setError(message);
     } finally {
       setLoading(false);
     }
   };
 
-  const enabled = effectiveMode === 'advice'
+  const providerReady = mode === 'advice'
     ? capabilities.generativeAdvice
     : capabilities.hairstyleImageGeneration && !imagePaused;
+  const canSubmit = providerReady && isAuthenticated && !(mode === 'image' && imagePaused);
 
   return (
     <div className="min-h-screen pb-8" style={{ backgroundColor: themeConfig.colors.background }}>
@@ -71,11 +82,28 @@ export default function AIAdvisorPage() {
         </button>
         <div>
           <h1 className="font-bold flex items-center gap-2" style={{ color: themeConfig.colors.text }}><Sparkles size={17} style={{ color: themeConfig.colors.accent }} /> مساعد حلاقي</h1>
-          <p className="text-[10px]" style={{ color: themeConfig.colors.textMuted }}>نصائح آمنة ومزايا ذكية قابلة للتفسير</p>
+          <p className="text-[10px]" style={{ color: themeConfig.colors.textMuted }}>نصائح عناية بالعربية عبر Groq</p>
         </div>
       </header>
 
       <main className="p-4 space-y-4">
+        {!isAuthenticated && (
+          <div className="rounded-2xl border p-4" style={{ backgroundColor: `${themeConfig.colors.info}12`, borderColor: themeConfig.colors.border }}>
+            <p className="text-xs font-bold" style={{ color: themeConfig.colors.text }}>سجّل الدخول لاستخدام المساعد</p>
+            <p className="text-[11px] mt-1 leading-5" style={{ color: themeConfig.colors.textMuted }}>
+              النصائح المجانية عبر Groq متاحة بعد تسجيل الدخول لحماية الحصص اليومية.
+            </p>
+            <button
+              type="button"
+              onClick={() => navigate('login', { redirectScreen: 'ai-advisor' })}
+              className="mt-3 w-full h-10 rounded-xl text-xs font-bold text-white flex items-center justify-center gap-2"
+              style={{ backgroundColor: themeConfig.colors.primary }}
+            >
+              <LogIn size={14} /> تسجيل الدخول
+            </button>
+          </div>
+        )}
+
         <div className="grid grid-cols-2 gap-2">
           <button type="button" onClick={() => setMode('advice')} className="h-11 rounded-xl text-xs font-bold flex items-center justify-center gap-2" style={{ backgroundColor: mode === 'advice' ? themeConfig.colors.primary : themeConfig.colors.surface, color: mode === 'advice' ? '#fff' : themeConfig.colors.text }}><WandSparkles size={15} /> نصيحة عناية</button>
           <button type="button" onClick={() => setMode('image')} className="h-11 rounded-xl text-xs font-bold flex items-center justify-center gap-2" style={{ backgroundColor: mode === 'image' ? themeConfig.colors.primary : themeConfig.colors.surface, color: mode === 'image' ? '#fff' : themeConfig.colors.text }}><Image size={15} /> تصور تسريحة</button>
@@ -102,17 +130,17 @@ export default function AIAdvisorPage() {
             className="w-full mt-3 rounded-xl border p-3 text-sm resize-none disabled:opacity-50"
             style={{ backgroundColor: themeConfig.colors.background, borderColor: themeConfig.colors.border, color: themeConfig.colors.text }}
           />
-          {!enabled && mode === 'advice' && (
+          {!providerReady && mode === 'advice' && (
             <p className="text-[11px] mt-2 p-2 rounded-lg" style={{ color: themeConfig.colors.warning, backgroundColor: themeConfig.colors.warning + '10' }}>
               {capabilities.externalBlocker || 'المساعد ينتظر إعداد GROQ_API_KEY (مجاني) على الخادم.'}
             </p>
           )}
-          {enabled && capabilities.provider === 'groq' && (
+          {providerReady && capabilities.provider === 'groq' && (
             <p className="text-[11px] mt-2" style={{ color: themeConfig.colors.textMuted }}>
-              يعمل عبر Groq مجاناً (Llama).
+              يعمل عبر Groq مجاناً (Llama). حد يومي لحماية الخدمة.
             </p>
           )}
-          {enabled && capabilities.provider === 'gemini' && (
+          {providerReady && capabilities.provider === 'gemini' && (
             <p className="text-[11px] mt-2" style={{ color: themeConfig.colors.textMuted }}>
               يعمل عبر Gemini مباشرة.
             </p>
@@ -120,12 +148,20 @@ export default function AIAdvisorPage() {
           <button
             type="button"
             onClick={() => void submit()}
-            disabled={!enabled || loading || question.trim().length < 5 || (mode === 'image' && imagePaused)}
+            disabled={!canSubmit || loading || question.trim().length < 5}
             className="w-full h-11 rounded-xl mt-3 text-white text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-45"
             style={{ backgroundColor: themeConfig.colors.primary }}
           >
             <Send size={15} />
-            {loading ? 'جاري المعالجة...' : mode === 'image' && imagePaused ? PAUSED_LABEL : mode === 'advice' ? 'احصل على النصيحة' : 'ولّد المرجع'}
+            {loading
+              ? 'جاري المعالجة...'
+              : !isAuthenticated
+                ? 'سجّل الدخول للمتابعة'
+                : mode === 'image' && imagePaused
+                  ? PAUSED_LABEL
+                  : mode === 'advice'
+                    ? 'احصل على النصيحة'
+                    : 'ولّد المرجع'}
           </button>
         </div>
 
@@ -140,7 +176,7 @@ export default function AIAdvisorPage() {
         {error && <p role="alert" className="text-xs p-3 rounded-xl" style={{ color: themeConfig.colors.error, backgroundColor: themeConfig.colors.error + '10' }}>{error}</p>}
 
         <div className="rounded-2xl p-4" style={{ backgroundColor: themeConfig.colors.success + '0D' }}>
-          <p className="text-xs font-bold" style={{ color: themeConfig.colors.text }}>يعمل بدون مزود خارجي الآن</p>
+          <p className="text-xs font-bold" style={{ color: themeConfig.colors.text }}>يعمل محلياً أيضاً</p>
           <p className="text-[11px] mt-1 leading-relaxed" style={{ color: themeConfig.colors.textMuted }}>ترتيب الحلاقين المقترحين وأفضل أوقات الحجز يعملان بخوارزمية محلية قابلة للتفسير ولا يرسلان بياناتك إلى نموذج خارجي.</p>
         </div>
       </main>

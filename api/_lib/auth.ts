@@ -36,16 +36,26 @@ export async function consumeAiQuota(
 ): Promise<boolean> {
   const supabaseUrl = process.env.VITE_SUPABASE_URL;
   const apiKey = process.env.VITE_SUPABASE_ANON_KEY;
-  if (!supabaseUrl || !apiKey) return false;
-  const response = await fetch(`${supabaseUrl}/rest/v1/rpc/consume_ai_quota`, {
-    method: 'POST',
-    headers: {
-      authorization: `Bearer ${user.accessToken}`,
-      apikey: apiKey,
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({ ai_feature: feature }),
-  });
-  if (!response.ok) return false;
-  return response.json() as Promise<boolean>;
+  if (!supabaseUrl || !apiKey) return true; // fail open — do not block AI when misconfigured
+  try {
+    const response = await fetch(`${supabaseUrl}/rest/v1/rpc/consume_ai_quota`, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${user.accessToken}`,
+        apikey: apiKey,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ ai_feature: feature }),
+    });
+    if (!response.ok) {
+      // Distinguishes infra/RPC errors from an exhausted quota (RPC returns false with 200)
+      console.error('consume_ai_quota failed', { status: response.status, feature, userId: user.id });
+      return true;
+    }
+    const allowed = await response.json();
+    return allowed === true;
+  } catch (error) {
+    console.error('consume_ai_quota exception', error);
+    return true;
+  }
 }
