@@ -15,9 +15,9 @@ const requestSchema = z.object({
 });
 
 const responseSchema = z.object({
-  answer: z.string().min(1).max(1200),
-  suggestedServices: z.array(z.string().max(80)).max(4),
-  cautions: z.array(z.string().max(160)).max(4),
+  answer: z.string().trim().min(1).max(1400),
+  suggestedServices: z.array(z.string().trim().max(80)).max(4).default([]),
+  cautions: z.array(z.string().trim().max(160)).max(4).default([]),
 });
 
 export async function POST(request: Request) {

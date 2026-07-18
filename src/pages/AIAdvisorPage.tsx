@@ -52,6 +52,8 @@ export default function AIAdvisorPage() {
     }
     setLoading(true);
     setError('');
+    setAdvice(null);
+    setStyleImage('');
     try {
       if (mode === 'advice') {
         setAdvice(await requestGroomingAdvice({ question: question.trim() }));
@@ -105,17 +107,19 @@ export default function AIAdvisorPage() {
         )}
 
         <div className="grid grid-cols-2 gap-2">
-          <button type="button" onClick={() => setMode('advice')} className="h-11 rounded-xl text-xs font-bold flex items-center justify-center gap-2" style={{ backgroundColor: mode === 'advice' ? themeConfig.colors.primary : themeConfig.colors.surface, color: mode === 'advice' ? '#fff' : themeConfig.colors.text }}><WandSparkles size={15} /> نصيحة عناية</button>
-          <button type="button" onClick={() => setMode('image')} className="h-11 rounded-xl text-xs font-bold flex items-center justify-center gap-2" style={{ backgroundColor: mode === 'image' ? themeConfig.colors.primary : themeConfig.colors.surface, color: mode === 'image' ? '#fff' : themeConfig.colors.text }}><Image size={15} /> تصور تسريحة</button>
+          <button type="button" onClick={() => { setMode('advice'); setError(''); }} className="h-11 rounded-xl text-xs font-bold flex items-center justify-center gap-2" style={{ backgroundColor: mode === 'advice' ? themeConfig.colors.primary : themeConfig.colors.surface, color: mode === 'advice' ? '#fff' : themeConfig.colors.text }}><WandSparkles size={15} /> نصيحة عناية</button>
+          <button type="button" onClick={() => { setMode('image'); setError(''); setAdvice(null); }} className="h-11 rounded-xl text-xs font-bold flex items-center justify-center gap-2" style={{ backgroundColor: mode === 'image' ? themeConfig.colors.primary : themeConfig.colors.surface, color: mode === 'image' ? '#fff' : themeConfig.colors.text }}><Image size={15} /> تصور تسريحة</button>
         </div>
 
-        {mode === 'image' && imagePaused && (
-          <PausedFeatureBanner
-            title="توليد صور التسريحات"
-            description="متوقف عند الإطلاق بسبب حصة Gemini. نصائح العناية النصية عبر Groq تبقى متاحة."
-            kind="paused"
-            colors={themeConfig.colors}
-          />
+        {mode === 'image' && (
+          imagePaused ? (
+            <PausedFeatureBanner
+              title="توليد صور التسريحات"
+              description="متوقف حالياً بسبب حصة Gemini. استخدم تبويب «نصيحة عناية» للنصائح النصية عبر Groq."
+              kind="paused"
+              colors={themeConfig.colors}
+            />
+          ) : null
         )}
 
         <div className="rounded-2xl border p-4" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
@@ -123,7 +127,7 @@ export default function AIAdvisorPage() {
           <textarea
             value={question}
             onChange={event => setQuestion(event.target.value)}
-            maxLength={600}
+            maxLength={500}
             rows={5}
             disabled={mode === 'image' && imagePaused}
             placeholder={mode === 'advice' || imagePaused ? 'مثال: ما الخدمة المناسبة لشعر جاف ومجعد؟' : 'مثال: تسريحة قصيرة متدرجة لشعر مجعد، مرجع صالون واقعي'}
@@ -165,14 +169,14 @@ export default function AIAdvisorPage() {
           </button>
         </div>
 
-        {advice && (
+        {mode === 'advice' && advice && (
           <div className="rounded-2xl border p-4 space-y-3" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.primary }}>
             <p className="text-sm leading-relaxed" style={{ color: themeConfig.colors.text }}>{advice.answer}</p>
             {advice.suggestedServices.length > 0 && <div className="flex flex-wrap gap-1">{advice.suggestedServices.map(service => <span key={service} className="text-[10px] px-2 py-1 rounded-full" style={{ backgroundColor: themeConfig.colors.primary + '12', color: themeConfig.colors.primary }}>{service}</span>)}</div>}
             {advice.cautions.map(caution => <p key={caution} className="text-[10px]" style={{ color: themeConfig.colors.warning }}>• {caution}</p>)}
           </div>
         )}
-        {styleImage && <img src={styleImage} alt="مرجع تسريحة مولد بالذكاء الاصطناعي" className="w-full rounded-2xl" loading="lazy" />}
+        {mode === 'image' && styleImage && <img src={styleImage} alt="مرجع تسريحة مولد بالذكاء الاصطناعي" className="w-full rounded-2xl" loading="lazy" />}
         {error && <p role="alert" className="text-xs p-3 rounded-xl" style={{ color: themeConfig.colors.error, backgroundColor: themeConfig.colors.error + '10' }}>{error}</p>}
 
         <div className="rounded-2xl p-4" style={{ backgroundColor: themeConfig.colors.success + '0D' }}>
