@@ -1817,7 +1817,7 @@ export type Database = {
         | "coloring"
         | "styling"
         | "package"
-      user_role: "client" | "barber" | "specialist" | "admin" | "moderator"
+      user_role: "client" | "barber" | "specialist" | "admin" | "moderator" | "store" | "company" | "doctor"
       user_status: "active" | "inactive" | "suspended" | "pending"
       verification_status: "unverified" | "pending" | "verified" | "premium"
     }
@@ -1968,7 +1968,7 @@ export const Constants = {
         "styling",
         "package",
       ],
-      user_role: ["client", "barber", "specialist", "admin", "moderator"],
+      user_role: ["client", "barber", "specialist", "admin", "moderator", "store", "company", "doctor"],
       user_status: ["active", "inactive", "suspended", "pending"],
       verification_status: ["unverified", "pending", "verified", "premium"],
     },

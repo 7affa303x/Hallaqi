@@ -397,6 +397,8 @@ export type ScreenName =
   | 'doctor-detail'
   | 'product-detail'
   | 'seller-dashboard'
+  | 'seller-products'
+  | 'seller-placements'
   | 'marketplace-analytics'
   | 'ai-listing-tools'
   | 'coming-soon';
@@ -417,6 +419,7 @@ export interface ScreenParams {
   productId?: string;
   tool?: string;
   role?: string;
+  plan?: string;
   [key: string]: string | undefined;
 }
 

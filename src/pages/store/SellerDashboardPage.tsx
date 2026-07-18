@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ArrowLeft, Check, Crown, Sparkles, Store, Building2, Stethoscope, BarChart3, Wand2 } from 'lucide-react';
+import { ArrowLeft, Check, Crown, Sparkles, Store, Building2, Stethoscope, BarChart3, Wand2, Package, Megaphone, BadgeCheck } from 'lucide-react';
 import { useApp } from '@/contexts/useApp';
 import { getMarketplacePlans } from '@/supabase/marketplace';
 import { MARKETPLACE_PREMIUM_LISTING_CAP } from '@/types/marketplace';
@@ -12,9 +12,11 @@ import type { MarketplacePlanTier, MarketplaceSubscriptionPlan } from '@/types/m
 export default function SellerDashboardPage() {
   const { themeConfig, goBack, navigate, screenParams } = useApp();
   const role = (screenParams?.role || 'store') as 'store' | 'company' | 'doctor';
+  const sellerId = screenParams?.sellerId || `demo-${role}`;
   const [plans, setPlans] = useState<MarketplaceSubscriptionPlan[]>([]);
   const [selected, setSelected] = useState<MarketplacePlanTier>('free');
   const [requested, setRequested] = useState(false);
+  const [doctorVerified, setDoctorVerified] = useState(false);
 
   useEffect(() => {
     void getMarketplacePlans().then(setPlans);
@@ -40,9 +42,24 @@ export default function SellerDashboardPage() {
           Start free · Pay as you grow. الحد الأقصى للبريميوم {MARKETPLACE_PREMIUM_LISTING_CAP} منتج — ليس غير محدود.
         </p>
         {role === 'doctor' && (
-          <p className="text-xs mt-2 font-bold" style={{ color: themeConfig.colors.primary }}>
-            التوثيق والشهادة مجانيان لحسابات الأطباء.
-          </p>
+          <div className="mt-3">
+            <p className="text-xs font-bold" style={{ color: themeConfig.colors.primary }}>
+              التوثيق والشهادة مجانيان لحسابات الأطباء.
+            </p>
+            <button
+              type="button"
+              disabled={doctorVerified}
+              onClick={() => setDoctorVerified(true)}
+              className="mt-2 w-full py-2 rounded-xl text-xs font-black flex items-center justify-center gap-1"
+              style={{
+                backgroundColor: doctorVerified ? `${themeConfig.colors.success}18` : themeConfig.colors.primary,
+                color: doctorVerified ? themeConfig.colors.success : '#fff',
+              }}
+            >
+              <BadgeCheck size={14} />
+              {doctorVerified ? 'تم إرسال طلب التوثيق المجاني' : 'طلب توثيق مجاني'}
+            </button>
+          </div>
         )}
       </div>
 
@@ -51,7 +68,25 @@ export default function SellerDashboardPage() {
           type="button"
           className="rounded-2xl border p-3 text-right"
           style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}
-          onClick={() => navigate('marketplace-analytics', { sellerId: `demo-${role}`, role })}
+          onClick={() => navigate('seller-products', { sellerId, role, plan: selected })}
+        >
+          <Package size={16} style={{ color: themeConfig.colors.primary }} />
+          <p className="text-xs font-black mt-1" style={{ color: themeConfig.colors.text }}>المنتجات</p>
+        </button>
+        <button
+          type="button"
+          className="rounded-2xl border p-3 text-right"
+          style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}
+          onClick={() => navigate('seller-placements', { sellerId, role })}
+        >
+          <Megaphone size={16} style={{ color: themeConfig.colors.accent }} />
+          <p className="text-xs font-black mt-1" style={{ color: themeConfig.colors.text }}>مواضع الإعلان</p>
+        </button>
+        <button
+          type="button"
+          className="rounded-2xl border p-3 text-right"
+          style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}
+          onClick={() => navigate('marketplace-analytics', { sellerId, role })}
         >
           <BarChart3 size={16} style={{ color: themeConfig.colors.primary }} />
           <p className="text-xs font-black mt-1" style={{ color: themeConfig.colors.text }}>التحليلات</p>
@@ -71,28 +106,28 @@ export default function SellerDashboardPage() {
         <Crown size={14} /> خطط الاشتراك
       </h2>
       <div className="space-y-2">
-        {plans.map(plan => (
+        {plans.map(planItem => (
           <button
-            key={plan.id}
+            key={planItem.id}
             type="button"
-            onClick={() => setSelected(plan.id)}
+            onClick={() => setSelected(planItem.id)}
             className="w-full rounded-2xl border p-3 text-right"
             style={{
-              backgroundColor: selected === plan.id ? `${themeConfig.colors.primary}10` : themeConfig.colors.surface,
-              borderColor: selected === plan.id ? themeConfig.colors.primary : themeConfig.colors.border,
+              backgroundColor: selected === planItem.id ? `${themeConfig.colors.primary}10` : themeConfig.colors.surface,
+              borderColor: selected === planItem.id ? themeConfig.colors.primary : themeConfig.colors.border,
             }}
           >
             <div className="flex items-center justify-between">
-              <span className="text-sm font-black" style={{ color: themeConfig.colors.text }}>{plan.nameAr}</span>
+              <span className="text-sm font-black" style={{ color: themeConfig.colors.text }}>{planItem.nameAr}</span>
               <span className="text-xs font-bold" style={{ color: themeConfig.colors.primary }}>
-                {plan.priceDzd === 0 ? 'مجاني' : `${plan.priceDzd.toLocaleString('ar-DZ')} دج/شهر`}
+                {planItem.priceDzd === 0 ? 'مجاني' : `${planItem.priceDzd.toLocaleString('ar-DZ')} دج/شهر`}
               </span>
             </div>
             <p className="text-[11px] mt-1" style={{ color: themeConfig.colors.textMuted }}>
-              حد القوائم: {plan.listingCap} · مميز: {plan.featuredSlots} · بانر: {plan.bannerSlots}
+              حد القوائم: {planItem.listingCap} · مميز: {planItem.featuredSlots} · بانر: {planItem.bannerSlots}
             </p>
             <ul className="mt-2 space-y-1">
-              {plan.features.map(f => (
+              {planItem.features.map(f => (
                 <li key={f} className="text-[11px] flex items-center gap-1" style={{ color: themeConfig.colors.textMuted }}>
                   <Check size={11} style={{ color: themeConfig.colors.primary }} /> {f}
                 </li>

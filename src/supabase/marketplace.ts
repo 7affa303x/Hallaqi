@@ -16,6 +16,7 @@ import type {
   MarketplacePlacement,
 } from '@/types/marketplace';
 import { filterMarketplaceProducts, getProductOfTheDay } from '@/lib/marketplace/filters';
+import { getAllSellerOwnedProducts } from '@/lib/marketplace/sellerInventory';
 import { isSupabaseConfigured, supabase } from '@/supabase/client';
 
 async function tryRemoteProducts(): Promise<MarketplaceProduct[] | null> {
@@ -131,7 +132,9 @@ export async function getMarketplaceSellerById(id: string): Promise<MarketplaceS
 export async function getMarketplaceProducts(filters: MarketplaceFilters = {}): Promise<MarketplaceProduct[]> {
   const remote = await tryRemoteProducts();
   const base = remote && remote.length > 0 ? remote : marketplaceProducts;
-  return filterMarketplaceProducts(base, filters);
+  const owned = typeof window !== 'undefined' ? getAllSellerOwnedProducts() : [];
+  const merged = [...owned, ...base.filter(p => !owned.some(o => o.id === p.id))];
+  return filterMarketplaceProducts(merged, filters);
 }
 
 export async function getMarketplaceProductById(id: string): Promise<MarketplaceProduct | undefined> {
@@ -142,7 +145,9 @@ export async function getMarketplaceProductById(id: string): Promise<Marketplace
 export async function getSellerProducts(sellerId: string): Promise<MarketplaceProduct[]> {
   const remote = await tryRemoteProducts();
   const all = remote && remote.length > 0 ? remote : marketplaceProducts;
-  return all.filter(p => p.sellerId === sellerId && p.isActive);
+  const owned = typeof window !== 'undefined' ? getAllSellerOwnedProducts().filter(p => p.sellerId === sellerId) : [];
+  const merged = [...owned, ...all.filter(p => p.sellerId === sellerId && !owned.some(o => o.id === p.id))];
+  return merged.filter(p => p.isActive);
 }
 
 export async function getProductOfTheDayProduct(): Promise<MarketplaceProduct | undefined> {

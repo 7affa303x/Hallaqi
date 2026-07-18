@@ -424,6 +424,26 @@ export const marketplacePlacements: MarketplacePlacement[] = [
     startsAt: '2026-07-01T00:00:00Z',
     isActive: true,
   },
+  {
+    id: 'place-banner-1',
+    placementType: 'banner',
+    sellerId: 'company-barberpro',
+    productId: 'prod-6',
+    title: 'دورة Fade — ظهور بانر',
+    bidAmountDzd: 8000,
+    startsAt: '2026-07-10T00:00:00Z',
+    isActive: true,
+  },
+  {
+    id: 'place-sponsored-1',
+    placementType: 'sponsored',
+    sellerId: 'store-atlas',
+    productId: 'prod-2',
+    title: 'زيت أطلس — Sponsored',
+    bidAmountDzd: 6000,
+    startsAt: '2026-07-12T00:00:00Z',
+    isActive: true,
+  },
 ];
 
 export const mockMarketplaceAnalytics: MarketplaceAnalyticsSummary = {

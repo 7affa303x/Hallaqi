@@ -18,6 +18,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { Users, Scissors, Calendar, CreditCard, Clock, Star, DollarSign, TrendingUp, ChevronRight, Shield, Check, X, ArrowRight, Crown, Flag, ShoppingBag } from 'lucide-react';
 import { marketplaceSellers, marketplaceProducts, marketplacePlacements } from '@/data/marketplaceSeed';
 import type { MarketplaceSeller, MarketplaceProduct } from '@/types/marketplace';
+import { getPlacementRequests, reviewPlacementRequest } from '@/lib/marketplace/sellerInventory';
 
 interface DashboardStats {
   totalUsers: number;
@@ -833,6 +834,7 @@ function MarketplaceAdminPanel() {
   const [sellers, setSellers] = useState<MarketplaceSeller[]>(marketplaceSellers);
   const [products] = useState<MarketplaceProduct[]>(marketplaceProducts);
   const [potdId, setPotdId] = useState(marketplaceProducts.find(p => p.isProductOfTheDay)?.id || '');
+  const [placementReqs, setPlacementReqs] = useState(() => getPlacementRequests());
   const [toast, setToast] = useState('');
 
   const approve = (id: string, ok: boolean) => {
@@ -850,6 +852,12 @@ function MarketplaceAdminPanel() {
   const setProductOfDay = (productId: string) => {
     setPotdId(productId);
     setToast('تم تعيين منتج اليوم (موضع إعلاني مدفوع — بدون عمولة)');
+  };
+
+  const reviewPlacement = (id: string, ok: boolean) => {
+    reviewPlacementRequest(id, ok);
+    setPlacementReqs(getPlacementRequests());
+    setToast(ok ? 'تم تفعيل الموضع الإعلاني' : 'تم رفض طلب الموضع');
   };
 
   return (
@@ -887,6 +895,25 @@ function MarketplaceAdminPanel() {
             <button type="button" onClick={() => approve(seller.id, true)} className="flex-1 h-8 rounded-lg text-xs font-bold" style={{ backgroundColor: themeConfig.colors.success + '15', color: themeConfig.colors.success }}>موافقة</button>
             <button type="button" onClick={() => approve(seller.id, false)} className="flex-1 h-8 rounded-lg text-xs font-bold" style={{ backgroundColor: themeConfig.colors.error + '15', color: themeConfig.colors.error }}>رفض</button>
           </div>
+        </div>
+      ))}
+
+      <h4 className="text-sm font-bold" style={{ color: themeConfig.colors.text }}>طلبات المواضع الإعلانية</h4>
+      {placementReqs.length === 0 && (
+        <p className="text-xs" style={{ color: themeConfig.colors.textMuted }}>لا طلبات مواضع حالياً</p>
+      )}
+      {placementReqs.map(req => (
+        <div key={req.id} className="p-3 rounded-xl" style={{ backgroundColor: themeConfig.colors.surface, border: `1px solid ${themeConfig.colors.border}` }}>
+          <p className="text-sm font-bold" style={{ color: themeConfig.colors.text }}>{req.title}</p>
+          <p className="text-[10px]" style={{ color: themeConfig.colors.textMuted }}>
+            {req.placementType} · {req.bidAmountDzd.toLocaleString('ar-DZ')} دج · {req.status}
+          </p>
+          {req.status === 'pending' && (
+            <div className="flex gap-2 mt-2">
+              <button type="button" onClick={() => reviewPlacement(req.id, true)} className="flex-1 h-8 rounded-lg text-xs font-bold" style={{ backgroundColor: themeConfig.colors.success + '15', color: themeConfig.colors.success }}>تفعيل</button>
+              <button type="button" onClick={() => reviewPlacement(req.id, false)} className="flex-1 h-8 rounded-lg text-xs font-bold" style={{ backgroundColor: themeConfig.colors.error + '15', color: themeConfig.colors.error }}>رفض</button>
+            </div>
+          )}
         </div>
       ))}
 

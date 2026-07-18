@@ -11,26 +11,31 @@ import {
   getMarketplaceCategories,
   getMarketplaceProducts,
   getMarketplaceSellers,
+  getMarketplacePlacements,
   getProductOfTheDayProduct,
 } from '@/supabase/marketplace';
 import { formatDzd, discountPercent, flattenCategories } from '@/lib/marketplace/filters';
 import { trackMarketplaceEvent } from '@/lib/marketplace/analytics';
+import { mapBarberExtrasToMarketplace } from '@/lib/marketplace/barberExtras';
 import type {
   MarketplaceCategory,
   MarketplaceFilters,
+  MarketplacePlacement,
   MarketplaceProduct,
   MarketplaceSeller,
 } from '@/types/marketplace';
 
 export default function MarketplaceTab() {
-  const { themeConfig, navigate } = useApp();
+  const { themeConfig, navigate, barbers } = useApp();
   const [categories, setCategories] = useState<MarketplaceCategory[]>([]);
   const [products, setProducts] = useState<MarketplaceProduct[]>([]);
   const [sellers, setSellers] = useState<MarketplaceSeller[]>([]);
+  const [placements, setPlacements] = useState<MarketplacePlacement[]>([]);
   const [potd, setPotd] = useState<MarketplaceProduct | undefined>();
   const [loading, setLoading] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
   const [expandedCats, setExpandedCats] = useState<Set<string>>(new Set());
+  const [showExtras, setShowExtras] = useState(false);
 
   const [filters, setFilters] = useState<MarketplaceFilters>({
     query: '',
@@ -41,22 +46,27 @@ export default function MarketplaceTab() {
     let cancelled = false;
     (async () => {
       setLoading(true);
-      const [cats, prods, sells, day] = await Promise.all([
+      const [cats, prods, sells, day, places] = await Promise.all([
         getMarketplaceCategories(),
         getMarketplaceProducts(filters),
         getMarketplaceSellers(),
         getProductOfTheDayProduct(),
+        getMarketplacePlacements(),
       ]);
       if (cancelled) return;
       setCategories(cats);
       setProducts(prods);
       setSellers(sells);
       setPotd(day);
+      setPlacements(places.filter(p => p.isActive));
       setLoading(false);
       trackMarketplaceEvent('search_impression', { categoryId: filters.categoryId || undefined, wilaya: filters.wilaya || undefined });
     })();
     return () => { cancelled = true; };
   }, [filters]);
+
+  const barberExtras = useMemo(() => mapBarberExtrasToMarketplace(barbers).slice(0, 8), [barbers]);
+  const banners = placements.filter(p => p.placementType === 'banner' || p.placementType === 'sponsored');
 
   const brands = useMemo(
     () => [...new Set(products.map(p => p.brand).filter(Boolean))].sort(),
@@ -177,6 +187,59 @@ export default function MarketplaceTab() {
               </div>
             </div>
           </button>
+        </section>
+      )}
+
+      {/* Sponsored / banner placements */}
+      {banners.length > 0 && (
+        <section className="px-4 mt-3 flex gap-2 overflow-x-auto no-scrollbar">
+          {banners.map(banner => (
+            <button
+              key={banner.id}
+              type="button"
+              className="shrink-0 min-w-[220px] rounded-2xl px-4 py-3 text-right text-white"
+              style={{ background: `linear-gradient(135deg, ${themeConfig.colors.primary}, ${themeConfig.colors.accent})` }}
+              onClick={() => {
+                trackMarketplaceEvent('featured_impression', { sellerId: banner.sellerId, productId: banner.productId });
+                if (banner.productId) navigate('product-detail', { productId: banner.productId });
+                else if (banner.sellerId) navigate('store-detail', { sellerId: banner.sellerId });
+              }}
+            >
+              <p className="text-[10px] font-bold opacity-90">إعلان مدعوم</p>
+              <p className="text-sm font-black">{banner.title || 'بانر مميز'}</p>
+            </button>
+          ))}
+        </section>
+      )}
+
+      {/* Barber service extras (not physical store products) */}
+      {barberExtras.length > 0 && (
+        <section className="px-4 mt-4">
+          <button
+            type="button"
+            className="w-full flex items-center justify-between mb-2"
+            onClick={() => setShowExtras(v => !v)}
+          >
+            <h3 className="text-sm font-black" style={{ color: themeConfig.colors.text }}>خدمات إضافية من الحلاقين</h3>
+            <span className="text-[10px] font-bold" style={{ color: themeConfig.colors.primary }}>
+              {showExtras ? 'إخفاء' : 'عرض'}
+            </span>
+          </button>
+          {showExtras && (
+            <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1">
+              {barberExtras.map(extra => (
+                <ProductCard
+                  key={extra.id}
+                  product={extra}
+                  compact
+                  onOpen={() => navigate('barber-detail', { barberId: extra.sellerId })}
+                />
+              ))}
+            </div>
+          )}
+          <p className="text-[10px] mt-1" style={{ color: themeConfig.colors.textMuted }}>
+            خدمات VIP/عناية — ليست منتجات متجر فيزيائية
+          </p>
         </section>
       )}
 
