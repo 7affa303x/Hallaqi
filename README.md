@@ -5,17 +5,24 @@
 ## Features
 
 - **Barber Discovery** — Search, filter, and browse barbers by location, rating, and services
-- **Online Booking** — Atomic multi-service appointments with real-time availability
+- **Online Booking** — Atomic multi-service appointments (cash at soft launch)
+- **Marketplace** — Stores / companies / doctors with external Visit Store (https only)
 - **Forum** — Community discussions, likes, bookmarks, reports, and live competitions
 - **QR Code** — Generate and scan barber QR codes
 - **Smart Matching** — Explainable barber recommendations and optimized appointment times
-- **Loyalty** — Booking points, tiers, rewards, and redemption vouchers
-- **AI Advisor** — Secure AI Gateway-ready grooming and hairstyle assistance
+- **AI Advisor** — Groq-powered Arabic grooming advice (free tier)
 - **Authentication** — Email/password and Google OAuth via Supabase Auth
 - **Security** — Optional TOTP two-factor authentication and administrator AAL2
-- **Real-time** — Live in-app notifications, Web Push, and a conversation inbox
+- **Real-time** — Live in-app notifications and conversation inbox
 - **Arabic Interface** — Full RTL Arabic support
 - **PWA** — Installable app shell with offline asset caching
+
+### Paused at soft launch (متوقف)
+- Card / CCP / Baridi Mob payments
+- Paid subscription upgrades
+- Paid ad placements
+- Loyalty program
+- In-app product checkout / commissions / shipping
 
 ## Tech Stack
 

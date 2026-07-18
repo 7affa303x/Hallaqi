@@ -1094,8 +1094,16 @@ function SubscriptionPage({ onBack }: { onBack: () => void }) {
       <div className="sticky top-0 z-30 flex items-center gap-3 px-4 py-3 backdrop-blur-lg border-b" style={{ backgroundColor: `${themeConfig.colors.background}ee`, borderColor: themeConfig.colors.border }}>
         <button onClick={onBack} className="w-9 h-9 rounded-xl flex items-center justify-center"><ArrowLeft size={20} style={{ color: themeConfig.colors.text }} /></button>
         <h2 className="text-base font-bold" style={{ color: themeConfig.colors.text }}>خطط الاشتراك</h2>
+        {!FEATURE_FLAGS.paidSubscriptionsEnabled && (
+          <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-bold">متوقف</span>
+        )}
       </div>
       <div className="px-4 mt-4 space-y-3">
+        {!FEATURE_FLAGS.paidSubscriptionsEnabled && (
+          <div className="p-3 rounded-xl text-xs leading-5" style={{ backgroundColor: themeConfig.colors.warning + '12', color: themeConfig.colors.warning }}>
+            ترقية الاشتراكات المدفوعة <strong>متوقفة</strong> عند الإطلاق. الخطة المجانية متاحة؛ الطلبات المدفوعة ستُفعَّل لاحقاً.
+          </div>
+        )}
         {requestStatus && (
           <div className="p-3 rounded-xl text-xs" style={{ backgroundColor: themeConfig.colors.info + '12', color: themeConfig.colors.info }}>
             حالة طلب الاشتراك: {requestStatus === 'pending' ? 'قيد المراجعة' : requestStatus}
@@ -1103,27 +1111,28 @@ function SubscriptionPage({ onBack }: { onBack: () => void }) {
         )}
         {plans.map(plan => {
           const features = Array.isArray(plan.features) ? plan.features.filter((item): item is string => typeof item === 'string') : [];
+          const paidPaused = plan.price_dzd > 0 && !FEATURE_FLAGS.paidSubscriptionsEnabled;
           return (
           <div key={plan.id} onClick={() => setSelectedPlan(plan.id)} className="rounded-2xl border-2 overflow-hidden transition-all cursor-pointer" style={{ backgroundColor: selectedPlan === plan.id ? themeConfig.colors.primary + '05' : themeConfig.colors.surface, borderColor: selectedPlan === plan.id ? themeConfig.colors.primary : themeConfig.colors.border }}>
             <div className="p-4">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2"><div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: plan.id === 'free' ? '#22C55E15' : plan.id === 'basic' ? '#3B82F615' : plan.id === 'pro' || plan.id === 'professional' ? '#8B5CF615' : '#EAB30815' }}><Crown size={20} style={{ color: plan.id === 'free' ? '#22C55E' : plan.id === 'basic' ? '#3B82F6' : plan.id === 'pro' || plan.id === 'professional' ? '#8B5CF6' : '#EAB308' }} /></div><div><h3 className="text-sm font-bold" style={{ color: themeConfig.colors.text }}>{plan.name_ar}</h3><p className="text-xs" style={{ color: themeConfig.colors.textMuted }}>{plan.billing_period === 'monthly' ? 'شهرياً' : plan.billing_period}</p></div></div>
-                <div className="text-right"><p className="text-lg font-bold" style={{ color: themeConfig.colors.primary }}>{plan.price_dzd === 0 ? 'مجاني' : `${plan.price_dzd} دج`}</p></div>
+                <div className="text-right"><p className="text-lg font-bold" style={{ color: themeConfig.colors.primary }}>{plan.price_dzd === 0 ? 'مجاني' : `${plan.price_dzd} دج`}</p>{paidPaused && <p className="text-[10px] font-bold text-amber-600">متوقف</p>}</div>
               </div>
               <div className="space-y-1.5">{features.map((feature, i) => (<div key={i} className="flex items-center gap-2"><Check size={14} className="text-green-500 flex-shrink-0" /><span className="text-xs" style={{ color: themeConfig.colors.textMuted }}>{feature}</span></div>))}</div>
-              {plan.price_dzd > 0 && selectedPlan === plan.id && (
+              {paidPaused && (
                 <div className="mt-3 p-3 rounded-xl text-[11px]" style={{ backgroundColor: themeConfig.colors.warning + '12', color: themeConfig.colors.warning }}>
-                  تفعيل الخطط المدفوعة متوقف مؤقتاً حتى اعتماد حساب التحصيل التجاري.
+                  تفعيل الخطط المدفوعة متوقف مؤقتاً عند الإطلاق الناعم.
                 </div>
               )}
               <button
                 type="button"
-                disabled={selectedPlan !== plan.id || isSubmitting || requestStatus === 'pending'}
+                disabled={selectedPlan !== plan.id || isSubmitting || requestStatus === 'pending' || paidPaused}
                 onClick={event => { event.stopPropagation(); void requestPlan(); }}
                 className="w-full h-10 rounded-xl text-sm font-bold text-white mt-3 transition-all disabled:opacity-50"
                 style={{ backgroundColor: selectedPlan === plan.id ? themeConfig.colors.primary : themeConfig.colors.border }}
               >
-                {requestStatus === 'pending' ? 'الطلب قيد المراجعة' : plan.price_dzd > 0 ? 'طلب التفعيل' : 'اختيار الخطة المجانية'}
+                {paidPaused ? 'متوقف' : requestStatus === 'pending' ? 'الطلب قيد المراجعة' : plan.price_dzd > 0 ? 'طلب التفعيل' : 'اختيار الخطة المجانية'}
               </button>
             </div>
           </div>
@@ -1138,7 +1147,9 @@ function PaymentMethods({ onBack }: { onBack: () => void }) {
   const { themeConfig } = useApp();
   const ccpAccount = import.meta.env.VITE_CCP_ACCOUNT_NUMBER as string | undefined;
   const ccpCard = import.meta.env.VITE_CCP_CARD_NUMBER as string | undefined;
-  const isConfigured = Boolean(ccpAccount && ccpCard);
+  const envReady = Boolean(ccpAccount && ccpCard);
+  const ccpLive = FEATURE_FLAGS.ccpPaymentsEnabled && envReady;
+  const cardLive = FEATURE_FLAGS.cardPaymentsEnabled;
   return (
     <div className="pb-20">
       <div className="sticky top-0 z-30 flex items-center gap-3 px-4 py-3 backdrop-blur-lg border-b" style={{ backgroundColor: `${themeConfig.colors.background}ee`, borderColor: themeConfig.colors.border }}>
@@ -1146,17 +1157,20 @@ function PaymentMethods({ onBack }: { onBack: () => void }) {
         <h2 className="text-base font-bold" style={{ color: themeConfig.colors.text }}>طرق الدفع</h2>
       </div>
       <div className="px-4 mt-4 space-y-3">
-        <div className="rounded-2xl border p-4" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
-          <div className="flex items-center gap-3 mb-3"><div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ backgroundColor: '#EAB30815' }}><CreditCard size={24} style={{ color: '#EAB308' }} /></div><div className="flex-1"><h3 className="text-sm font-bold" style={{ color: themeConfig.colors.text }}>CCP - حساب بريد الجزائر</h3><p className="text-xs" style={{ color: themeConfig.colors.textMuted }}>الدفع عبر الحساب البريدي</p></div><span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${isConfigured ? 'bg-green-100 text-green-600' : 'bg-amber-100 text-amber-700'}`}>{isConfigured ? 'متاح' : 'غير مهيأ'}</span></div>
-          {isConfigured ? (
-            <div className="p-3 rounded-xl" style={{ backgroundColor: themeConfig.colors.background }}><p className="text-xs" style={{ color: themeConfig.colors.textMuted }}>رقم الحساب البريدي</p><p className="text-sm font-mono font-bold mt-0.5" style={{ color: themeConfig.colors.text }}>{ccpAccount}</p><p className="text-xs mt-2" style={{ color: themeConfig.colors.textMuted }}>رقم البطاقة</p><p className="text-sm font-mono font-bold mt-0.5" style={{ color: themeConfig.colors.text }}>{ccpCard}</p></div>
-          ) : (
-            <p className="p-3 rounded-xl text-xs" style={{ backgroundColor: themeConfig.colors.warning + '10', color: themeConfig.colors.warning }}>يتطلب تفعيل حساب التحصيل التجاري قبل إتاحة الدفع اليدوي.</p>
-          )}
+        <div className="rounded-2xl border p-3 text-[11px] leading-5" style={{ backgroundColor: `${themeConfig.colors.warning}12`, borderColor: themeConfig.colors.border, color: themeConfig.colors.warning }}>
+          الدفع الإلكتروني والاشتراكات المدفوعة <strong>متوقفة</strong> عند الإطلاق الناعم. المتاح الآن: الدفع النقدي عند زيارة الصالون.
         </div>
         <div className="rounded-2xl border p-4" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
-          <div className="flex items-center gap-3 mb-3"><div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ backgroundColor: '#3B82F615' }}><Wallet size={24} style={{ color: '#3B82F6' }} /></div><div className="flex-1"><h3 className="text-sm font-bold" style={{ color: themeConfig.colors.text }}>بريدي موب</h3><p className="text-xs" style={{ color: themeConfig.colors.textMuted }}>الدفع عبر تطبيق بريدي موب</p></div><span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-600 font-bold">قريباً</span></div>
-          <div className="p-4 rounded-xl text-center" style={{ backgroundColor: themeConfig.colors.background }}><p className="text-xs" style={{ color: themeConfig.colors.textMuted }}>يتطلب حساب تحصيل تجاري معتمداً قبل التفعيل.</p></div>
+          <div className="flex items-center gap-3 mb-3"><div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ backgroundColor: '#EAB30815' }}><CreditCard size={24} style={{ color: '#EAB308' }} /></div><div className="flex-1"><h3 className="text-sm font-bold" style={{ color: themeConfig.colors.text }}>CCP - حساب بريد الجزائر</h3><p className="text-xs" style={{ color: themeConfig.colors.textMuted }}>الدفع عبر الحساب البريدي</p></div><span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${ccpLive ? 'bg-green-100 text-green-600' : 'bg-amber-100 text-amber-700'}`}>{ccpLive ? 'متاح' : 'متوقف'}</span></div>
+          <p className="p-3 rounded-xl text-xs" style={{ backgroundColor: themeConfig.colors.warning + '10', color: themeConfig.colors.warning }}>متوقف حتى اعتماد حساب التحصيل التجاري وتفعيل الميزة.</p>
+        </div>
+        <div className="rounded-2xl border p-4" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
+          <div className="flex items-center gap-3 mb-3"><div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ backgroundColor: '#3B82F615' }}><Wallet size={24} style={{ color: '#3B82F6' }} /></div><div className="flex-1"><h3 className="text-sm font-bold" style={{ color: themeConfig.colors.text }}>بريدي موب</h3><p className="text-xs" style={{ color: themeConfig.colors.textMuted }}>الدفع عبر تطبيق بريدي موب</p></div><span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-bold">متوقف</span></div>
+          <div className="p-4 rounded-xl text-center" style={{ backgroundColor: themeConfig.colors.background }}><p className="text-xs" style={{ color: themeConfig.colors.textMuted }}>متوقف عند الإطلاق — سيُفعَّل مع التحصيل التجاري.</p></div>
+        </div>
+        <div className="rounded-2xl border p-4" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
+          <div className="flex items-center gap-3 mb-3"><div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ backgroundColor: '#6366F115' }}><CreditCard size={24} style={{ color: '#6366F1' }} /></div><div className="flex-1"><h3 className="text-sm font-bold" style={{ color: themeConfig.colors.text }}>بطاقة (Stripe)</h3><p className="text-xs" style={{ color: themeConfig.colors.textMuted }}>دفع إلكتروني بالبطاقة</p></div><span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${cardLive ? 'bg-green-100 text-green-600' : 'bg-amber-100 text-amber-700'}`}>{cardLive ? 'متاح' : 'متوقف'}</span></div>
+          <p className="p-3 rounded-xl text-xs" style={{ backgroundColor: themeConfig.colors.warning + '10', color: themeConfig.colors.warning }}>متوقف حتى ضبط مفاتيح Stripe الحية والـ webhook.</p>
         </div>
         <div className="rounded-2xl border p-4" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
           <div className="flex items-center gap-3"><div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ backgroundColor: '#22C55E15' }}><CreditCard size={24} style={{ color: '#22C55E' }} /></div><div className="flex-1"><h3 className="text-sm font-bold" style={{ color: themeConfig.colors.text }}>الدفع النقدي</h3><p className="text-xs" style={{ color: themeConfig.colors.textMuted }}>الدفع مباشرة عند الزيارة</p></div><span className="text-[10px] px-2 py-0.5 rounded-full bg-green-100 text-green-600 font-bold">متاح</span></div>

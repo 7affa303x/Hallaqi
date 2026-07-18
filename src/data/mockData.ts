@@ -459,9 +459,9 @@ export const settingsSections = [
       { id: 'changePassword', label: 'تغيير كلمة المرور', icon: 'Lock', description: 'تحديث كلمة المرور', type: 'link' },
       { id: 'twoFactor', label: 'المصادقة الثنائية', icon: 'Smartphone', description: 'تفعيل 2FA', type: 'toggle' },
       { id: 'linkedAccounts', label: 'الحسابات المرتبطة', icon: 'Link', description: 'ربط بحسابات التواصل', type: 'link' },
-      { id: 'subscription', label: 'الاشتراك', icon: 'Crown', description: 'إدارة خطط الاشتراك', type: 'link' },
-      { id: 'paymentMethods', label: 'طرق الدفع', icon: 'CreditCard', description: 'CCP / بريدي موب / نقدي', type: 'link' },
-      { id: 'baridiMob', label: 'ربط بريدي موب', icon: 'Wallet', description: 'ربط حساب بريدي موب', type: 'link' },
+      { id: 'subscription', label: 'الاشتراك', icon: 'Crown', description: 'متوقف عند الإطلاق — خطط مدفوعة لاحقاً', type: 'link' },
+      { id: 'paymentMethods', label: 'طرق الدفع', icon: 'CreditCard', description: 'نقدي متاح · بطاقة/CCP متوقف', type: 'link' },
+      { id: 'baridiMob', label: 'ربط بريدي موب', icon: 'Wallet', description: 'متوقف', type: 'link' },
     ],
   },
   {

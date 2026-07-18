@@ -95,10 +95,10 @@ export const bookingStep3Schema = z.object({
   isMobileService: z.boolean(),
   address: z.string().optional(),
 }).refine(data => {
-  if (data.isMobileService) return data.address && data.address.trim().length > 0;
-  return true;
+  if (!data.isMobileService) return true;
+  return Boolean(data.address && data.address.trim().length >= 8);
 }, {
-  message: 'أدخل العنوان للخدمة المتنقلة',
+  message: 'أدخل عنواناً واضحاً (8 أحرف على الأقل) للخدمة المتنقلة',
   path: ['address'],
 });
 

@@ -790,9 +790,12 @@ export async function createSellerReview(input: {
   return { ok: true };
 }
 
+import { sanitizeExternalHttpsUrl } from '@/lib/marketplace/externalUrl';
+
 export function openExternalStore(url?: string) {
-  if (!url) return;
-  window.open(url, '_blank', 'noopener,noreferrer');
+  const safe = sanitizeExternalHttpsUrl(url);
+  if (!safe) return;
+  window.open(safe, '_blank', 'noopener,noreferrer');
 }
 
 export { listingCapForPlan, MARKETPLACE_PREMIUM_LISTING_CAP };

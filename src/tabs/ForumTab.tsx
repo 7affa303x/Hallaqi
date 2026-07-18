@@ -10,6 +10,7 @@ import { forumCategories } from '@/data/mockData';
 import type { ForumCategory, ForumPost, ScreenName, ScreenParams } from '@/types';
 import { themes } from '@/data/themes';
 import { enterCompetition, getActiveCompetitions, getForumCategories } from '@/supabase/database';
+import { isForumBookmarked, toggleForumBookmark } from '@/lib/deviceStorage';
 import {
   MessageCircle, Trophy, Eye, Shield, BadgeCheck, Pin,
   Megaphone, Heart, MessageSquare, Share2, Bookmark,
@@ -245,14 +246,7 @@ function ForumPostCard({ post, isPinned = false, navigate, themeConfig }: PostCa
   const { toggleLike } = useApp();
   const { isAuthenticated } = useAuth();
   const [isExpanded, setIsExpanded] = useState(false);
-  const [isBookmarked, setIsBookmarked] = useState(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem('hallaqi-forum-bookmarks') || '[]') as string[];
-      return saved.includes(post.id);
-    } catch {
-      return false;
-    }
-  });
+  const [isBookmarked, setIsBookmarked] = useState(() => isForumBookmarked(post.id));
   const RoleIcon = roleIcons[post.authorRole] || Users;
   const rColor = roleColors[post.authorRole] || '#6B7280';
   const catInfo = forumCategories.find(c => c.key === post.category);
@@ -269,15 +263,7 @@ function ForumPostCard({ post, isPinned = false, navigate, themeConfig }: PostCa
   };
 
   const toggleBookmark = () => {
-    try {
-      const saved = new Set(JSON.parse(localStorage.getItem('hallaqi-forum-bookmarks') || '[]') as string[]);
-      if (saved.has(post.id)) saved.delete(post.id);
-      else saved.add(post.id);
-      localStorage.setItem('hallaqi-forum-bookmarks', JSON.stringify([...saved]));
-      setIsBookmarked(saved.has(post.id));
-    } catch {
-      setIsBookmarked(value => !value);
-    }
+    setIsBookmarked(toggleForumBookmark(post.id));
   };
 
   const sharePost = async () => {

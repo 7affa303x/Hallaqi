@@ -24,7 +24,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { bookingStep3Schema } from '@/lib/validation';
 import type { BookingStep3FormData } from '@/lib/validation';
 import { preferredBookingHour, rankAvailableSlots } from '@/lib/scheduling';
-import { FEATURE_FLAGS } from '@/lib/featureFlags';
+import { FEATURE_FLAGS, PAUSED_LABEL } from '@/lib/featureFlags';
 import { trackProductEvent } from '@/lib/product-analytics';
 
 const ALL_TIME_SLOTS = [
@@ -34,9 +34,11 @@ const ALL_TIME_SLOTS = [
   '17:30', '18:00', '18:30', '19:00', '19:30', '20:00', '20:30', '21:00',
 ];
 
-const ccpConfigured = Boolean(
+const ccpEnvConfigured = Boolean(
   import.meta.env.VITE_CCP_ACCOUNT_NUMBER && import.meta.env.VITE_CCP_CARD_NUMBER
 );
+const cardEnabled = FEATURE_FLAGS.cardPaymentsEnabled;
+const ccpEnabled = FEATURE_FLAGS.ccpPaymentsEnabled && ccpEnvConfigured;
 
 interface AvailableVoucher {
   id: string;
@@ -370,6 +372,15 @@ export default function BookingFlowPage() {
     setSaveError(null);
 
     try {
+      if (data.paymentMethod === 'card' && !cardEnabled) {
+        setSaveError('الدفع بالبطاقة متوقف حالياً. اختر الدفع نقداً.');
+        return;
+      }
+      if ((data.paymentMethod === 'ccp' || data.paymentMethod === 'baridi-mob') && !ccpEnabled) {
+        setSaveError('دفع CCP / بريدي موب متوقف حالياً. اختر الدفع نقداً.');
+        return;
+      }
+
       // Validate: check slot is still available
       const overlaps = isSlotOverlapping(selectedTime, totalDuration, existingBookings, selectedDate);
       if (overlaps) {
@@ -822,19 +833,37 @@ export default function BookingFlowPage() {
           <div>
             <p className="text-xs font-bold mb-2" style={{ color: themeConfig.colors.text }}>طريقة الدفع</p>
             <div className="grid grid-cols-4 gap-2">
-              {[{ key: 'card' as const, label: 'بطاقة', icon: CreditCard, disabled: false }, { key: 'cash' as const, label: 'نقداً', icon: Banknote, disabled: false }, { key: 'ccp' as const, label: 'CCP', icon: CreditCard, disabled: !ccpConfigured }, { key: 'baridi-mob' as const, label: 'بريدي موب', icon: Wallet, disabled: !ccpConfigured }].map(pm => (
+              {([
+                { key: 'cash' as const, label: 'نقداً', icon: Banknote, disabled: false, badge: null as string | null },
+                { key: 'card' as const, label: 'بطاقة', icon: CreditCard, disabled: !cardEnabled, badge: cardEnabled ? null : PAUSED_LABEL },
+                { key: 'ccp' as const, label: 'CCP', icon: CreditCard, disabled: !ccpEnabled, badge: ccpEnabled ? null : PAUSED_LABEL },
+                { key: 'baridi-mob' as const, label: 'بريدي موب', icon: Wallet, disabled: !ccpEnabled, badge: ccpEnabled ? null : PAUSED_LABEL },
+              ]).map(pm => (
                 <button key={pm.key} type="button" disabled={pm.disabled} onClick={() => {
                   registerStep3('paymentMethod').onChange({ target: { value: pm.key } });
                   trackProductEvent('Payment Method Selected', { method: pm.key, barberId: barber.id });
                 }}
-                  className="flex flex-col items-center gap-1 p-3 rounded-xl border transition-all disabled:opacity-40"
-                  title={pm.disabled ? 'يتطلب إعداد حساب التحصيل التجاري' : undefined}
+                  className="relative flex flex-col items-center gap-1 p-3 rounded-xl border transition-all disabled:opacity-45"
+                  title={pm.disabled ? 'هذه الطريقة متوقفة حالياً' : undefined}
                   style={{ backgroundColor: watchedPaymentMethod === pm.key ? themeConfig.colors.primary + '08' : themeConfig.colors.surface, borderColor: watchedPaymentMethod === pm.key ? themeConfig.colors.primary : themeConfig.colors.border }}>
+                  {pm.badge && (
+                    <span className="absolute -top-1.5 left-1 text-[8px] font-black px-1 rounded bg-amber-100 text-amber-700">{pm.badge}</span>
+                  )}
                   <pm.icon size={20} style={{ color: watchedPaymentMethod === pm.key ? themeConfig.colors.primary : themeConfig.colors.textMuted }} />
                   <span className="text-[10px] font-bold" style={{ color: watchedPaymentMethod === pm.key ? themeConfig.colors.primary : themeConfig.colors.textMuted }}>{pm.label}</span>
                 </button>
               ))}
             </div>
+            <p className="text-[10px] mt-2 leading-5" style={{ color: themeConfig.colors.textMuted }}>
+              عند الإطلاق: الدفع النقدي عند الزيارة متاح. البطاقة وCCP وبريدي موب <span className="font-bold" style={{ color: themeConfig.colors.warning }}>{PAUSED_LABEL}</span> حتى تفعيل التحصيل.
+            </p>
+          </div>
+
+          <div className="rounded-xl border p-3" style={{ backgroundColor: `${themeConfig.colors.info}08`, borderColor: themeConfig.colors.border }}>
+            <p className="text-[11px] font-bold" style={{ color: themeConfig.colors.text }}>سياسة الإلغاء</p>
+            <p className="text-[10px] mt-1 leading-5" style={{ color: themeConfig.colors.textMuted }}>
+              يمكنك طلب الإلغاء من المواعيد قبل الموعد. عدم الحضور دون إشعار قد يؤثر على حجوزاتك القادمة حسب سياسة الحلاق.
+            </p>
           </div>
 
           {/* Mobile service */}

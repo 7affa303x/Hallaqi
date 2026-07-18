@@ -10,6 +10,7 @@ import {
 } from '@/supabase/marketplace';
 import { MARKETPLACE_PREMIUM_LISTING_CAP } from '@/types/marketplace';
 import { canAccessAiListingTools } from '@/lib/marketplace/planAccess';
+import { FEATURE_FLAGS, PAUSED_LABEL } from '@/lib/featureFlags';
 import type { MarketplacePlanTier, MarketplaceSeller, MarketplaceSubscriptionPlan } from '@/types/marketplace';
 
 /**
@@ -52,6 +53,10 @@ export default function SellerDashboardPage() {
   const Icon = role === 'company' ? Building2 : role === 'doctor' ? Stethoscope : Store;
 
   const requestPlan = async () => {
+    if (!FEATURE_FLAGS.paidSubscriptionsEnabled && selected !== 'free') {
+      setToast('ترقية الاشتراك المدفوع متوقفة حالياً');
+      return;
+    }
     const result = await requestMarketplaceSubscription(sellerId, selected);
     if (result.ok) {
       setRequested(true);
@@ -183,7 +188,15 @@ export default function SellerDashboardPage() {
 
       <h2 className="text-sm font-black mb-2 flex items-center gap-1" style={{ color: themeConfig.colors.text }}>
         <Crown size={14} /> خطط الاشتراك {role === 'company' ? '(تسعير الشركات)' : ''}
+        {!FEATURE_FLAGS.paidSubscriptionsEnabled && (
+          <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700">{PAUSED_LABEL}</span>
+        )}
       </h2>
+      {!FEATURE_FLAGS.paidSubscriptionsEnabled && (
+        <p className="text-[11px] mb-2 leading-5" style={{ color: themeConfig.colors.warning }}>
+          الترقية المدفوعة متوقفة عند الإطلاق. يمكنك البقاء على المجاني وتجهيز منتجاتك.
+        </p>
+      )}
       <div className="space-y-2">
         {plans.map(planItem => (
           <button
@@ -200,6 +213,7 @@ export default function SellerDashboardPage() {
               <span className="text-sm font-black" style={{ color: themeConfig.colors.text }}>{planItem.nameAr}</span>
               <span className="text-xs font-bold" style={{ color: themeConfig.colors.primary }}>
                 {planItem.priceDzd === 0 ? 'مجاني' : `${planItem.priceDzd.toLocaleString('ar-DZ')} دج/شهر`}
+                {planItem.priceDzd > 0 && !FEATURE_FLAGS.paidSubscriptionsEnabled ? ` · ${PAUSED_LABEL}` : ''}
               </span>
             </div>
             <p className="text-[11px] mt-1" style={{ color: themeConfig.colors.textMuted }}>
@@ -218,18 +232,20 @@ export default function SellerDashboardPage() {
 
       <button
         type="button"
-        disabled={requested}
+        disabled={requested || (!FEATURE_FLAGS.paidSubscriptionsEnabled && selected !== 'free')}
         onClick={() => void requestPlan()}
         className="w-full mt-4 py-3 rounded-2xl text-sm font-black text-white"
-        style={{ backgroundColor: themeConfig.colors.primary, opacity: requested ? 0.7 : 1 }}
+        style={{ backgroundColor: themeConfig.colors.primary, opacity: (requested || (!FEATURE_FLAGS.paidSubscriptionsEnabled && selected !== 'free')) ? 0.55 : 1 }}
       >
-        {requested ? 'تم إرسال طلب الاشتراك للأدمن' : 'طلب ترقية الخطة'}
+        {!FEATURE_FLAGS.paidSubscriptionsEnabled && selected !== 'free'
+          ? `الترقية ${PAUSED_LABEL}`
+          : requested ? 'تم إرسال طلب الاشتراك للأدمن' : 'طلب ترقية الخطة'}
       </button>
       {toast && <p className="text-xs text-center mt-2 font-bold" style={{ color: themeConfig.colors.success }}>{toast}</p>}
 
       <div className="mt-4 rounded-2xl border p-3" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
         <p className="text-xs font-bold flex items-center gap-1" style={{ color: themeConfig.colors.text }}>
-          <Sparkles size={12} /> مواضع الإعلان المتاحة
+          <Sparkles size={12} /> مواضع الإعلان {!FEATURE_FLAGS.paidPlacementsEnabled && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700">{PAUSED_LABEL}</span>}
         </p>
         <ul className="mt-2 text-[11px] space-y-1" style={{ color: themeConfig.colors.textMuted }}>
           <li>• ظهور مميز / Featured</li>
@@ -238,6 +254,7 @@ export default function SellerDashboardPage() {
           <li>• بانرات ورعاية Sponsored</li>
           <li>• شارات بريميوم</li>
           <li>• لا عمولات · لا دفع داخل التطبيق للمنتجات</li>
+          {!FEATURE_FLAGS.paidPlacementsEnabled && <li>• طلب المواضع المدفوعة متوقف عند الإطلاق</li>}
         </ul>
       </div>
     </div>

@@ -88,21 +88,23 @@ export default function AdminDashboard() {
   const [recentUsers, setRecentUsers] = useState<RecentUser[]>([]);
   const [chartData, setChartData] = useState<ChartData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [statsError, setStatsError] = useState('');
   const [activeSection, setActiveSection] = useState<'home' | 'users' | 'bookings' | 'payments' | 'reviews' | 'identity' | 'subscriptions' | 'reports' | 'marketplace'>('home');
 
   const isAdmin = !!appUser && appUser.user_role === 'admin';
 
   const fetchStats = useCallback(async () => {
     try {
+      setStatsError('');
       const [
-        { count: usersCount },
-        { count: prosCount },
-        { count: bookingsCount },
-        { count: paymentsCount },
-        { data: pendingCCP },
-        { data: stripeData },
-        { count: reviewsCount },
-        { data: revenueData },
+        { count: usersCount, error: usersErr },
+        { count: prosCount, error: prosErr },
+        { count: bookingsCount, error: bookingsErr },
+        { count: paymentsCount, error: paymentsErr },
+        { data: pendingCCP, error: ccpErr },
+        { data: stripeData, error: stripeErr },
+        { count: reviewsCount, error: reviewsErr },
+        { data: revenueData, error: revenueErr },
       ] = await Promise.all([
         supabase.from('profiles').select('id', { count: 'exact', head: true }),
         supabase.from('professionals').select('*', { count: 'exact', head: true }),
@@ -113,6 +115,11 @@ export default function AdminDashboard() {
         supabase.from('reviews').select('*', { count: 'exact', head: true }).eq('moderation_status', 'pending'),
         supabase.from('payments').select('amount').eq('status', 'completed'),
       ]);
+
+      const firstError = usersErr || prosErr || bookingsErr || paymentsErr || ccpErr || stripeErr || reviewsErr || revenueErr;
+      if (firstError) {
+        setStatsError(firstError.message || 'تعذر تحميل بعض إحصائيات الأدمن');
+      }
 
       const totalRevenue = revenueData?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
 
@@ -128,6 +135,7 @@ export default function AdminDashboard() {
       });
     } catch (err) {
       console.error('Failed to fetch stats:', err);
+      setStatsError(err instanceof Error ? err.message : 'فشل تحميل إحصائيات الأدمن');
     }
   }, []);
 
@@ -344,6 +352,15 @@ export default function AdminDashboard() {
       </div>
 
       <div className="px-4 pt-4 space-y-6">
+        {statsError && (
+          <div role="alert" className="p-3 rounded-xl text-xs leading-5" style={{ backgroundColor: `${themeConfig.colors.error}12`, color: themeConfig.colors.error }}>
+            تعذر تحميل بعض الإحصائيات: {statsError}
+            <button type="button" className="underline font-bold mr-2" onClick={() => void fetchStats()}>إعادة المحاولة</button>
+          </div>
+        )}
+        <div className="p-3 rounded-xl text-[11px] leading-5" style={{ backgroundColor: `${themeConfig.colors.warning}12`, color: themeConfig.colors.warning }}>
+          تنبيه الإطلاق: دفع البطاقة/CCP وترقية الاشتراكات المدفوعة <strong>متوقفة</strong> في الواجهة حتى التفعيل اليدوي.
+        </div>
         {/* Stats Grid */}
         <div className="grid grid-cols-2 gap-3">
           {statCards.map((card, i) => (

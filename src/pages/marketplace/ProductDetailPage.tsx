@@ -5,6 +5,8 @@ import { getMarketplaceProductById, getMarketplaceSellerById, openExternalStore 
 import { formatDzd, discountPercent } from '@/lib/marketplace/filters';
 import { trackMarketplaceEvent } from '@/lib/marketplace/analytics';
 import { createMarketplaceReport } from '@/lib/marketplace/sectionConfig';
+import { canOpenExternalStore } from '@/lib/marketplace/externalUrl';
+import { DEVICE_SAVE_HINT, isMarketplaceSaved, toggleMarketplaceSave } from '@/lib/deviceStorage';
 import type { MarketplaceProduct, MarketplaceSeller } from '@/types/marketplace';
 
 export default function ProductDetailPage() {
@@ -14,6 +16,7 @@ export default function ProductDetailPage() {
   const [seller, setSeller] = useState<MarketplaceSeller | null>(null);
   const [saved, setSaved] = useState(false);
   const [reportToast, setReportToast] = useState('');
+  const [visitError, setVisitError] = useState('');
 
   useEffect(() => {
     if (!productId) return;
@@ -26,11 +29,7 @@ export default function ProductDetailPage() {
       if (p.isProductOfTheDay) trackMarketplaceEvent('product_of_day_view', { productId: p.id, sellerId: p.sellerId });
       const s = await getMarketplaceSellerById(p.sellerId);
       if (s) setSeller(s);
-      try {
-        const raw = localStorage.getItem('hallaqi-marketplace-saves');
-        const ids = raw ? JSON.parse(raw) as string[] : [];
-        setSaved(ids.includes(p.id));
-      } catch { /* ignore */ }
+      setSaved(isMarketplaceSaved(p.id));
     })();
   }, [productId]);
 
@@ -43,31 +42,33 @@ export default function ProductDetailPage() {
   }
 
   const pct = discountPercent(product.priceDzd, product.compareAtPriceDzd);
+  const externalTarget = product.externalUrl || seller?.websiteUrl;
+  const canVisit = canOpenExternalStore(externalTarget);
+
   const visit = () => {
+    setVisitError('');
+    if (!canVisit) {
+      setVisitError('رابط المتجر غير آمن أو غير متوفر (يُسمح بـ https فقط).');
+      return;
+    }
     trackMarketplaceEvent('click', { productId: product.id, sellerId: product.sellerId });
     trackMarketplaceEvent('visit_store', { productId: product.id, sellerId: product.sellerId });
     if (product.isFeatured) trackMarketplaceEvent('featured_click', { productId: product.id, sellerId: product.sellerId });
     if (product.isProductOfTheDay) trackMarketplaceEvent('product_of_day_click', { productId: product.id, sellerId: product.sellerId });
-    openExternalStore(product.externalUrl || seller?.websiteUrl);
+    openExternalStore(externalTarget);
   };
 
   const toggleSave = () => {
-    try {
-      const raw = localStorage.getItem('hallaqi-marketplace-saves');
-      const ids = new Set(raw ? JSON.parse(raw) as string[] : []);
-      if (ids.has(product.id)) ids.delete(product.id);
-      else {
-        ids.add(product.id);
-        trackMarketplaceEvent('save', {
-          productId: product.id,
-          sellerId: product.sellerId,
-          categoryId: product.categoryId,
-          wilaya: product.wilaya,
-        });
-      }
-      localStorage.setItem('hallaqi-marketplace-saves', JSON.stringify([...ids]));
-      setSaved(ids.has(product.id));
-    } catch { /* ignore */ }
+    const next = toggleMarketplaceSave(product.id);
+    setSaved(next);
+    if (next) {
+      trackMarketplaceEvent('save', {
+        productId: product.id,
+        sellerId: product.sellerId,
+        categoryId: product.categoryId,
+        wilaya: product.wilaya,
+      });
+    }
   };
 
   const report = () => {
@@ -162,14 +163,17 @@ export default function ProductDetailPage() {
         <button
           type="button"
           onClick={visit}
-          className="w-full py-3.5 rounded-2xl text-sm font-black text-white flex items-center justify-center gap-2"
+          disabled={!canVisit}
+          className="w-full py-3.5 rounded-2xl text-sm font-black text-white flex items-center justify-center gap-2 disabled:opacity-50"
           style={{ backgroundColor: themeConfig.colors.primary }}
         >
           <ExternalLink size={16} /> زيارة المتجر
         </button>
         <p className="text-[10px] text-center mt-1.5" style={{ color: themeConfig.colors.textMuted }}>
-          لا يوجد دفع داخل التطبيق — اكتشف هنا واشترِ هناك
+          لا يوجد دفع داخل التطبيق — اكتشف هنا واشترِ هناك · روابط https فقط
         </p>
+        {saved && <p className="text-[10px] text-center mt-1" style={{ color: themeConfig.colors.textMuted }}>{DEVICE_SAVE_HINT}</p>}
+        {visitError && <p role="alert" className="text-[10px] text-center mt-1 font-bold" style={{ color: themeConfig.colors.error }}>{visitError}</p>}
       </div>
     </div>
   );

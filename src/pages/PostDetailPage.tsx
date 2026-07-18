@@ -3,6 +3,7 @@ import { useApp } from '@/contexts/useApp';
 import { useAuth } from '@/hooks/useAuth';
 import { addForumComment, getPostComments, reportForumContent, toggleForumLike } from '@/supabase/database';
 import { mapForumComments } from '@/lib/mappers';
+import { isForumBookmarked, toggleForumBookmark } from '@/lib/deviceStorage';
 import type { ForumComment } from '@/types';
 import { motion } from 'framer-motion';
 import {
@@ -23,14 +24,7 @@ export default function PostDetailPage() {
   const [comments, setComments] = useState<ForumComment[]>([]);
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState('');
-  const [isBookmarked, setIsBookmarked] = useState(() => {
-    try {
-      return (JSON.parse(localStorage.getItem('hallaqi-forum-bookmarks') || '[]') as string[])
-        .includes(screenParams?.postId || '');
-    } catch {
-      return false;
-    }
-  });
+  const [isBookmarked, setIsBookmarked] = useState(() => isForumBookmarked(screenParams?.postId || ''));
 
   const post = forumPosts.find(p => p.id === screenParams?.postId);
 
@@ -112,15 +106,7 @@ export default function PostDetailPage() {
 
   const toggleBookmark = () => {
     if (!post) return;
-    try {
-      const saved = new Set(JSON.parse(localStorage.getItem('hallaqi-forum-bookmarks') || '[]') as string[]);
-      if (saved.has(post.id)) saved.delete(post.id);
-      else saved.add(post.id);
-      localStorage.setItem('hallaqi-forum-bookmarks', JSON.stringify([...saved]));
-      setIsBookmarked(saved.has(post.id));
-    } catch {
-      setIsBookmarked(value => !value);
-    }
+    setIsBookmarked(toggleForumBookmark(post.id));
   };
 
   const updateCommentLike = (

@@ -7,6 +7,7 @@ import {
   listPlacementRequests,
   requestMarketplacePlacement,
 } from '@/supabase/marketplace';
+import { FEATURE_FLAGS, PAUSED_LABEL } from '@/lib/featureFlags';
 import type { SellerPlacementRequest } from '@/lib/marketplace/sellerInventory';
 import type { MarketplacePlacementType, MarketplaceProduct } from '@/types/marketplace';
 
@@ -36,6 +37,10 @@ export default function SellerPlacementsPage() {
   }, [sellerId]);
 
   const submit = async () => {
+    if (!FEATURE_FLAGS.paidPlacementsEnabled) {
+      setToast(`طلب المواضع المدفوعة ${PAUSED_LABEL} عند الإطلاق`);
+      return;
+    }
     const needsProduct = type === 'featured_product' || type === 'product_of_the_day' || type === 'premium_badge' || type === 'sponsored';
     if (needsProduct && !productId) {
       setToast('اختر منتجاً لهذا الموضع');
@@ -59,11 +64,19 @@ export default function SellerPlacementsPage() {
           <ArrowLeft size={18} />
         </button>
         <h1 className="text-base font-black" style={{ color: themeConfig.colors.text }}>مواضع الإعلان</h1>
+        {!FEATURE_FLAGS.paidPlacementsEnabled && (
+          <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 font-bold">{PAUSED_LABEL}</span>
+        )}
       </div>
 
       <p className="text-xs mb-3" style={{ color: themeConfig.colors.textMuted }}>
         محرك التسييل: اشتراكات + مواضع مدفوعة. لا عمولات ولا دفع منتجات داخل التطبيق.
       </p>
+      {!FEATURE_FLAGS.paidPlacementsEnabled && (
+        <p className="text-[11px] mb-3 leading-5 p-3 rounded-xl" style={{ backgroundColor: `${themeConfig.colors.warning}12`, color: themeConfig.colors.warning }}>
+          طلب المواضع المدفوعة <strong>متوقف</strong> عند الإطلاق الناعم. يمكنك تجهيز منتجاتك الآن.
+        </p>
+      )}
 
       <div className="space-y-2 mb-4">
         {OPTIONS.map(opt => {
@@ -117,11 +130,12 @@ export default function SellerPlacementsPage() {
 
       <button
         type="button"
+        disabled={!FEATURE_FLAGS.paidPlacementsEnabled}
         onClick={() => void submit()}
-        className="w-full py-3 rounded-2xl text-sm font-black text-white"
+        className="w-full py-3 rounded-2xl text-sm font-black text-white disabled:opacity-50"
         style={{ backgroundColor: themeConfig.colors.primary }}
       >
-        طلب الموضع
+        {FEATURE_FLAGS.paidPlacementsEnabled ? 'طلب الموضع' : `طلب الموضع (${PAUSED_LABEL})`}
       </button>
       {toast && <p className="text-xs text-center mt-2 font-bold" style={{ color: themeConfig.colors.success }}>{toast}</p>}
 
