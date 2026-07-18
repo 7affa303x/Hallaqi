@@ -1,5 +1,6 @@
 import type { MarketplaceAnalyticsEventType, MarketplaceAnalyticsSummary } from '@/types/marketplace';
 import { mockMarketplaceAnalytics } from '@/data/marketplaceSeed';
+import { trackMarketplaceEventRemote } from '@/supabase/marketplace';
 
 const LOCAL_KEY = 'hallaqi-marketplace-analytics';
 
@@ -29,7 +30,7 @@ function writeEvents(events: LocalEvent[]) {
   }
 }
 
-/** Fire-and-forget marketplace analytics (local + optional remote later). */
+/** Fire-and-forget marketplace analytics (local + remote when available). */
 export function trackMarketplaceEvent(
   eventType: MarketplaceAnalyticsEventType,
   payload: { sellerId?: string; productId?: string; wilaya?: string; categoryId?: string } = {}
@@ -37,6 +38,7 @@ export function trackMarketplaceEvent(
   const events = readEvents();
   events.push({ eventType, ...payload, at: new Date().toISOString() });
   writeEvents(events);
+  void trackMarketplaceEventRemote(eventType, payload);
 }
 
 export function summarizeMarketplaceAnalytics(sellerId?: string): MarketplaceAnalyticsSummary {

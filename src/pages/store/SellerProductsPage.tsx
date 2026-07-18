@@ -1,21 +1,22 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Plus, Trash2, Package } from 'lucide-react';
 import { useApp } from '@/contexts/useApp';
-import { getMarketplaceCategories } from '@/supabase/marketplace';
+import { useAuth } from '@/hooks/useAuth';
 import {
-  deactivateSellerProduct,
-  getSellerOwnedProducts,
+  createOrUpdateSellerProduct,
+  getMarketplaceCategories,
+  getSellerProducts,
+  removeSellerProduct,
   listingCapForPlan,
-  upsertSellerProduct,
-} from '@/lib/marketplace/sellerInventory';
-import { formatDzd } from '@/lib/marketplace/filters';
+} from '@/supabase/marketplace';
+import { formatDzd, flattenCategories } from '@/lib/marketplace/filters';
 import { MARKETPLACE_PREMIUM_LISTING_CAP } from '@/types/marketplace';
 import type { MarketplaceCategory, MarketplacePlanTier, MarketplaceProduct, MarketplaceProductKind } from '@/types/marketplace';
-import { flattenCategories } from '@/lib/marketplace/filters';
 
 export default function SellerProductsPage() {
   const { themeConfig, goBack, screenParams, navigate } = useApp();
-  const sellerId = screenParams?.sellerId || `demo-${screenParams?.role || 'store'}`;
+  const { appUser } = useAuth();
+  const sellerId = appUser?.id || screenParams?.sellerId || `demo-${screenParams?.role || 'store'}`;
   const role = (screenParams?.role || 'store') as 'store' | 'company' | 'doctor';
   const plan = (screenParams?.plan || 'free') as MarketplacePlanTier;
 
@@ -39,18 +40,22 @@ export default function SellerProductsPage() {
 
   useEffect(() => {
     void getMarketplaceCategories().then(setCategories);
-    setProducts(getSellerOwnedProducts(sellerId));
+    void getSellerProducts(sellerId).then(setProducts);
   }, [sellerId]);
 
-  const save = () => {
+  const save = async () => {
     setError('');
     if (!form.title.trim() || !form.description.trim()) {
       setError('العنوان والوصف مطلوبان');
       return;
     }
-    const result = upsertSellerProduct(sellerId, plan, {
+    if (!form.externalUrl.trim()) {
+      setError('رابط المتجر الخارجي مطلوب (لا يوجد دفع داخل التطبيق)');
+      return;
+    }
+    const result = await createOrUpdateSellerProduct(sellerId, plan, {
       ...form,
-      sellerName: role === 'company' ? 'شركتي' : role === 'doctor' ? 'عيادتي' : 'متجري',
+      sellerName: appUser?.full_name || (role === 'company' ? 'شركتي' : role === 'doctor' ? 'عيادتي' : 'متجري'),
       sellerType: role,
       keywords: form.title.split(/\s+/).slice(0, 6),
     });
@@ -62,7 +67,7 @@ export default function SellerProductsPage() {
       title: '', description: '', brand: '', categoryId: 'hair', kind: 'physical',
       priceDzd: 1000, compareAtPriceDzd: undefined, externalUrl: '', offerText: '',
     });
-    setProducts(getSellerOwnedProducts(sellerId));
+    setProducts(await getSellerProducts(sellerId));
   };
 
   return (
@@ -125,7 +130,7 @@ export default function SellerProductsPage() {
           value={form.offerText} onChange={e => setForm(f => ({ ...f, offerText: e.target.value }))}
           style={{ backgroundColor: themeConfig.colors.background, color: themeConfig.colors.text }} />
         {error && <p className="text-xs font-bold" style={{ color: themeConfig.colors.error }}>{error}</p>}
-        <button type="button" onClick={save} className="w-full py-2.5 rounded-xl text-sm font-black text-white flex items-center justify-center gap-1"
+        <button type="button" onClick={() => void save()} className="w-full py-2.5 rounded-xl text-sm font-black text-white flex items-center justify-center gap-1"
           style={{ backgroundColor: themeConfig.colors.primary }}>
           <Plus size={16} /> إضافة منتج
         </button>
@@ -150,7 +155,7 @@ export default function SellerProductsPage() {
             <button
               type="button"
               aria-label="حذف"
-              onClick={() => { deactivateSellerProduct(sellerId, p.id); setProducts(getSellerOwnedProducts(sellerId)); }}
+              onClick={() => { void removeSellerProduct(sellerId, p.id).then(() => getSellerProducts(sellerId).then(setProducts)); }}
               className="p-2 rounded-xl"
               style={{ backgroundColor: `${themeConfig.colors.error}12`, color: themeConfig.colors.error }}
             >

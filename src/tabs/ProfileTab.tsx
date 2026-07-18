@@ -17,6 +17,7 @@ import {
   ArrowLeft, LogIn, UserPlus as UserPlusIcon, Gift,
   Store, Building2, Stethoscope, CalendarDays, ShoppingBag,
 } from 'lucide-react';
+import { FEATURE_FLAGS } from '@/lib/featureFlags';
 import EditBarberProfile from '@/components/EditBarberProfile';
 import ServicesManagement from '@/components/ServicesManagement';
 import {
@@ -299,7 +300,7 @@ export default function ProfileTab() {
         <div className="px-4 mt-4 grid grid-cols-1 gap-2">
           <button
             type="button"
-            onClick={() => navigate('seller-dashboard', { role: userRole })}
+            onClick={() => navigate('seller-dashboard', { role: userRole, sellerId: appUser?.id })}
             className="flex items-center gap-3 p-4 rounded-2xl border text-right"
             style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}
           >
@@ -348,23 +349,25 @@ export default function ProfileTab() {
         </div>
       )}
 
-      <div className="px-4 mt-4">
-        <button
-          type="button"
-          onClick={() => setSubPage('loyalty')}
-          className="w-full flex items-center gap-3 p-4 rounded-2xl border text-right"
-          style={{ backgroundColor: themeConfig.colors.accent + '0D', borderColor: themeConfig.colors.accent + '40' }}
-        >
-          <div className="w-11 h-11 rounded-xl flex items-center justify-center" style={{ backgroundColor: themeConfig.colors.accent + '18' }}>
-            <Gift size={21} style={{ color: themeConfig.colors.accent }} />
-          </div>
-          <div className="flex-1">
-            <p className="text-sm font-bold" style={{ color: themeConfig.colors.text }}>برنامج ولاء حلاقي</p>
-            <p className="text-[11px]" style={{ color: themeConfig.colors.textMuted }}>اكسب نقاطاً من الحجوزات واستبدلها بمكافآت</p>
-          </div>
-          <ChevronLeft size={17} style={{ color: themeConfig.colors.textMuted }} />
-        </button>
-      </div>
+      {FEATURE_FLAGS.loyaltyEnabled && (
+        <div className="px-4 mt-4">
+          <button
+            type="button"
+            onClick={() => setSubPage('loyalty')}
+            className="w-full flex items-center gap-3 p-4 rounded-2xl border text-right"
+            style={{ backgroundColor: themeConfig.colors.accent + '0D', borderColor: themeConfig.colors.accent + '40' }}
+          >
+            <div className="w-11 h-11 rounded-xl flex items-center justify-center" style={{ backgroundColor: themeConfig.colors.accent + '18' }}>
+              <Gift size={21} style={{ color: themeConfig.colors.accent }} />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-bold" style={{ color: themeConfig.colors.text }}>برنامج ولاء حلاقي</p>
+              <p className="text-[11px]" style={{ color: themeConfig.colors.textMuted }}>اكسب نقاطاً من الحجوزات واستبدلها بمكافآت</p>
+            </div>
+            <ChevronLeft size={17} style={{ color: themeConfig.colors.textMuted }} />
+          </button>
+        </div>
+      )}
 
       {actionError && (
         <p role="alert" className="mx-4 mt-4 p-3 rounded-xl text-xs" style={{ backgroundColor: themeConfig.colors.error + '10', color: themeConfig.colors.error }}>

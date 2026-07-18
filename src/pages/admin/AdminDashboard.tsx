@@ -18,7 +18,13 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { Users, Scissors, Calendar, CreditCard, Clock, Star, DollarSign, TrendingUp, ChevronRight, Shield, Check, X, ArrowRight, Crown, Flag, ShoppingBag } from 'lucide-react';
 import { marketplaceSellers, marketplaceProducts, marketplacePlacements } from '@/data/marketplaceSeed';
 import type { MarketplaceSeller, MarketplaceProduct } from '@/types/marketplace';
-import { getPlacementRequests, reviewPlacementRequest } from '@/lib/marketplace/sellerInventory';
+import {
+  adminReviewPlacement,
+  adminReviewSeller,
+  adminSetProductOfDay,
+  listPlacementRequests,
+} from '@/supabase/marketplace';
+import type { SellerPlacementRequest } from '@/lib/marketplace/sellerInventory';
 
 interface DashboardStats {
   totalUsers: number;
@@ -834,10 +840,15 @@ function MarketplaceAdminPanel() {
   const [sellers, setSellers] = useState<MarketplaceSeller[]>(marketplaceSellers);
   const [products] = useState<MarketplaceProduct[]>(marketplaceProducts);
   const [potdId, setPotdId] = useState(marketplaceProducts.find(p => p.isProductOfTheDay)?.id || '');
-  const [placementReqs, setPlacementReqs] = useState(() => getPlacementRequests());
+  const [placementReqs, setPlacementReqs] = useState<SellerPlacementRequest[]>([]);
   const [toast, setToast] = useState('');
 
-  const approve = (id: string, ok: boolean) => {
+  useEffect(() => {
+    void listPlacementRequests().then(setPlacementReqs);
+  }, []);
+
+  const approve = async (id: string, ok: boolean) => {
+    const result = await adminReviewSeller(id, ok);
     setSellers(prev => prev.map(s => s.id === id
       ? {
           ...s,
@@ -846,18 +857,25 @@ function MarketplaceAdminPanel() {
           isTrustedDoctor: ok && s.sellerType === 'doctor' ? true : s.isTrustedDoctor,
         }
       : s));
-    setToast(ok ? 'تمت الموافقة على الحساب' : 'تم رفض الحساب');
+    setToast(result.ok
+      ? (ok ? 'تمت الموافقة على الحساب' : 'تم رفض الحساب')
+      : (result.error || 'فشل'));
   };
 
-  const setProductOfDay = (productId: string) => {
+  const setProductOfDay = async (productId: string) => {
+    const result = await adminSetProductOfDay(productId, 25000);
     setPotdId(productId);
-    setToast('تم تعيين منتج اليوم (موضع إعلاني مدفوع — بدون عمولة)');
+    setToast(result.ok
+      ? 'تم تعيين منتج اليوم (موضع إعلاني مدفوع — بدون عمولة)'
+      : (result.error || 'فشل'));
   };
 
-  const reviewPlacement = (id: string, ok: boolean) => {
-    reviewPlacementRequest(id, ok);
-    setPlacementReqs(getPlacementRequests());
-    setToast(ok ? 'تم تفعيل الموضع الإعلاني' : 'تم رفض طلب الموضع');
+  const reviewPlacement = async (id: string, ok: boolean) => {
+    const result = await adminReviewPlacement(id, ok);
+    setPlacementReqs(await listPlacementRequests());
+    setToast(result.ok
+      ? (ok ? 'تم تفعيل الموضع الإعلاني' : 'تم رفض طلب الموضع')
+      : (result.error || 'فشل'));
   };
 
   return (
@@ -892,8 +910,8 @@ function MarketplaceAdminPanel() {
             <ShoppingBag size={16} style={{ color: themeConfig.colors.primary }} />
           </div>
           <div className="flex gap-2 mt-2">
-            <button type="button" onClick={() => approve(seller.id, true)} className="flex-1 h-8 rounded-lg text-xs font-bold" style={{ backgroundColor: themeConfig.colors.success + '15', color: themeConfig.colors.success }}>موافقة</button>
-            <button type="button" onClick={() => approve(seller.id, false)} className="flex-1 h-8 rounded-lg text-xs font-bold" style={{ backgroundColor: themeConfig.colors.error + '15', color: themeConfig.colors.error }}>رفض</button>
+            <button type="button" onClick={() => void approve(seller.id, true)} className="flex-1 h-8 rounded-lg text-xs font-bold" style={{ backgroundColor: themeConfig.colors.success + '15', color: themeConfig.colors.success }}>موافقة</button>
+            <button type="button" onClick={() => void approve(seller.id, false)} className="flex-1 h-8 rounded-lg text-xs font-bold" style={{ backgroundColor: themeConfig.colors.error + '15', color: themeConfig.colors.error }}>رفض</button>
           </div>
         </div>
       ))}
@@ -910,8 +928,8 @@ function MarketplaceAdminPanel() {
           </p>
           {req.status === 'pending' && (
             <div className="flex gap-2 mt-2">
-              <button type="button" onClick={() => reviewPlacement(req.id, true)} className="flex-1 h-8 rounded-lg text-xs font-bold" style={{ backgroundColor: themeConfig.colors.success + '15', color: themeConfig.colors.success }}>تفعيل</button>
-              <button type="button" onClick={() => reviewPlacement(req.id, false)} className="flex-1 h-8 rounded-lg text-xs font-bold" style={{ backgroundColor: themeConfig.colors.error + '15', color: themeConfig.colors.error }}>رفض</button>
+              <button type="button" onClick={() => void reviewPlacement(req.id, true)} className="flex-1 h-8 rounded-lg text-xs font-bold" style={{ backgroundColor: themeConfig.colors.success + '15', color: themeConfig.colors.success }}>تفعيل</button>
+              <button type="button" onClick={() => void reviewPlacement(req.id, false)} className="flex-1 h-8 rounded-lg text-xs font-bold" style={{ backgroundColor: themeConfig.colors.error + '15', color: themeConfig.colors.error }}>رفض</button>
             </div>
           )}
         </div>
@@ -922,7 +940,7 @@ function MarketplaceAdminPanel() {
         <button
           key={product.id}
           type="button"
-          onClick={() => setProductOfDay(product.id)}
+          onClick={() => void setProductOfDay(product.id)}
           className="w-full p-3 rounded-xl text-right"
           style={{
             backgroundColor: potdId === product.id ? `${themeConfig.colors.accent}18` : themeConfig.colors.surface,

@@ -1,9 +1,14 @@
 import { useEffect, useState } from 'react';
-import { ArrowLeft, Check, Crown, Sparkles, Store, Building2, Stethoscope, BarChart3, Wand2, Package, Megaphone, BadgeCheck } from 'lucide-react';
+import { ArrowLeft, Check, Crown, Sparkles, Store, Building2, Stethoscope, BarChart3, Wand2, Package, Megaphone, BadgeCheck, Settings2 } from 'lucide-react';
 import { useApp } from '@/contexts/useApp';
-import { getMarketplacePlans } from '@/supabase/marketplace';
+import { useAuth } from '@/hooks/useAuth';
+import {
+  ensureMarketplaceSellerProfile,
+  getMarketplacePlans,
+  requestMarketplaceSubscription,
+} from '@/supabase/marketplace';
 import { MARKETPLACE_PREMIUM_LISTING_CAP } from '@/types/marketplace';
-import type { MarketplacePlanTier, MarketplaceSubscriptionPlan } from '@/types/marketplace';
+import type { MarketplacePlanTier, MarketplaceSeller, MarketplaceSubscriptionPlan } from '@/types/marketplace';
 
 /**
  * Role-separated seller dashboard for Store / Company / Doctor.
@@ -11,19 +16,43 @@ import type { MarketplacePlanTier, MarketplaceSubscriptionPlan } from '@/types/m
  */
 export default function SellerDashboardPage() {
   const { themeConfig, goBack, navigate, screenParams } = useApp();
-  const role = (screenParams?.role || 'store') as 'store' | 'company' | 'doctor';
-  const sellerId = screenParams?.sellerId || `demo-${role}`;
+  const { appUser } = useAuth();
+  const role = (screenParams?.role || (appUser?.user_role as 'store' | 'company' | 'doctor') || 'store') as 'store' | 'company' | 'doctor';
+  const sellerId = appUser?.id || screenParams?.sellerId || `demo-${role}`;
   const [plans, setPlans] = useState<MarketplaceSubscriptionPlan[]>([]);
+  const [seller, setSeller] = useState<MarketplaceSeller | null>(null);
   const [selected, setSelected] = useState<MarketplacePlanTier>('free');
   const [requested, setRequested] = useState(false);
   const [doctorVerified, setDoctorVerified] = useState(false);
+  const [toast, setToast] = useState('');
 
   useEffect(() => {
-    void getMarketplacePlans().then(setPlans);
-  }, []);
+    void (async () => {
+      const list = await getMarketplacePlans();
+      setPlans(list);
+      const profile = await ensureMarketplaceSellerProfile({
+        id: sellerId,
+        sellerType: role,
+        displayName: appUser?.full_name || 'متجري',
+      });
+      setSeller(profile);
+      setSelected(profile.subscriptionPlan || 'free');
+      if (profile.isTrustedDoctor || profile.isVerified) setDoctorVerified(true);
+    })();
+  }, [sellerId, role, appUser?.full_name]);
 
   const title = role === 'company' ? 'لوحة الشركة' : role === 'doctor' ? 'لوحة الطبيب' : 'لوحة المتجر';
   const Icon = role === 'company' ? Building2 : role === 'doctor' ? Stethoscope : Store;
+
+  const requestPlan = async () => {
+    const result = await requestMarketplaceSubscription(sellerId, selected);
+    if (result.ok) {
+      setRequested(true);
+      setToast('تم إرسال طلب الاشتراك للأدمن');
+    } else {
+      setToast(result.error);
+    }
+  };
 
   return (
     <div className="min-h-screen pb-24 px-4 pt-4" style={{ backgroundColor: themeConfig.colors.background }}>
@@ -31,9 +60,16 @@ export default function SellerDashboardPage() {
         <button type="button" onClick={goBack} className="w-10 h-10 rounded-full flex items-center justify-center" style={{ backgroundColor: themeConfig.colors.surface }} aria-label="رجوع">
           <ArrowLeft size={18} />
         </button>
-        <h1 className="text-base font-black flex items-center gap-1" style={{ color: themeConfig.colors.text }}>
-          <Icon size={16} /> {title}
-        </h1>
+        <div className="flex-1">
+          <h1 className="text-base font-black flex items-center gap-1" style={{ color: themeConfig.colors.text }}>
+            <Icon size={16} /> {title}
+          </h1>
+          {seller && (
+            <p className="text-[10px]" style={{ color: themeConfig.colors.textMuted }}>
+              {seller.displayName} · {seller.approvalStatus} · {seller.subscriptionPlan}
+            </p>
+          )}
+        </div>
       </div>
 
       <div className="rounded-2xl border p-4 mb-4" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
@@ -57,13 +93,22 @@ export default function SellerDashboardPage() {
               }}
             >
               <BadgeCheck size={14} />
-              {doctorVerified ? 'تم إرسال طلب التوثيق المجاني' : 'طلب توثيق مجاني'}
+              {doctorVerified ? 'طلب التوثيق المجاني مُرسل / مفعّل' : 'طلب توثيق مجاني'}
             </button>
           </div>
         )}
       </div>
 
       <div className="grid grid-cols-2 gap-2 mb-5">
+        <button
+          type="button"
+          className="rounded-2xl border p-3 text-right"
+          style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}
+          onClick={() => navigate('seller-profile-edit', { sellerId, role })}
+        >
+          <Settings2 size={16} style={{ color: themeConfig.colors.primary }} />
+          <p className="text-xs font-black mt-1" style={{ color: themeConfig.colors.text }}>الملف</p>
+        </button>
         <button
           type="button"
           className="rounded-2xl border p-3 text-right"
@@ -93,7 +138,7 @@ export default function SellerDashboardPage() {
         </button>
         <button
           type="button"
-          className="rounded-2xl border p-3 text-right"
+          className="rounded-2xl border p-3 text-right col-span-2"
           style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}
           onClick={() => navigate('ai-listing-tools', { role })}
         >
@@ -140,12 +185,13 @@ export default function SellerDashboardPage() {
       <button
         type="button"
         disabled={requested}
-        onClick={() => setRequested(true)}
+        onClick={() => void requestPlan()}
         className="w-full mt-4 py-3 rounded-2xl text-sm font-black text-white"
         style={{ backgroundColor: themeConfig.colors.primary, opacity: requested ? 0.7 : 1 }}
       >
         {requested ? 'تم إرسال طلب الاشتراك للأدمن' : 'طلب ترقية الخطة'}
       </button>
+      {toast && <p className="text-xs text-center mt-2 font-bold" style={{ color: themeConfig.colors.success }}>{toast}</p>}
 
       <div className="mt-4 rounded-2xl border p-3" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
         <p className="text-xs font-bold flex items-center gap-1" style={{ color: themeConfig.colors.text }}>

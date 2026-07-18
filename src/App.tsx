@@ -42,6 +42,7 @@ const ProductDetailPage = lazy(() => import('@/pages/marketplace/ProductDetailPa
 const SellerDashboardPage = lazy(() => import('@/pages/store/SellerDashboardPage'));
 const SellerProductsPage = lazy(() => import('@/pages/store/SellerProductsPage'));
 const SellerPlacementsPage = lazy(() => import('@/pages/store/SellerPlacementsPage'));
+const SellerProfileEditPage = lazy(() => import('@/pages/store/SellerProfileEditPage'));
 const MarketplaceAnalyticsPage = lazy(() => import('@/pages/analytics/MarketplaceAnalyticsPage'));
 const AiListingToolsPage = lazy(() => import('@/pages/marketplace/AiListingToolsPage'));
 
@@ -124,6 +125,8 @@ function ScreenRouter() {
       return <Suspense fallback={<LoadingFallback />}><SellerProductsPage /></Suspense>;
     case 'seller-placements':
       return <Suspense fallback={<LoadingFallback />}><SellerPlacementsPage /></Suspense>;
+    case 'seller-profile-edit':
+      return <Suspense fallback={<LoadingFallback />}><SellerProfileEditPage /></Suspense>;
     case 'marketplace-analytics':
       return <Suspense fallback={<LoadingFallback />}><MarketplaceAnalyticsPage /></Suspense>;
     case 'ai-listing-tools':

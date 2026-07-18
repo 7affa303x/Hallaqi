@@ -1,6 +1,6 @@
 # Hallaqi Monetization & Platform Expansion — Implementation Report
 
-Updated: 2026-07-18 (continuation pass)
+Updated: 2026-07-18 (production-wiring pass)
 
 ## Navigation (final)
 
@@ -8,53 +8,43 @@ RTL right → left:
 
 1. **الحجز** (`booking`)
 2. **المنتدى** (`forum`)
-3. **المساعد** central AI (`ai-hub`) — tap → AI Advisor · long-press → radial (AI / QR / Camera / Gallery)
+3. **المساعد** central AI (`ai-hub`) — tap → AI Advisor · long-press → radial
 4. **السوق** (`marketplace`)
 5. **البروفايل** (`profile`)
 
-Discover also links into Marketplace. My Bookings remains from Profile / barber studio.
-
-## Checklist vs Brief
+## Checklist
 
 | Area | Status |
 |------|--------|
-| Role separation Client / Barber / Store / Company / Doctor / Admin | ✅ |
-| Separate seller dashboards (no barber studio mix) | ✅ |
-| Seller product CRUD + listing cap ≤ 99 | ✅ |
-| Placement requests (featured / POTD / banner / sponsored / premium) | ✅ |
-| Admin review of sellers + placements + POTD | ✅ |
-| Marketplace categories (expandable) | ✅ |
-| Filters (category, price, brand, store, company, wilaya, delivery, rating, popularity, newest, featured, premium, POTD) | ✅ |
-| Featured / Premium / Banner / Sponsored visibility | ✅ |
-| Product of the Day (paid placement, not random discount) | ✅ |
-| Barber service extras surfaced separately (not forced physical products) | ✅ |
-| Store / Company / Doctor pages + Visit Store CTA | ✅ |
-| Deep links `/store` `/company` `/doctor` `/product` | ✅ |
-| External website only (no in-app checkout / no commissions) | ✅ |
-| Subscriptions Free / Basic / Professional / Business | ✅ |
-| Doctor free verification request | ✅ |
-| Analytics dashboards | ✅ |
-| AI listing tools + `/api/ai/listing-assist` | ✅ |
-| Central AI button tap / long-press radial | ✅ |
-| Sitemap includes marketplace URLs | ✅ |
+| Role separation + seller dashboards | ✅ |
+| Wire `appUser.id` to seller flows | ✅ |
+| `ensureMarketplaceSellerProfile` | ✅ |
+| Seller profile edit (logo/cover/about/website) | ✅ |
+| Product CRUD with listing cap (Supabase + local fallback) | ✅ |
+| Placement / subscription requests (Supabase + local) | ✅ |
+| Admin RPCs wired with fallback | ✅ |
+| Premium/subscription boost in discovery ranking | ✅ |
+| Loyalty gated off (`FEATURE_FLAGS.loyaltyEnabled = false`) | ✅ |
+| Analytics local + remote fire-and-forget | ✅ |
+| Deep links store/company/doctor/product | ✅ |
+| No commissions / no in-app product checkout | ✅ |
 
-## Key files (this pass)
+## Remaining blocker (credentials)
 
-- `src/lib/marketplace/sellerInventory.ts`
-- `src/lib/marketplace/barberExtras.ts`
-- `src/pages/store/SellerProductsPage.tsx`
-- `src/pages/store/SellerPlacementsPage.tsx`
-- `supabase/migrations/20260718130000_marketplace_placement_requests.sql`
+- **Supabase MCP auth / real project env** required to apply migrations remotely.
+- Local migrations ready:
+  - `20260718120000_marketplace_platform.sql`
+  - `20260718130000_marketplace_placement_requests.sql`
+- `.env` currently has placeholder Supabase URL/key — client correctly treats as unconfigured and uses seed/localStorage.
 
-## Blockers
+## After credentials are available
 
-- **Supabase MCP auth** still required to apply migrations remotely.
-- **Gemini / AI Gateway key** optional — listing assist falls back locally.
+1. Set `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY`
+2. `supabase db push` (or apply the two marketplace migrations)
+3. Re-generate types if desired
+4. Optional: enable Gemini for live listing assist
 
-## Intentionally NOT implemented (per brief)
+## Intentionally NOT implemented
 
-- Commissions
-- Affiliates
-- In-app product checkout
-- Unlimited premium
-- Daily random discounts
+- Commissions, affiliates, in-app product checkout, unlimited premium, random daily discounts
+- Loyalty UI hidden at launch (code retained behind flag)

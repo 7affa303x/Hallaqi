@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { ArrowLeft, Megaphone, Crown, Sparkles, Image as ImageIcon } from 'lucide-react';
 import { useApp } from '@/contexts/useApp';
+import { useAuth } from '@/hooks/useAuth';
 import {
-  createPlacementRequest,
-  getPlacementRequests,
-  getSellerOwnedProducts,
-  type SellerPlacementRequest,
-} from '@/lib/marketplace/sellerInventory';
+  getSellerProducts,
+  listPlacementRequests,
+  requestMarketplacePlacement,
+} from '@/supabase/marketplace';
+import type { SellerPlacementRequest } from '@/lib/marketplace/sellerInventory';
 import type { MarketplacePlacementType, MarketplaceProduct } from '@/types/marketplace';
 
 const OPTIONS: { type: MarketplacePlacementType; label: string; hint: string; icon: typeof Crown }[] = [
@@ -20,7 +21,8 @@ const OPTIONS: { type: MarketplacePlacementType; label: string; hint: string; ic
 
 export default function SellerPlacementsPage() {
   const { themeConfig, goBack, screenParams } = useApp();
-  const sellerId = screenParams?.sellerId || `demo-${screenParams?.role || 'store'}`;
+  const { appUser } = useAuth();
+  const sellerId = appUser?.id || screenParams?.sellerId || `demo-${screenParams?.role || 'store'}`;
   const [products, setProducts] = useState<MarketplaceProduct[]>([]);
   const [requests, setRequests] = useState<SellerPlacementRequest[]>([]);
   const [type, setType] = useState<MarketplacePlacementType>('featured_product');
@@ -29,17 +31,17 @@ export default function SellerPlacementsPage() {
   const [toast, setToast] = useState('');
 
   useEffect(() => {
-    setProducts(getSellerOwnedProducts(sellerId));
-    setRequests(getPlacementRequests(sellerId));
+    void getSellerProducts(sellerId).then(setProducts);
+    void listPlacementRequests(sellerId).then(setRequests);
   }, [sellerId]);
 
-  const submit = () => {
+  const submit = async () => {
     const needsProduct = type === 'featured_product' || type === 'product_of_the_day' || type === 'premium_badge' || type === 'sponsored';
     if (needsProduct && !productId) {
       setToast('اختر منتجاً لهذا الموضع');
       return;
     }
-    createPlacementRequest({
+    await requestMarketplacePlacement({
       sellerId,
       placementType: type,
       productId: productId || undefined,
@@ -47,8 +49,7 @@ export default function SellerPlacementsPage() {
       title: OPTIONS.find(o => o.type === type)?.label || type,
     });
     setToast('تم إرسال طلب الموضع للأدمن — بدون عمولة على المبيعات');
-    setProducts(getSellerOwnedProducts(sellerId));
-    setRequests(getPlacementRequests(sellerId));
+    setRequests(await listPlacementRequests(sellerId));
   };
 
   return (
@@ -116,7 +117,7 @@ export default function SellerPlacementsPage() {
 
       <button
         type="button"
-        onClick={submit}
+        onClick={() => void submit()}
         className="w-full py-3 rounded-2xl text-sm font-black text-white"
         style={{ backgroundColor: themeConfig.colors.primary }}
       >

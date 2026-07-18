@@ -27,7 +27,7 @@ export interface Barber {
   hasIdCard: boolean;
   idCardVerified: boolean;
   isSubscribed: boolean;
-  subscriptionPlan?: 'basic' | 'pro' | 'premium';
+  subscriptionPlan?: 'free' | 'basic' | 'pro' | 'premium' | 'professional' | 'business';
   followers: number;
   following: number;
   likes: number;
@@ -230,7 +230,7 @@ export interface User {
   theme: ThemeName;
   language: 'ar' | 'fr' | 'en';
   isSubscribed: boolean;
-  subscriptionPlan?: 'free' | 'basic' | 'pro' | 'premium';
+  subscriptionPlan?: 'free' | 'basic' | 'pro' | 'premium' | 'professional' | 'business';
   subscriptionExpiry?: string;
   badges: Badge[];
   stats: UserStats;
@@ -399,6 +399,7 @@ export type ScreenName =
   | 'seller-dashboard'
   | 'seller-products'
   | 'seller-placements'
+  | 'seller-profile-edit'
   | 'marketplace-analytics'
   | 'ai-listing-tools'
   | 'coming-soon';
