@@ -16,6 +16,45 @@ export interface GroomingAdvice {
   cautions: string[];
 }
 
+/** Client safety net: never render raw JSON blobs as the advice answer. */
+export function normalizeGroomingAdvice(advice: GroomingAdvice): GroomingAdvice {
+  const answer = advice.answer?.trim() || '';
+  if (!answer.startsWith('{') && !answer.startsWith('```')) {
+    return {
+      answer,
+      suggestedServices: advice.suggestedServices ?? [],
+      cautions: advice.cautions ?? [],
+    };
+  }
+  try {
+    const start = answer.indexOf('{');
+    const end = answer.lastIndexOf('}');
+    if (start >= 0 && end > start) {
+      const parsed = JSON.parse(answer.slice(start, end + 1)) as Partial<GroomingAdvice>;
+      if (typeof parsed.answer === 'string' && parsed.answer.trim()) {
+        return {
+          answer: parsed.answer.trim(),
+          suggestedServices: Array.isArray(parsed.suggestedServices)
+            ? parsed.suggestedServices.filter((s): s is string => typeof s === 'string').slice(0, 4)
+            : (advice.suggestedServices ?? []),
+          cautions: Array.isArray(parsed.cautions)
+            ? parsed.cautions.filter((s): s is string => typeof s === 'string').slice(0, 4)
+            : (advice.cautions ?? []),
+        };
+      }
+    }
+  } catch {
+    // keep original below
+  }
+  return {
+    answer: 'تعذر تنسيق النصيحة. حاول صياغة السؤال مرة أخرى.',
+    suggestedServices: advice.suggestedServices ?? [],
+    cautions: advice.cautions?.length
+      ? advice.cautions
+      : ['هذه نصيحة عامة — راجع حلاقاً أو مختصاً عند الحاجة.'],
+  };
+}
+
 export interface BarberAssistResult {
   answer: string;
   suggestedActions: string[];
@@ -73,7 +112,7 @@ export async function requestGroomingAdvice(input: {
   if (!response.ok || !body.advice) {
     mapAiError(body.code, 'تعذر الحصول على النصيحة حالياً');
   }
-  return body.advice!;
+  return normalizeGroomingAdvice(body.advice!);
 }
 
 export async function requestStyleImage(description: string): Promise<string> {
