@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ArrowLeft, Save, Globe, MapPin, Phone, Mail, Building2 } from 'lucide-react';
+import { ArrowLeft, Save, Building2 } from 'lucide-react';
 import { useApp } from '@/contexts/useApp';
 import { useAuth } from '@/hooks/useAuth';
 import {
