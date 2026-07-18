@@ -79,7 +79,14 @@ export default function RegisterScreen() {
       );
       if (result.session) {
         setAuthenticated(true);
-        navigate('home', { redirectTab: 'booking' });
+        const sellerRoles = ['store', 'company', 'doctor'];
+        if (sellerRoles.includes(data.accountType)) {
+          navigate('seller-dashboard', { role: data.accountType, pendingApproval: '1' });
+        } else if (data.accountType === 'barber') {
+          navigate('home', { redirectTab: 'profile' });
+        } else {
+          navigate('home', { redirectTab: 'booking' });
+        }
       } else {
         setAuthenticated(false);
         setVerificationEmail(data.email);
@@ -450,9 +457,29 @@ export default function RegisterScreen() {
               </motion.div>
               <p className="text-[11px] leading-relaxed text-right" style={{ color: themeConfig.colors.textMuted }}>
                 أوافق على{' '}
-                <span className="font-bold" style={{ color: themeConfig.colors.primary }}>شروط الاستخدام</span>
+                <button
+                  type="button"
+                  className="font-bold underline-offset-2 hover:underline"
+                  style={{ color: themeConfig.colors.primary }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate('home', { redirectTab: 'profile', openLegal: 'terms' });
+                  }}
+                >
+                  شروط الاستخدام
+                </button>
                 {' '}و{' '}
-                <span className="font-bold" style={{ color: themeConfig.colors.primary }}>سياسة الخصوصية</span>
+                <button
+                  type="button"
+                  className="font-bold underline-offset-2 hover:underline"
+                  style={{ color: themeConfig.colors.primary }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate('home', { redirectTab: 'profile', openLegal: 'privacy' });
+                  }}
+                >
+                  سياسة الخصوصية
+                </button>
               </p>
             </button>
           )}

@@ -77,12 +77,21 @@ type ProfileSubPage = 'main' | 'theme' | 'animation' | 'language' | 'notificatio
   'accessibility' | 'privacy-policy' | 'terms' | 'licenses' | 'security';
 
 export default function ProfileTab() {
-  const { themeConfig, settings, navigate, setActiveTab, unreadCount, bookings, barbers } = useApp();
+  const { themeConfig, settings, navigate, setActiveTab, unreadCount, bookings, barbers, screenParams } = useApp();
   const { isAuthenticated, appUser, user, logout, isLoading: authLoading } = useAuth();
-  const [subPage, setSubPage] = useState<ProfileSubPage>('main');
+  const [subPage, setSubPage] = useState<ProfileSubPage>(() => {
+    if (screenParams?.openLegal === 'terms') return 'terms';
+    if (screenParams?.openLegal === 'privacy') return 'privacy-policy';
+    return 'main';
+  });
   const [actionError, setActionError] = useState('');
   const [actionMessage, setActionMessage] = useState('');
   const [loyaltySummary, setLoyaltySummary] = useState<{ points: number; tier: string }>({ points: 0, tier: 'bronze' });
+
+  useEffect(() => {
+    if (screenParams?.openLegal === 'terms') setSubPage('terms');
+    if (screenParams?.openLegal === 'privacy') setSubPage('privacy-policy');
+  }, [screenParams?.openLegal]);
 
   useEffect(() => {
     if (!appUser) return;
@@ -649,16 +658,22 @@ function LegalPage({ onBack, kind }: { onBack: () => void; kind: 'privacy' | 'te
     privacy: {
       title: 'سياسة الخصوصية',
       sections: [
-        ['البيانات التي نجمعها', 'بيانات الحساب والحجوزات والموقع الاختياري وملفات الدفع أو الهوية التي يرفعها المستخدم.'],
-        ['كيفية الاستخدام', 'نستخدم البيانات لتشغيل الحجز والدفع والتواصل ومنع الاحتيال وتحسين Hallaqi.'],
-        ['حقوقك', 'يمكنك تصدير بياناتك أو حذف حسابك من الإعدادات. وثائق الهوية وإيصالات الدفع خاصة ولا تظهر للعامة.'],
+        ['البيانات التي نجمعها', 'بيانات الحساب (الاسم، البريد، الهاتف)، الحجوزات، الموقع الاختياري، صور الملف/المحفظة، إيصالات الدفع، وبيانات الاستخدام لتحسين الخدمة.'],
+        ['كيفية الاستخدام', 'نشغّل الحجز والدفع والتواصل ومنع الاحتيال، ونفعّل مساعد AI عبر مزودين مثل Groq/Google عند تفعيل الميزة، دون بيع بياناتك الشخصية.'],
+        ['المدفوعات والوثائق', 'إيصالات CCP/بريدي والبطاقات والمستندات خاصة — تظهر فقط لصاحب الحساب والأدمن/الحلاق المعني بالموافقة.'],
+        ['السوق الخارجي', 'عند زيارة متجر خارجي (Visit Store) تغادر Hallaqi؛ سياسة ذلك الموقع منفصلة عنّا.'],
+        ['حقوقك', 'يمكنك طلب تصدير بياناتك أو حذف حسابك من الإعدادات. للاستفسار: عبر الدعم داخل التطبيق.'],
+        ['ملفات الارتباط والتحليلات', 'قد نستخدم أدوات تحليل (مثل Vercel Analytics) لقياس الأداء دون تحديد هوية شخصية قدر الإمكان.'],
       ],
     },
     terms: {
       title: 'شروط الاستخدام',
       sections: [
-        ['الحجوزات', 'يلتزم العميل بمعلومات صحيحة، ويلتزم الحلاق بتحديث التوفر والخدمات والأسعار.'],
-        ['المدفوعات', 'الدفع الإلكتروني أو اليدوي يخضع للتحقق. لا يُعد الإيصال قبولاً نهائياً حتى اعتماده.'],
+        ['الحسابات والأدوار', 'يختار المستخدم دوره (عميل، حلاق، متجر، شركة، طبيب). حسابات السوق قد تبقى معلّقة حتى موافقة الإدارة.'],
+        ['الحجوزات', 'يلتزم العميل بمعلومات صحيحة، ويلتزم الحلاق بتحديث التوفر والخدمات والأسعار. الإلغاء يخضع لسياسة الحلاق الظاهرة عند الحجز.'],
+        ['المدفوعات', 'الدفع الإلكتروني أو اليدوي (CCP) يخضع للتحقق. لا يُعد الإيصال قبولاً نهائياً حتى اعتماده. الحجوزات غير المدفوعة بالبطاقة قد تُلغى.'],
+        ['السوق', 'الشراء داخل التطبيق للمنتجات غير مفعّل عند الإطلاق؛ الروابط الخارجية على مسؤولية البائع والمشتري.'],
+        ['المساعد الذكي', 'محتوى AI استرشادي فقط وليس تشخيصاً طبياً. للمشاكل الجلدية أو تساقط غير مفسَّر راجع مختصاً.'],
         ['السلوك', 'يُمنع الاحتيال والتحرش والمحتوى المضلل، ويحق للإدارة تعليق الحساب عند المخالفة.'],
       ],
     },

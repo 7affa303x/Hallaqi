@@ -65,6 +65,15 @@ VITE_AI_PROVIDER=groq
 GEMINI_API_KEY=<اختياري — لتوليد الصور فقط>
 ```
 
+### ما تم إصلاحه في دفعة الإطلاق P0 (2026-07-18)
+
+- بذر 3 بائعين + 6 منتجات في Supabase
+- إيقاف seed الوهمي عند اتصال Supabase (`marketplaceSeedFallback: false`)
+- CSP يسمح بـ Stripe + Groq
+- إلغاء الحجز تلقائياً عند فشل/إلغاء دفع البطاقة
+- بوابة «بانتظار الموافقة» للبائعين
+- روابط شروط/خصوصية من التسجيل + نص قانوني موسّع
+
 ### ما زال ناقصاً (اختياري)
 
 - `VITE_STRIPE_PUBLISHABLE_KEY` + `STRIPE_SECRET_KEY` — دفع Stripe

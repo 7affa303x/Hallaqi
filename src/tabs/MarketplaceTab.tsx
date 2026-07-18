@@ -143,6 +143,11 @@ export default function MarketplaceTab() {
             <SlidersHorizontal size={18} />
           </button>
         </div>
+        {!loading && sellers.length === 0 && products.length === 0 && (
+          <p className="text-[10px] mb-2 px-2 py-1 rounded-lg text-center" style={{ backgroundColor: `${themeConfig.colors.warning}15`, color: themeConfig.colors.warning }}>
+            السوق جاهز — كن أول متجر أو شركة تنضم
+          </p>
+        )}
         <div className="relative">
           <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2" style={{ color: themeConfig.colors.textMuted }} />
           <input
@@ -532,7 +537,12 @@ export default function MarketplaceTab() {
         {loading ? (
           <p className="text-sm py-8 text-center" style={{ color: themeConfig.colors.textMuted }}>جاري التحميل...</p>
         ) : products.length === 0 ? (
-          <EmptyState icon={Search} title="لا نتائج" description="جرّب تغيير الفلاتر أو البحث" themeConfig={themeConfig} />
+          <EmptyState
+            icon={Search}
+            title={sellers.length === 0 ? 'السوق فارغ حالياً' : 'لا نتائج'}
+            description={sellers.length === 0 ? 'سجّل كمتجر أو شركة لإضافة أول المنتجات' : 'جرّب تغيير الفلاتر أو البحث'}
+            themeConfig={themeConfig}
+          />
         ) : (
           <div className="grid grid-cols-2 gap-3">
             {products.map(p => (

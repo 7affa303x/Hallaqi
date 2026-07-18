@@ -80,6 +80,14 @@ export default function SellerDashboardPage() {
       </div>
 
       <div className="rounded-2xl border p-4 mb-4" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
+        {seller?.approvalStatus === 'pending' || screenParams?.pendingApproval === '1' ? (
+          <div className="mb-3 rounded-xl p-3" style={{ backgroundColor: `${themeConfig.colors.warning}15` }}>
+            <p className="text-sm font-black" style={{ color: themeConfig.colors.warning }}>بانتظار موافقة الإدارة</p>
+            <p className="text-[11px] mt-1 leading-5" style={{ color: themeConfig.colors.textMuted }}>
+              يمكنك تجهيز ملفك ومنتجاتك الآن. الظهور العام في السوق يبدأ بعد الموافقة.
+            </p>
+          </div>
+        ) : null}
         <p className="text-sm font-black" style={{ color: themeConfig.colors.text }}>ابدأ مجاناً — ادفع مع نموّك</p>
         <p className="text-xs mt-1" style={{ color: themeConfig.colors.textMuted }}>
           Start free · Pay as you grow. الحد الأقصى للبريميوم {MARKETPLACE_PREMIUM_LISTING_CAP} منتج — ليس غير محدود.

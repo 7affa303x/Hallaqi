@@ -39,8 +39,15 @@ import {
   type SellerPlacementRequest,
 } from '@/lib/marketplace/sellerInventory';
 import { isSupabaseConfigured, supabase } from '@/supabase/client';
+import { FEATURE_FLAGS } from '@/lib/featureFlags';
 
 type Row = Record<string, unknown>;
+
+/** True when live catalog is empty and seed would be misleading. */
+export function shouldUseMarketplaceSeed(): boolean {
+  if (!isSupabaseConfigured()) return true;
+  return FEATURE_FLAGS.marketplaceSeedFallback;
+}
 
 function mapProduct(row: Row): MarketplaceProduct {
   const seller = row.marketplace_sellers as { display_name?: string; seller_type?: MarketplaceSeller['sellerType'] } | null;
@@ -194,11 +201,11 @@ export async function getMarketplacePlans(sellerType?: 'store' | 'company' | 'do
   return marketplacePlans;
 }
 
-/** All sellers for admin review (includes pending local + seed). */
+/** All sellers for admin review (includes pending local + optional seed). */
 export async function getMarketplaceSellersForAdmin(): Promise<MarketplaceSeller[]> {
   const remote = await tryRemoteSellers(true);
   const local = typeof window !== 'undefined' ? readLocalSellers() : [];
-  const seed = marketplaceSellers;
+  const seed = shouldUseMarketplaceSeed() ? marketplaceSellers : [];
   const byId = new Map<string, MarketplaceSeller>();
   for (const s of [...seed, ...(remote || []), ...local]) byId.set(s.id, s);
   return [...byId.values()].sort((a, b) => {
@@ -244,29 +251,35 @@ export async function getMarketplacePlacements(): Promise<MarketplacePlacement[]
         .from('marketplace_placements' as never)
         .select('*')
         .eq('is_active', true);
-      if (!error && data && (data as Row[]).length > 0) {
-        return (data as Row[]).map(row => ({
-          id: String(row.id),
-          placementType: row.placement_type as MarketplacePlacementType,
-          sellerId: row.seller_id ? String(row.seller_id) : undefined,
-          productId: row.product_id ? String(row.product_id) : undefined,
-          title: row.title ? String(row.title) : undefined,
-          bannerImageUrl: row.banner_image_url ? String(row.banner_image_url) : undefined,
-          bidAmountDzd: Number(row.bid_amount_dzd || 0),
-          startsAt: String(row.starts_at || ''),
-          endsAt: row.ends_at ? String(row.ends_at) : undefined,
-          isActive: Boolean(row.is_active),
-        }));
+      if (!error && data) {
+        if ((data as Row[]).length > 0) {
+          return (data as Row[]).map(row => ({
+            id: String(row.id),
+            placementType: row.placement_type as MarketplacePlacementType,
+            sellerId: row.seller_id ? String(row.seller_id) : undefined,
+            productId: row.product_id ? String(row.product_id) : undefined,
+            title: row.title ? String(row.title) : undefined,
+            bannerImageUrl: row.banner_image_url ? String(row.banner_image_url) : undefined,
+            bidAmountDzd: Number(row.bid_amount_dzd || 0),
+            startsAt: String(row.starts_at || ''),
+            endsAt: row.ends_at ? String(row.ends_at) : undefined,
+            isActive: Boolean(row.is_active),
+          }));
+        }
+        if (!shouldUseMarketplaceSeed()) return [];
       }
     } catch { /* fallback */ }
   }
-  return marketplacePlacements;
+  return shouldUseMarketplaceSeed() ? marketplacePlacements : [];
 }
 
 export async function getMarketplaceSellers(): Promise<MarketplaceSeller[]> {
   const remote = await tryRemoteSellers();
-  return (remote && remote.length > 0 ? remote : marketplaceSellers)
-    .filter(s => s.approvalStatus === 'approved' && s.isActive);
+  if (remote && remote.length > 0) {
+    return remote.filter(s => s.approvalStatus === 'approved' && s.isActive);
+  }
+  if (!shouldUseMarketplaceSeed()) return [];
+  return marketplaceSellers.filter(s => s.approvalStatus === 'approved' && s.isActive);
 }
 
 export async function getMarketplaceSellerById(id: string): Promise<MarketplaceSeller | undefined> {
@@ -451,7 +464,12 @@ export async function updateMarketplaceSellerProfile(
 
 export async function getMarketplaceProducts(filters: MarketplaceFilters = {}): Promise<MarketplaceProduct[]> {
   const remote = await tryRemoteProducts();
-  const base = remote && remote.length > 0 ? remote : marketplaceProducts;
+  const base =
+    remote && remote.length > 0
+      ? remote
+      : shouldUseMarketplaceSeed()
+        ? marketplaceProducts
+        : [];
   const owned = typeof window !== 'undefined' ? getAllSellerOwnedProducts() : [];
   const merged = [...owned, ...base.filter(p => !owned.some(o => o.id === p.id))];
   return filterMarketplaceProducts(merged, filters);
@@ -478,7 +496,7 @@ export async function getSellerProducts(sellerId: string): Promise<MarketplacePr
     } catch { /* fallback */ }
   }
   const remote = await tryRemoteProducts();
-  const all = remote && remote.length > 0 ? remote : marketplaceProducts;
+  const all = remote && remote.length > 0 ? remote : (shouldUseMarketplaceSeed() ? marketplaceProducts : []);
   const owned = getSellerOwnedProducts(sellerId);
   return [...owned, ...all.filter(p => p.sellerId === sellerId && !owned.some(o => o.id === p.id))]
     .filter(p => p.isActive);

@@ -21,6 +21,11 @@ export const FEATURE_FLAGS = {
    * Affiliate system — not in launch scope.
    */
   affiliates: false,
+  /**
+   * When Supabase is configured, do NOT fall back to Unsplash seed catalog.
+   * Set true only for local demos without a live marketplace DB.
+   */
+  marketplaceSeedFallback: false,
 } as const;
 
 /** User-facing label for deferred launch features. */

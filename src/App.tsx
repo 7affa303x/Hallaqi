@@ -65,7 +65,7 @@ function ScreenRouter() {
   const { screen, screenParams, activeTab } = useApp();
   const { isAuthenticated, appUser } = useAuth();
 
-  const authRequiredScreens = ['booking-flow', 'chat-room', 'messages', 'create-post', 'admin-dashboard'];
+  const authRequiredScreens = ['booking-flow', 'chat-room', 'messages', 'create-post', 'admin-dashboard', 'seller-dashboard', 'seller-products', 'seller-placements', 'seller-profile-edit'];
   const needsAuth = authRequiredScreens.includes(screen) && !isAuthenticated;
 
   if (needsAuth) {

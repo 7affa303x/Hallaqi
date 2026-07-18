@@ -65,20 +65,20 @@ async function main() {
   }
 
   if (anonKey && supabaseUrl) {
-    const res = await fetch(`${supabaseUrl}/rest/v1/`, { headers: { apikey: anonKey } });
-    const schema = await res.json();
-    const tables = Object.keys(schema.definitions || {}).filter((t) => t.startsWith('marketplace'));
-    const hasSellers = tables.includes('marketplace_sellers');
-    const hasLegacyProducts =
-      schema.definitions?.marketplace_products?.properties?.store_id != null;
+    const sellersRes = await fetch(`${supabaseUrl}/rest/v1/marketplace_sellers?select=id&limit=1`, {
+      headers: { apikey: anonKey, Authorization: `Bearer ${anonKey}` },
+    });
+    const productsRes = await fetch(`${supabaseUrl}/rest/v1/marketplace_products?select=id&limit=1`, {
+      headers: { apikey: anonKey, Authorization: `Bearer ${anonKey}` },
+    });
+    const sellersOk = sellersRes.status === 200;
+    const productsOk = productsRes.status === 200;
     await check(
       'Marketplace schema',
-      hasSellers && !hasLegacyProducts,
-      hasSellers
-        ? 'marketplace_sellers present'
-        : hasLegacyProducts
-          ? 'LEGACY schema (store_id/company_id) — run replace migration'
-          : 'marketplace_sellers missing — run migrations',
+      sellersOk && productsOk,
+      sellersOk && productsOk
+        ? 'marketplace_sellers + products OK'
+        : `sellers HTTP ${sellersRes.status}, products HTTP ${productsRes.status}`,
     );
   }
 

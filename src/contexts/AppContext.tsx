@@ -145,7 +145,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       initialParams = { bookingId: query.get('booking_id') || undefined };
     } else if (queryScreen === 'booking-flow' && query.get('barberId')) {
       initialScreen = 'booking-flow';
-      initialParams = { barberId: query.get('barberId') || undefined };
+      initialParams = {
+        barberId: query.get('barberId') || undefined,
+        cancelledBooking: query.get('cancelledBooking') || undefined,
+      };
     } else if (queryScreen === 'notifications') {
       initialScreen = 'notifications';
     } else if (queryScreen === 'ai-advisor') {
@@ -173,8 +176,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
         return tab;
       });
       setScreen('home');
-      setScreenParams(undefined);
-      setHistory([{ screen: 'home' }]);
+      // Keep lightweight home params (e.g. openLegal) so Profile can deep-link
+      const homeParams = params?.openLegal
+        ? { openLegal: params.openLegal }
+        : undefined;
+      setScreenParams(homeParams);
+      setHistory([{ screen: 'home', params: homeParams }]);
       window.history.replaceState({ hallaqi: true, tab }, '', '/');
       return;
     }
