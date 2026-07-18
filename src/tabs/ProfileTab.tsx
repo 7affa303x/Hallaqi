@@ -14,8 +14,10 @@ import {
   Phone, Bug, Lightbulb, Info, FileText, FileCode,
   Trash2, Download, AlertTriangle, Check, X, Sparkles,
   Scissors, Clock, TrendingUp, Award, Zap, Crown as CrownIcon,
-  ArrowLeft, LogIn, UserPlus as UserPlusIcon, Gift
+  ArrowLeft, LogIn, UserPlus as UserPlusIcon, Gift,
+  Store, Building2, Stethoscope, CalendarDays, ShoppingBag,
 } from 'lucide-react';
+import { FEATURE_FLAGS } from '@/lib/featureFlags';
 import EditBarberProfile from '@/components/EditBarberProfile';
 import ServicesManagement from '@/components/ServicesManagement';
 import {
@@ -131,7 +133,7 @@ export default function ProfileTab() {
   const userAvatar = appUser?.avatar_url || '/logo-icon.png';
   const isVerified = appUser?.verification_status === 'verified' || appUser?.verification_status === 'premium';
   const isIdVerified = isVerified;
-  const userRole = appUser?.user_role || 'client';
+  const userRole = String(appUser?.user_role || 'client');
 
   if (subPage === 'theme') return <ThemeSelector onBack={() => setSubPage('main')} />;
   if (subPage === 'animation') return <AnimationSelector onBack={() => setSubPage('main')} />;
@@ -263,6 +265,61 @@ export default function ProfileTab() {
         </div>
       )}
 
+      {/* Client: appointments moved out of bottom nav — accessible here */}
+      {(userRole === 'client' || !appUser) && (
+        <div className="px-4 mt-4 grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => setActiveTab('appointments')}
+            className="flex items-center gap-2 p-3 rounded-2xl border text-right"
+            style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}
+          >
+            <CalendarDays size={16} style={{ color: themeConfig.colors.primary }} />
+            <span>
+              <span className="block text-xs font-bold" style={{ color: themeConfig.colors.text }}>مواعيدي</span>
+              <span className="block text-[10px]" style={{ color: themeConfig.colors.textMuted }}>الحجوزات والرسائل</span>
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('marketplace')}
+            className="flex items-center gap-2 p-3 rounded-2xl border text-right"
+            style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}
+          >
+            <ShoppingBag size={16} style={{ color: themeConfig.colors.accent }} />
+            <span>
+              <span className="block text-xs font-bold" style={{ color: themeConfig.colors.text }}>السوق</span>
+              <span className="block text-[10px]" style={{ color: themeConfig.colors.textMuted }}>اكتشف المنتجات</span>
+            </span>
+          </button>
+        </div>
+      )}
+
+      {/* Store / Company / Doctor — separate dashboards (no barber studio mix) */}
+      {(userRole === 'store' || userRole === 'company' || userRole === 'doctor') && (
+        <div className="px-4 mt-4 grid grid-cols-1 gap-2">
+          <button
+            type="button"
+            onClick={() => navigate('seller-dashboard', { role: userRole, sellerId: appUser?.id })}
+            className="flex items-center gap-3 p-4 rounded-2xl border text-right"
+            style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}
+          >
+            {userRole === 'company' ? <Building2 size={18} style={{ color: themeConfig.colors.primary }} />
+              : userRole === 'doctor' ? <Stethoscope size={18} style={{ color: themeConfig.colors.primary }} />
+                : <Store size={18} style={{ color: themeConfig.colors.primary }} />}
+            <span className="flex-1">
+              <span className="block text-sm font-bold" style={{ color: themeConfig.colors.text }}>
+                {userRole === 'company' ? 'لوحة الشركة' : userRole === 'doctor' ? 'لوحة الطبيب' : 'لوحة المتجر'}
+              </span>
+              <span className="block text-[11px]" style={{ color: themeConfig.colors.textMuted }}>
+                اشتراكات · مواضع إعلان · تحليلات · أدوات AI
+              </span>
+            </span>
+            <ChevronLeft size={16} style={{ color: themeConfig.colors.textMuted }} />
+          </button>
+        </div>
+      )}
+
       {(userRole === 'barber' || userRole === 'specialist') && (
         <div className="px-4 mt-4 grid grid-cols-2 gap-2">
           <button
@@ -292,23 +349,25 @@ export default function ProfileTab() {
         </div>
       )}
 
-      <div className="px-4 mt-4">
-        <button
-          type="button"
-          onClick={() => setSubPage('loyalty')}
-          className="w-full flex items-center gap-3 p-4 rounded-2xl border text-right"
-          style={{ backgroundColor: themeConfig.colors.accent + '0D', borderColor: themeConfig.colors.accent + '40' }}
-        >
-          <div className="w-11 h-11 rounded-xl flex items-center justify-center" style={{ backgroundColor: themeConfig.colors.accent + '18' }}>
-            <Gift size={21} style={{ color: themeConfig.colors.accent }} />
-          </div>
-          <div className="flex-1">
-            <p className="text-sm font-bold" style={{ color: themeConfig.colors.text }}>برنامج ولاء حلاقي</p>
-            <p className="text-[11px]" style={{ color: themeConfig.colors.textMuted }}>اكسب نقاطاً من الحجوزات واستبدلها بمكافآت</p>
-          </div>
-          <ChevronLeft size={17} style={{ color: themeConfig.colors.textMuted }} />
-        </button>
-      </div>
+      {FEATURE_FLAGS.loyaltyEnabled && (
+        <div className="px-4 mt-4">
+          <button
+            type="button"
+            onClick={() => setSubPage('loyalty')}
+            className="w-full flex items-center gap-3 p-4 rounded-2xl border text-right"
+            style={{ backgroundColor: themeConfig.colors.accent + '0D', borderColor: themeConfig.colors.accent + '40' }}
+          >
+            <div className="w-11 h-11 rounded-xl flex items-center justify-center" style={{ backgroundColor: themeConfig.colors.accent + '18' }}>
+              <Gift size={21} style={{ color: themeConfig.colors.accent }} />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-bold" style={{ color: themeConfig.colors.text }}>برنامج ولاء حلاقي</p>
+              <p className="text-[11px]" style={{ color: themeConfig.colors.textMuted }}>اكسب نقاطاً من الحجوزات واستبدلها بمكافآت</p>
+            </div>
+            <ChevronLeft size={17} style={{ color: themeConfig.colors.textMuted }} />
+          </button>
+        </div>
+      )}
 
       {actionError && (
         <p role="alert" className="mx-4 mt-4 p-3 rounded-xl text-xs" style={{ backgroundColor: themeConfig.colors.error + '10', color: themeConfig.colors.error }}>

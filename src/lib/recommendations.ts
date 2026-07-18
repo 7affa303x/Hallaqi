@@ -59,6 +59,21 @@ export function rankBarberRecommendations(
         reasons.push('حساب موثق');
       }
 
+      // Monetization visibility: subscribed / premium barbers rank higher (not unlimited quantity).
+      if (barber.isSubscribed) {
+        const planBoost =
+          barber.subscriptionPlan === 'premium' || barber.subscriptionPlan === 'business' ? 12
+            : barber.subscriptionPlan === 'pro' || barber.subscriptionPlan === 'professional' ? 8
+              : barber.subscriptionPlan === 'basic' ? 4
+                : 2;
+        score += planBoost;
+        reasons.push('ظهور اشتراك مميز');
+      }
+
+      if (barber.tags.includes('premium') || barber.tags.includes('trending')) {
+        score += 3;
+      }
+
       if (barber.isFollowing) {
         score += 3;
         reasons.push('من المفضلة');

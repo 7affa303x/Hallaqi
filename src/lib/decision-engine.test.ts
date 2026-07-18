@@ -48,6 +48,16 @@ describe('decision engine', () => {
     expect(ranked[0]?.score).toBeGreaterThan(ranked[1]?.score || 0);
   });
 
+  it('boosts subscribed premium barbers for monetization visibility', () => {
+    const ranked = rankBarberRecommendations([
+      barber({ id: 'free', rating: 4.7, isVerified: true }),
+      barber({ id: 'premium', rating: 4.5, isVerified: true, isSubscribed: true, subscriptionPlan: 'premium' }),
+    ], { city: 'الجزائر', category: 'haircut' });
+
+    expect(ranked[0]?.barber.id).toBe('premium');
+    expect(ranked[0]?.score).toBeGreaterThan(ranked[1]?.score || 0);
+  });
+
   it('ranks slots near the user preferred hour first', () => {
     const ranked = rankAvailableSlots(
       ['09:00', '14:00', '18:00'],

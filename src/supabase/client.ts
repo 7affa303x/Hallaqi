@@ -5,7 +5,10 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
 export const isSupabaseConfigured = (): boolean => {
-  return supabaseUrl.length > 10 && supabaseKey.length > 10 && supabaseUrl.startsWith('http');
+  if (!supabaseUrl.startsWith('http') || supabaseUrl.length < 20 || supabaseKey.length < 20) return false;
+  if (supabaseUrl.includes('your-project') || supabaseUrl.includes('placeholder')) return false;
+  if (supabaseKey.includes('your_') || supabaseKey === 'placeholder') return false;
+  return true;
 };
 
 export const isDeveloperMode = (() => {

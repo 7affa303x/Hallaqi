@@ -67,6 +67,10 @@ function screenUrl(screen: ScreenName, params?: ScreenParams): string {
   if (screen === 'reset-password' || screen === 'forgot-password') return `/${screen}`;
   if (screen === 'barber-detail' && params?.barberId) return `/barber/${encodeURIComponent(params.barberId)}`;
   if (screen === 'post-detail' && params?.postId) return `/post/${encodeURIComponent(params.postId)}`;
+  if (screen === 'store-detail' && params?.sellerId) return `/store/${encodeURIComponent(params.sellerId)}`;
+  if (screen === 'company-detail' && params?.sellerId) return `/company/${encodeURIComponent(params.sellerId)}`;
+  if (screen === 'doctor-detail' && params?.sellerId) return `/doctor/${encodeURIComponent(params.sellerId)}`;
+  if (screen === 'product-detail' && params?.productId) return `/product/${encodeURIComponent(params.productId)}`;
   const query = new URLSearchParams({ screen });
   for (const [key, value] of Object.entries(params || {})) {
     if (value) query.set(key, value);
@@ -108,6 +112,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } else if (pathname.startsWith('/post/')) {
       initialScreen = 'post-detail';
       initialParams = { postId: decodeURIComponent(pathname.slice('/post/'.length)) };
+    } else if (pathname.startsWith('/store/')) {
+      initialScreen = 'store-detail';
+      initialParams = { sellerId: decodeURIComponent(pathname.slice('/store/'.length)) };
+    } else if (pathname.startsWith('/company/')) {
+      initialScreen = 'company-detail';
+      initialParams = { sellerId: decodeURIComponent(pathname.slice('/company/'.length)) };
+    } else if (pathname.startsWith('/doctor/')) {
+      initialScreen = 'doctor-detail';
+      initialParams = { sellerId: decodeURIComponent(pathname.slice('/doctor/'.length)) };
+    } else if (pathname.startsWith('/product/')) {
+      initialScreen = 'product-detail';
+      initialParams = { productId: decodeURIComponent(pathname.slice('/product/'.length)) };
     } else if (queryScreen === 'payment-success') {
       initialScreen = 'payment-success';
       initialParams = { bookingId: query.get('booking_id') || undefined };
@@ -296,6 +312,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
       } else if (pathname.startsWith('/post/')) {
         setScreen('post-detail');
         setScreenParams({ postId: decodeURIComponent(pathname.slice('/post/'.length)) });
+        return;
+      } else if (pathname.startsWith('/store/')) {
+        setScreen('store-detail');
+        setScreenParams({ sellerId: decodeURIComponent(pathname.slice('/store/'.length)) });
+        return;
+      } else if (pathname.startsWith('/company/')) {
+        setScreen('company-detail');
+        setScreenParams({ sellerId: decodeURIComponent(pathname.slice('/company/'.length)) });
+        return;
+      } else if (pathname.startsWith('/doctor/')) {
+        setScreen('doctor-detail');
+        setScreenParams({ sellerId: decodeURIComponent(pathname.slice('/doctor/'.length)) });
+        return;
+      } else if (pathname.startsWith('/product/')) {
+        setScreen('product-detail');
+        setScreenParams({ productId: decodeURIComponent(pathname.slice('/product/'.length)) });
         return;
       } else if (query.get('screen') === 'payment-success') {
         setScreen('payment-success');

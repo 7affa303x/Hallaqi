@@ -23,6 +23,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { bookingStep3Schema } from '@/lib/validation';
 import type { BookingStep3FormData } from '@/lib/validation';
 import { preferredBookingHour, rankAvailableSlots } from '@/lib/scheduling';
+import { FEATURE_FLAGS } from '@/lib/featureFlags';
 import { trackProductEvent } from '@/lib/product-analytics';
 
 const ALL_TIME_SLOTS = [
@@ -164,7 +165,7 @@ export default function BookingFlowPage() {
   }, [barber, initializedFromParams, screenParams?.serviceIds]);
 
   useEffect(() => {
-    if (!appUser) return;
+    if (!FEATURE_FLAGS.loyaltyEnabled || !appUser) return;
     void getLoyaltyDashboard(appUser.id).then(data => {
       const vouchers = data.redemptions.flatMap(redemption => {
         const reward = redemption.loyalty_rewards;
@@ -763,13 +764,15 @@ export default function BookingFlowPage() {
                 <span className="text-[11px] font-bold" style={{ color: themeConfig.colors.success }}>-{discountAmount} دج</span>
               </div>
             )}
-            <div className="flex items-center justify-between mt-2 p-2 rounded-lg" style={{ backgroundColor: themeConfig.colors.accent + '10' }}>
-              <span className="text-[11px]" style={{ color: themeConfig.colors.textMuted }}>مكافأة إكمال الموعد</span>
-              <span className="text-[11px] font-bold" style={{ color: themeConfig.colors.accent }}>+{estimatedLoyaltyPoints} نقطة ولاء</span>
-            </div>
+            {FEATURE_FLAGS.loyaltyEnabled && (
+              <div className="flex items-center justify-between mt-2 p-2 rounded-lg" style={{ backgroundColor: themeConfig.colors.accent + '10' }}>
+                <span className="text-[11px]" style={{ color: themeConfig.colors.textMuted }}>مكافأة إكمال الموعد</span>
+                <span className="text-[11px] font-bold" style={{ color: themeConfig.colors.accent }}>+{estimatedLoyaltyPoints} نقطة ولاء</span>
+              </div>
+            )}
           </div>
 
-          {availableVouchers.length > 0 && (
+          {FEATURE_FLAGS.loyaltyEnabled && availableVouchers.length > 0 && (
             <div>
               <p className="text-xs font-bold mb-2" style={{ color: themeConfig.colors.text }}>قسائم الولاء</p>
               <div className="space-y-2">
