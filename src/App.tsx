@@ -1,16 +1,20 @@
-import { lazy, Suspense, useEffect } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { AppProvider } from '@/contexts/AppContext';
 import { useApp } from '@/contexts/useApp';
 import { useAuth } from '@/hooks/useAuth';
 import { useStore } from '@/store/useStore';
 import { isDeveloperMode } from '@/supabase/client';
+import { Analytics } from '@vercel/analytics/react';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 
 import ErrorBoundary from '@/components/ErrorBoundary';
 import BottomNav from '@/components/BottomNav';
 import BrandLogo from '@/components/BrandLogo';
 import InstallPrompt from '@/components/InstallPrompt';
 import SoftOnboarding from '@/components/SoftOnboarding';
+import CookieConsent, { readAnalyticsConsent } from '@/components/CookieConsent';
 import { reportClientError } from '@/lib/error-reporting';
+import { translate } from '@/lib/i18n';
 import BookingTab from '@/tabs/BookingTab';
 import './App.css';
 
@@ -175,13 +179,13 @@ function LoadingFallback() {
 }
 
 function NetworkStatusBar() {
-  const { themeConfig } = useApp();
+  const { themeConfig, settings } = useApp();
   const isOnline = useStore(s => s.isOnline);
   if (isOnline) return null;
   return (
     <div className="fixed top-0 left-0 right-0 z-[100] flex items-center justify-center gap-2 py-1.5 px-4"
       style={{ backgroundColor: themeConfig.colors.warning }}>
-      <span className="text-xs font-bold text-white">لا يوجد اتصال بالإنترنت</span>
+      <span className="text-xs font-bold text-white">{translate(settings.language, 'offline')}</span>
     </div>
   );
 }
@@ -189,11 +193,12 @@ function NetworkStatusBar() {
 
 
 function AppContent() {
-  const { themeConfig, animationStyle, screen, dataError, refreshData } = useApp();
+  const { themeConfig, animationStyle, screen, dataError, refreshData, settings } = useApp();
   const { isLoading: authLoading } = useAuth();
   // Keep bottom nav on home tabs AND legacy ai-advisor route (prevents nav disappearing)
   const showNav = screen === 'home' || screen === 'ai-advisor';
   const setIsOnline = useStore(s => s.setIsOnline);
+  const [analyticsOn, setAnalyticsOn] = useState(() => readAnalyticsConsent() === 'accepted');
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -260,7 +265,7 @@ function AppContent() {
         className="absolute -right-[9999px] focus:right-2 focus:top-2 focus:z-[120] focus:px-3 focus:py-2 focus:rounded-xl focus:text-xs focus:font-bold"
         style={{ backgroundColor: themeConfig.colors.primary, color: '#fff' }}
       >
-        تخطَّ إلى المحتوى
+        {translate(settings.language, 'skipToContent')}
       </a>
       <NetworkStatusBar />
       {dataError && (
@@ -271,7 +276,7 @@ function AppContent() {
         >
           <span className="text-xs flex-1">{dataError}</span>
           <button type="button" onClick={() => void refreshData()} className="text-xs font-bold underline">
-            إعادة المحاولة
+            {translate(settings.language, 'retry')}
           </button>
         </div>
       )}
@@ -298,6 +303,13 @@ function AppContent() {
       {showNav && <BottomNav />}
       <InstallPrompt />
       {showNav && <SoftOnboarding />}
+      <CookieConsent onChange={value => setAnalyticsOn(value === 'accepted')} />
+      {analyticsOn && (
+        <>
+          <Analytics />
+          <SpeedInsights />
+        </>
+      )}
     </div>
   );
 }

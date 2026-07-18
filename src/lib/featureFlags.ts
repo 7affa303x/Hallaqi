@@ -35,6 +35,22 @@ export const FEATURE_FLAGS = {
    * Dynamic per-page Open Graph for SPA routes — paused (static index OG only).
    */
   dynamicOgEnabled: false,
+  /**
+   * Full ar/fr/en string coverage — paused; primary UI remains Arabic with partial nav i18n.
+   */
+  fullI18nEnabled: false,
+  /**
+   * React Query data layer — paused; Zustand + Context remain.
+   */
+  reactQueryEnabled: false,
+  /**
+   * WhatsApp support chat — paused until VITE_SUPPORT_WHATSAPP is set.
+   */
+  whatsappSupportEnabled: false,
+  /**
+   * Gemini hairstyle image generation — paused (quota / cost).
+   */
+  aiImageGenerationEnabled: false,
 } as const;
 
 /** User-facing label for deferred launch features. */
@@ -50,4 +66,10 @@ export function isCashOnlyPayments(): boolean {
 export function isWebPushConfigured(): boolean {
   const key = import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined;
   return Boolean(key?.trim());
+}
+
+export function isWhatsAppSupportConfigured(): boolean {
+  if (!FEATURE_FLAGS.whatsappSupportEnabled) return false;
+  const n = import.meta.env.VITE_SUPPORT_WHATSAPP as string | undefined;
+  return Boolean(n?.trim());
 }

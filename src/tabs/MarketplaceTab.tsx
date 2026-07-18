@@ -45,18 +45,30 @@ export default function MarketplaceTab() {
     query: '',
     sortBy: 'popularity',
   });
+  const [debouncedQuery, setDebouncedQuery] = useState('');
 
   useEffect(() => {
     setSections(readMarketplaceSectionConfig());
   }, []);
 
   useEffect(() => {
+    const t = setTimeout(() => setDebouncedQuery(filters.query || ''), 350);
+    return () => clearTimeout(t);
+  }, [filters.query]);
+
+  const fetchKey = useMemo(
+    () => JSON.stringify({ ...filters, query: debouncedQuery }),
+    [filters, debouncedQuery]
+  );
+
+  useEffect(() => {
     let cancelled = false;
+    const activeFilters = JSON.parse(fetchKey) as MarketplaceFilters;
     (async () => {
       setLoading(true);
       const [cats, prods, sells, day, places] = await Promise.all([
         getMarketplaceCategories(),
-        getMarketplaceProducts(filters),
+        getMarketplaceProducts(activeFilters),
         getMarketplaceSellers(),
         getProductOfTheDayProduct(),
         getMarketplacePlacements(),
@@ -68,10 +80,13 @@ export default function MarketplaceTab() {
       setPotd(day);
       setPlacements(places.filter(p => p.isActive));
       setLoading(false);
-      trackMarketplaceEvent('search_impression', { categoryId: filters.categoryId || undefined, wilaya: filters.wilaya || undefined });
+      trackMarketplaceEvent('search_impression', {
+        categoryId: activeFilters.categoryId || undefined,
+        wilaya: activeFilters.wilaya || undefined,
+      });
     })();
     return () => { cancelled = true; };
-  }, [filters]);
+  }, [fetchKey]);
 
   const barberExtras = useMemo(() => mapBarberExtrasToMarketplace(barbers).slice(0, 8), [barbers]);
   const banners = placements.filter(p => p.placementType === 'banner' || p.placementType === 'sponsored');
@@ -574,21 +589,27 @@ function ProductCard({
   onOpen: () => void;
   compact?: boolean;
 }) {
-  const { themeConfig } = useApp();
+  const { themeConfig, settings } = useApp();
   const pct = discountPercent(product.priceDzd, product.compareAtPriceDzd);
+  const reduceMotion = settings.accessibility.reduceMotion;
+  const src = product.imageUrls[0] || '/logo-icon.png';
 
   return (
     <motion.button
       type="button"
-      whileTap={{ scale: 0.98 }}
+      whileTap={reduceMotion ? undefined : { scale: 0.98 }}
       onClick={onOpen}
       className={`text-right overflow-hidden rounded-2xl border ${compact ? 'shrink-0 w-40' : 'w-full'}`}
       style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}
     >
-      <div
-        className={`${compact ? 'h-24' : 'h-32'} bg-cover bg-center relative`}
-        style={{ backgroundImage: `url(${product.imageUrls[0] || ''})` }}
-      >
+      <div className={`${compact ? 'h-24' : 'h-32'} relative bg-black/5 overflow-hidden`}>
+        <img
+          src={src}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          className="absolute inset-0 w-full h-full object-cover"
+        />
         <div className="absolute top-1.5 right-1.5 flex flex-col gap-1">
           {product.isProductOfTheDay && (
             <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-amber-400 text-black">اليوم</span>

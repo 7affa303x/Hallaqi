@@ -49,6 +49,7 @@ export default defineConfig({
           "motion-vendor": ["framer-motion"],
           "supabase-vendor": ["@supabase/supabase-js"],
           "form-vendor": ["react-hook-form", "@hookform/resolvers", "zod"],
+          recharts: ["recharts"],
         },
       },
     },

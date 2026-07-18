@@ -15,12 +15,13 @@ import {
   Trash2, Download, AlertTriangle, Check, X, Sparkles,
   Scissors, Clock, TrendingUp, Award, Zap, Crown as CrownIcon,
   ArrowLeft, LogIn, UserPlus as UserPlusIcon, Gift,
-  Store, Building2, Stethoscope, CalendarDays, ShoppingBag,
+  Store, Building2, Stethoscope, CalendarDays, ShoppingBag, Bookmark,
 } from 'lucide-react';
-import { FEATURE_FLAGS, isWebPushConfigured, PAUSED_LABEL } from '@/lib/featureFlags';
 import EditBarberProfile from '@/components/EditBarberProfile';
 import ServicesManagement from '@/components/ServicesManagement';
 import PausedFeatureBanner from '@/components/PausedFeatureBanner';
+import SavedItemsPage from '@/components/SavedItemsPage';
+import { FEATURE_FLAGS, isWebPushConfigured, isWhatsAppSupportConfigured, PAUSED_LABEL, COMING_SOON_LABEL } from '@/lib/featureFlags';
 import {
   createIdVerificationRequest,
   getLatestIdVerificationRequest,
@@ -74,7 +75,7 @@ const iconMap: Record<string, LucideIcon> = {
 type ProfileSubPage = 'main' | 'theme' | 'animation' | 'language' | 'notifications' |
   'privacy' | 'account' | 'subscription' | 'payment' | 'id-verification' |
   'linked-accounts' | 'help' | 'about' | 'badges' | 'stats' | 'edit-profile' | 'services' | 'loyalty' |
-  'accessibility' | 'privacy-policy' | 'terms' | 'licenses' | 'security';
+  'accessibility' | 'privacy-policy' | 'terms' | 'licenses' | 'security' | 'saves';
 
 export default function ProfileTab() {
   const { themeConfig, settings, navigate, setActiveTab, unreadCount, bookings, barbers, screenParams } = useApp();
@@ -160,6 +161,7 @@ export default function ProfileTab() {
   if (subPage === 'loyalty') return <LoyaltyPage onBack={() => setSubPage('main')} />;
   if (subPage === 'accessibility') return <AccessibilitySettings onBack={() => setSubPage('main')} />;
   if (subPage === 'security') return <SecuritySettings onBack={() => setSubPage('main')} />;
+  if (subPage === 'saves') return <SavedItemsPage onBack={() => setSubPage('main')} />;
   if (subPage === 'privacy-policy') return <LegalPage onBack={() => setSubPage('main')} kind="privacy" />;
   if (subPage === 'terms') return <LegalPage onBack={() => setSubPage('main')} kind="terms" />;
   if (subPage === 'licenses') return <LegalPage onBack={() => setSubPage('main')} kind="licenses" />;
@@ -274,6 +276,24 @@ export default function ProfileTab() {
         </div>
       )}
 
+      {appUser && userRole !== 'client' && (
+        <div className="px-4 mt-3">
+          <button
+            type="button"
+            onClick={() => setSubPage('saves')}
+            className="w-full flex items-center gap-2 p-3 rounded-2xl border text-right"
+            style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}
+          >
+            <Bookmark size={16} style={{ color: themeConfig.colors.primary }} />
+            <span className="flex-1">
+              <span className="block text-xs font-bold" style={{ color: themeConfig.colors.text }}>محفوظاتي</span>
+              <span className="block text-[10px]" style={{ color: themeConfig.colors.textMuted }}>منتجات وإشارات على الجهاز</span>
+            </span>
+            <ChevronLeft size={16} style={{ color: themeConfig.colors.textMuted }} />
+          </button>
+        </div>
+      )}
+
       {/* Client: appointments moved out of bottom nav — accessible here */}
       {(userRole === 'client' || !appUser) && (
         <div className="px-4 mt-4 grid grid-cols-2 gap-2">
@@ -299,6 +319,18 @@ export default function ProfileTab() {
             <span>
               <span className="block text-xs font-bold" style={{ color: themeConfig.colors.text }}>السوق</span>
               <span className="block text-[10px]" style={{ color: themeConfig.colors.textMuted }}>اكتشف المنتجات</span>
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setSubPage('saves')}
+            className="col-span-2 flex items-center gap-2 p-3 rounded-2xl border text-right"
+            style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}
+          >
+            <Bookmark size={16} style={{ color: themeConfig.colors.primary }} />
+            <span>
+              <span className="block text-xs font-bold" style={{ color: themeConfig.colors.text }}>محفوظاتي</span>
+              <span className="block text-[10px]" style={{ color: themeConfig.colors.textMuted }}>منتجات وإشارات على هذا الجهاز</span>
             </span>
           </button>
         </div>
@@ -635,10 +667,9 @@ function AccessibilitySettings({ onBack }: { onBack: () => void }) {
           </div>
         </div>
         {([
-          ['highContrast', 'تباين مرتفع', 'ألوان أوضح للنصوص والعناصر'],
-          ['reduceMotion', 'تقليل الحركة', 'تقليل الانتقالات والمؤثرات'],
-          ['screenReader', 'تحسين قارئ الشاشة', 'إضافة وصف موسع للعناصر'],
-        ] as const).map(([key, label, description]) => {
+          ['highContrast', 'تباين مرتفع', 'ألوان أوضح للنصوص والعناصر'] as const,
+          ['reduceMotion', 'تقليل الحركة', 'تقليل الانتقالات والمؤثرات'] as const,
+        ]).map(([key, label, description]) => {
           const enabled = settings.accessibility[key];
           return (
             <div key={key} className="rounded-2xl border p-4 flex items-center gap-3" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
@@ -647,6 +678,12 @@ function AccessibilitySettings({ onBack }: { onBack: () => void }) {
             </div>
           );
         })}
+        <PausedFeatureBanner
+          title="تحسين قارئ الشاشة المتقدم"
+          description={`وضع أوصاف موسّعة لكل عنصر ${PAUSED_LABEL}. حجم الخط والتباين وتقليل الحركة تعمل الآن.`}
+          kind="paused"
+          colors={themeConfig.colors}
+        />
       </div>
     </div>
   );
@@ -810,7 +847,13 @@ function InformationPage({ onBack, kind }: { onBack: () => void; kind: 'help' | 
             </div>
             <div className="rounded-2xl border p-4" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
               <h3 className="font-bold text-sm" style={{ color: themeConfig.colors.text }}>الدعم والتواصل</h3>
-              <p className="text-xs mt-2 leading-relaxed" style={{ color: themeConfig.colors.textMuted }}>راسلنا على <a href="mailto:support@hallaqi.app" className="font-bold underline" style={{ color: themeConfig.colors.primary }}>support@hallaqi.app</a> أو واتساب لاحقاً. لا ترسل كلمة المرور أبداً.</p>
+              <p className="text-xs mt-2 leading-relaxed" style={{ color: themeConfig.colors.textMuted }}>
+                راسلنا على <a href="mailto:support@hallaqi.app" className="font-bold underline" style={{ color: themeConfig.colors.primary }}>support@hallaqi.app</a>.
+                {!isWhatsAppSupportConfigured() && (
+                  <> واتساب الدعم <span className="font-bold" style={{ color: themeConfig.colors.warning }}>{COMING_SOON_LABEL}</span>.</>
+                )}
+                {' '}لا ترسل كلمة المرور أبداً.
+              </p>
             </div>
             <div className="rounded-2xl border p-4" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
               <h3 className="font-bold text-sm" style={{ color: themeConfig.colors.text }}>السوق</h3>
@@ -893,6 +936,14 @@ function LanguageSelector({ onBack }: { onBack: () => void }) {
         <h2 className="text-base font-bold" style={{ color: themeConfig.colors.text }}>اللغة</h2>
       </div>
       <div className="px-4 mt-4 space-y-2">
+        {!FEATURE_FLAGS.fullI18nEnabled && (
+          <PausedFeatureBanner
+            title="ترجمة كاملة للواجهة"
+            description={`الواجهة الأساسية عربية. ترجمة fr/en للتنقل فقط حالياً — التغطية الكاملة ${COMING_SOON_LABEL}.`}
+            kind="soon"
+            colors={themeConfig.colors}
+          />
+        )}
         {languages.map(lang => (
           <button key={lang.key} onClick={() => updateSettings({ language: lang.key as 'ar' | 'fr' | 'en' })} className="w-full flex items-center gap-3 p-3 rounded-2xl border transition-all" style={{ backgroundColor: settings.language === lang.key ? themeConfig.colors.primary + '08' : themeConfig.colors.surface, borderColor: settings.language === lang.key ? themeConfig.colors.primary : themeConfig.colors.border }}>
             <span className="text-2xl">{lang.flag}</span><div className="flex-1 text-right"><p className="text-sm font-bold" style={{ color: themeConfig.colors.text }}>{lang.label}</p></div>

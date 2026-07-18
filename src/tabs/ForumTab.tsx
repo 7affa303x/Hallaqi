@@ -227,6 +227,8 @@ export default function ForumTab() {
           icon={MessageCircle}
           title="لا توجد منشورات في هذا القسم"
           description="كن أول من ينشر منشوراً هنا"
+          actionLabel="أنشئ منشوراً"
+          onAction={() => navigate('create-post')}
           themeConfig={themeConfig}
         />
       )}
