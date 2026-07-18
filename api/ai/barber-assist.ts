@@ -2,6 +2,10 @@ import { APICallError } from 'ai';
 import { z } from 'zod';
 import { authenticateSupabaseRequest, consumeAiQuota } from '../_lib/auth.js';
 import {
+  buildHallaqiAiContext,
+  toHallaqiSystemPrompt,
+} from '../_lib/ai-context.js';
+import {
   aiUnavailableMessage,
   getTextModel,
   isAiGenerationEnabled,
@@ -53,6 +57,9 @@ export async function POST(request: Request) {
     return Response.json({ code: 'AI_RATE_LIMITED' }, { status: 429 });
   }
 
+  const hallaqiContext = await buildHallaqiAiContext(user);
+  const identityBlock = toHallaqiSystemPrompt(hallaqiContext, 'barber-assist');
+
   const intentHints: Record<string, string> = {
     client_brief: 'Summarize what the barber should know before serving this client.',
     reply_review: 'Draft a professional, warm Arabic reply to a client review.',
@@ -68,12 +75,10 @@ export async function POST(request: Request) {
       schemaName: 'hallaqi_barber_assist',
       schemaDescription: '{"answer":"string","suggestedActions":["string"],"messageDraft":"string optional"}',
       instructions: [
-        'You are Hallaqi Barber Copilot — an assistant for Algerian barbers and salon professionals.',
-        'Respond in clear Arabic (Darija OK when natural). Be practical and respectful.',
-        'Never invent medical diagnoses. Never invent prices as facts.',
+        identityBlock,
         'Keep answers short enough to read between clients.',
         intentHints[parsed.data.intent],
-      ].join(' '),
+      ].join('\n'),
       prompt: JSON.stringify({
         question: parsed.data.question,
         context: parsed.data.context || {},

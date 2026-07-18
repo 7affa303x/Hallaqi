@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
-import { ArrowRight, Image, LogIn, Send, Sparkles, WandSparkles } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { ArrowRight, Image, LogIn, MapPin, Send, Sparkles, WandSparkles } from 'lucide-react';
 import { useApp } from '@/contexts/useApp';
 import { useAuth } from '@/hooks/useAuth';
 import PausedFeatureBanner from '@/components/PausedFeatureBanner';
 import { FEATURE_FLAGS, PAUSED_LABEL } from '@/lib/featureFlags';
+import { buildClientSiteContext } from '@/lib/ai/siteContext';
 import {
   getAICapabilities,
   requestGroomingAdvice,
@@ -21,7 +22,7 @@ const fallbackCapabilities: AICapabilities = {
 };
 
 export default function AIAdvisorPage() {
-  const { themeConfig, goBack, navigate } = useApp();
+  const { themeConfig, goBack, navigate, barbers, bookings, currentUser } = useApp();
   const { isAuthenticated } = useAuth();
   const [capabilities, setCapabilities] = useState(fallbackCapabilities);
   const [mode, setMode] = useState<'advice' | 'image'>('advice');
@@ -38,6 +39,32 @@ export default function AIAdvisorPage() {
   }, []);
 
   const imagePaused = !FEATURE_FLAGS.aiImageGenerationEnabled;
+
+  const discoveryWilaya = useMemo(() => {
+    try {
+      return localStorage.getItem('hallaqi-discovery-wilaya') || undefined;
+    } catch {
+      return undefined;
+    }
+  }, []);
+
+  const userWilaya = useMemo(() => {
+    if (!currentUser) return undefined;
+    if ('wilaya' in currentUser && currentUser.wilaya) return currentUser.wilaya;
+    if ('city' in currentUser && currentUser.city) return currentUser.city;
+    return undefined;
+  }, [currentUser]);
+
+  const siteContext = useMemo(() => buildClientSiteContext({
+    barbers,
+    bookings,
+    userWilaya,
+    discoveryWilaya,
+  }), [barbers, bookings, userWilaya, discoveryWilaya]);
+
+  const contextLabel = siteContext.wilaya
+    ? `مرتبط بمنطقة ${siteContext.wilaya}`
+    : 'مرتبط بمنصة حلاقي';
 
   const submit = async () => {
     if (question.trim().length < 5) return;
@@ -56,7 +83,10 @@ export default function AIAdvisorPage() {
     setStyleImage('');
     try {
       if (mode === 'advice') {
-        setAdvice(await requestGroomingAdvice({ question: question.trim() }));
+        setAdvice(await requestGroomingAdvice({
+          question: question.trim(),
+          siteContext,
+        }));
       } else {
         setStyleImage(await requestStyleImage(question.trim()));
       }
@@ -84,7 +114,7 @@ export default function AIAdvisorPage() {
         </button>
         <div>
           <h1 className="font-bold flex items-center gap-2" style={{ color: themeConfig.colors.text }}><Sparkles size={17} style={{ color: themeConfig.colors.accent }} /> مساعد حلاقي</h1>
-          <p className="text-[10px]" style={{ color: themeConfig.colors.textMuted }}>نصائح عناية بالعربية عبر Groq</p>
+          <p className="text-[10px]" style={{ color: themeConfig.colors.textMuted }}>مساعد Hallaqi — نصائح عناية مرتبطة بالمنصة والحلاقين</p>
         </div>
       </header>
 
@@ -103,6 +133,13 @@ export default function AIAdvisorPage() {
             >
               <LogIn size={14} /> تسجيل الدخول
             </button>
+          </div>
+        )}
+
+        {isAuthenticated && (
+          <div className="rounded-xl px-3 py-2 flex items-center gap-2 text-[11px]" style={{ backgroundColor: themeConfig.colors.primary + '10', color: themeConfig.colors.textMuted }}>
+            <MapPin size={13} style={{ color: themeConfig.colors.primary }} />
+            <span>{contextLabel}{(siteContext.topBarbers?.length ?? 0) > 0 ? ` · ${siteContext.topBarbers!.length} حلاق مقترح` : ''}</span>
           </div>
         )}
 
@@ -141,7 +178,7 @@ export default function AIAdvisorPage() {
           )}
           {providerReady && capabilities.provider === 'groq' && (
             <p className="text-[11px] mt-2" style={{ color: themeConfig.colors.textMuted }}>
-              يعمل عبر Groq مجاناً (Llama). حد يومي لحماية الخدمة.
+              يعرف سياسات Hallaqi والحلاقين على المنصة. حد يومي لحماية الخدمة.
             </p>
           )}
           {providerReady && capabilities.provider === 'gemini' && (
