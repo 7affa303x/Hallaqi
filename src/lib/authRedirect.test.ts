@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { getAuthRedirectUrl, getCanonicalOrigin, consumeAuthUrlError } from '@/lib/authRedirect';
+import { getAuthRedirectUrl, getCanonicalOrigin, consumeAuthUrlError, stripAuthHashFromUrl } from '@/lib/authRedirect';
 
 describe('authRedirect', () => {
   afterEach(() => {
@@ -116,5 +116,43 @@ describe('authRedirect', () => {
     });
     expect(consumeAuthUrlError()).toMatch(/تسجيل الدخول/);
     expect(replaceState).toHaveBeenCalled();
+  });
+
+  it('strips access_token hash after session is applied', () => {
+    const replaceState = vi.fn();
+    vi.stubGlobal('window', {
+      ...window,
+      location: {
+        ...window.location,
+        hostname: 'hallaqi.app',
+        origin: 'https://hallaqi.app',
+        href: 'https://hallaqi.app/#access_token=eyJhbGci&expires_in=3600&token_type=bearer',
+        pathname: '/',
+        search: '',
+        hash: '#access_token=eyJhbGci&expires_in=3600&token_type=bearer',
+      },
+      history: { ...window.history, state: null, replaceState },
+    });
+    expect(stripAuthHashFromUrl()).toBe(true);
+    expect(replaceState).toHaveBeenCalledWith(null, '', '/');
+  });
+
+  it('leaves non-auth hashes alone', () => {
+    const replaceState = vi.fn();
+    vi.stubGlobal('window', {
+      ...window,
+      location: {
+        ...window.location,
+        hostname: 'hallaqi.app',
+        origin: 'https://hallaqi.app',
+        href: 'https://hallaqi.app/#section',
+        pathname: '/',
+        search: '',
+        hash: '#section',
+      },
+      history: { ...window.history, state: null, replaceState },
+    });
+    expect(stripAuthHashFromUrl()).toBe(false);
+    expect(replaceState).not.toHaveBeenCalled();
   });
 });
