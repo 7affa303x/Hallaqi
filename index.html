@@ -85,11 +85,13 @@
     </style>
     <!-- Loaded before the app — checks server build id and drops stale SW/cache automatically. -->
     <script src="/auth-shell.js"></script>
-    <!-- Safety net if cached auth-shell.js blocks React on #access_token (Brave/mobile after manual cache clear). -->
+    <!-- Safety net if cached auth-shell.js blocks React on OAuth return (Brave/mobile after cache clear). -->
     <script>
       (function () {
+        var q = location.search || '';
         var h = location.hash || '';
-        if (/access_token=/.test(h) || /type=recovery/.test(h)) {
+        if (/[?&]code=/.test(q) || /[?&]error=/.test(q)
+            || /access_token=/.test(h) || /type=recovery/.test(h)) {
           window.__HALLAQI_AUTH_SHELL_PENDING = false;
         }
       })();

@@ -2,6 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import { ensureFreshAppShell } from '@/lib/appShell'
+import { isOAuthCallbackUrl } from '@/lib/authRedirect'
 
 declare global {
   interface Window {
@@ -10,20 +11,19 @@ declare global {
 }
 
 async function waitForAuthShellGate(): Promise<void> {
-  const hash = window.location.hash || ''
-  if (window.__HALLAQI_AUTH_SHELL_PENDING && (/access_token=/.test(hash) || /type=recovery/.test(hash))) {
+  if (isOAuthCallbackUrl()) {
     window.__HALLAQI_AUTH_SHELL_PENDING = false
+    return
   }
   if (!window.__HALLAQI_AUTH_SHELL_PENDING) return
 
-  // auth-shell may hang on SW/cache APIs after manual cache clear — never block boot forever.
-  await new Promise<void>(resolve => window.setTimeout(resolve, 4000))
+  // Stale auth-shell may hang on SW/cache APIs — never block boot forever.
+  await new Promise<void>(resolve => window.setTimeout(resolve, 2000))
   window.__HALLAQI_AUTH_SHELL_PENDING = false
 }
 
 async function boot() {
   await waitForAuthShellGate()
-  if (window.__HALLAQI_AUTH_SHELL_PENDING) return
 
   const reloading = await ensureFreshAppShell()
   if (reloading) return
@@ -36,8 +36,6 @@ async function boot() {
     }
   } catch { /* ignore */ }
 
-  // Dynamic import AFTER shell checks so supabase detectSessionInUrl does not run
-  // on the first OAuth pass (when we are about to clear SW and reload).
   const { default: App } = await import('./App.tsx')
 
   createRoot(document.getElementById('root')!).render(

@@ -62,18 +62,22 @@ jobs:
             fi
           done
 
-      - name: Verify auth-shell.js on production
+      - name: Verify OAuth fix on production
         run: |
           set -euo pipefail
           for i in 1 2 3 4 5 6 7 8 9 10 11 12; do
             sleep 5
-            CT=$(curl -sSI "https://hallaqi.app/auth-shell.js" | tr -d '\r' | awk -F': ' 'tolower($1)=="content-type"{print tolower($2)}')
-            echo "attempt $i content-type: $CT"
-            if echo "$CT" | grep -q 'javascript'; then
-              curl -sS "https://hallaqi.app/" | grep -q 'auth-shell.js'
-              echo "Production auth-shell OK"
+            BODY=$(curl -sS "https://hallaqi.app/auth-shell.js")
+            HTML=$(curl -sS "https://hallaqi.app/")
+            echo "attempt $i"
+            if echo "$BODY" | grep -q 'isOAuthReturn'; then
+              echo "Production auth-shell skips OAuth reload"
+              exit 0
+            fi
+            if echo "$HTML" | grep -q '\[?&\]code='; then
+              echo "Production index.html has inline PKCE safety net"
               exit 0
             fi
           done
-          curl -sSI "https://hallaqi.app/" | head -15
+          echo "$BODY" | head -c 400
           exit 1

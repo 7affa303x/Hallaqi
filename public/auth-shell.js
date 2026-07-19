@@ -1,9 +1,8 @@
 /**
  * Early shell guards — runs before React (CSP-safe external script).
  * 1) Apex redirect
- * 2) OAuth ?code= (PKCE) → purge SW/cache once then reload
- * 3) OAuth #access_token= → NEVER block React (Supabase must read the hash)
- * 4) Every visit → fetch fresh build id; auto-upgrade if deploy changed
+ * 2) OAuth return (?code= / #access_token=) → NEVER block React or reload
+ * 3) Every visit → fetch fresh build id; auto-upgrade if deploy changed
  */
 (function () {
   var BUILD_KEY = 'hallaqi-app-build-v1';
@@ -75,6 +74,13 @@
     if (!reloading) window.__HALLAQI_AUTH_SHELL_PENDING = false;
   }
 
+  function isOAuthReturn() {
+    var q = location.search || '';
+    var h = location.hash || '';
+    return /[?&]code=/.test(q) || /[?&]error=/.test(q)
+      || /access_token=/.test(h) || /type=recovery/.test(h);
+  }
+
   function runVersionCheck() {
     var docBuild = readBuildFromDocument();
     return fetch(location.origin + '/index.html?_shell=' + Date.now(), {
@@ -97,39 +103,9 @@
       return;
     }
 
-    var q = location.search || '';
-    var h = location.hash || '';
-    // PKCE / query errors — safe to purge SW then reload (code survives in query).
-    var hasAuthCode = /[?&]code=/.test(q) || /[?&]error=/.test(q);
-    // Implicit / recovery tokens live in the hash — React+Supabase MUST read them.
-    // Never set PENDING or reload before boot for these, or the page stays blank.
-    var hasHashToken = /access_token=/.test(h) || /type=recovery/.test(h);
-
-    if (hasAuthCode) {
-      window.__HALLAQI_AUTH_SHELL_PENDING = true;
-      var codeMatch = q.match(/[?&]code=([^&]+)/);
-      var refreshKey = 'hallaqi-auth-shell-refreshed:' + (codeMatch ? codeMatch[1].slice(0, 24) : 'err');
-      if (sessionStorage.getItem(refreshKey) === '1') {
-        finishShellGate(false);
-        return;
-      }
-      sessionStorage.setItem(refreshKey, '1');
-      var done = false;
-      var finishReload = function () {
-        if (done) return;
-        done = true;
-        reloadWithRefresh('oauth');
-      };
-      clearShellCaches().then(finishReload, finishReload);
-      // Never leave a white screen if cache APIs hang (Brave after manual cache clear).
-      setTimeout(finishReload, 2500);
-      return;
-    }
-
-    if (hasHashToken) {
-      // Let the app boot immediately so detectSessionInUrl can consume #access_token.
+    // Supabase must read ?code= / #access_token= on first paint — never reload or block React.
+    if (isOAuthReturn()) {
       window.__HALLAQI_AUTH_SHELL_PENDING = false;
-      // Do NOT clear SW/caches here — on some mobile browsers that hangs and blocks reload.
       return;
     }
 

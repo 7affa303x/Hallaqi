@@ -7,7 +7,7 @@ import {
 } from 'react';
 import { supabase, isDeveloperMode } from '@/supabase/client';
 import { signIn, signUp, signOut, resetPassword, fetchUserProfile } from '@/supabase/auth';
-import { getAuthRedirectUrl, stripAuthHashFromUrl } from '@/lib/authRedirect';
+import { getAuthRedirectUrl, stripOAuthCallbackFromUrl } from '@/lib/authRedirect';
 import { AuthContext, type AuthContextValue, type AuthState } from '@/contexts/authContext';
 import type { Profile } from '@/types/supabase-aliases';
 import type { Session, User } from '@supabase/supabase-js';
@@ -89,8 +89,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
         return;
       }
-      // Session is persisted — remove OAuth tokens from the visible URL.
-      stripAuthHashFromUrl();
+      // Session is persisted — remove OAuth tokens/codes from the visible URL.
+      stripOAuthCallbackFromUrl();
       try {
         let profile: Profile | null = null;
         for (let attempt = 0; attempt < 3 && !profile; attempt += 1) {
