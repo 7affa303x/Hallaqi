@@ -59,7 +59,7 @@ interface HistoryEntry { screen: ScreenName; params?: ScreenParams }
 const queryScreens = new Set<ScreenName>([
   'booking-flow', 'chat-room', 'messages', 'notifications', 'create-post',
   'login', 'register', 'payment-success', 'admin-dashboard', 'ai-advisor',
-  'mfa-challenge', 'coming-soon',
+  'mfa-challenge', 'compare-barbers', 'coming-soon',
 ]);
 
 function screenUrl(screen: ScreenName, params?: ScreenParams): string {
@@ -435,9 +435,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       language: prefs.language || globalLanguage,
       countryCode: prefs.countryCode || 'DZ',
       currencyCode: prefs.currencyCode || 'DZD',
+      discoveryWilaya: (() => {
+        try { return localStorage.getItem('hallaqi-discovery-wilaya') || ''; } catch { return ''; }
+      })(),
       notifications: { pushEnabled: true, emailEnabled: true, smsEnabled: false, bookingReminders: true, promotions: true, forumReplies: true, competitionUpdates: true, newFollowers: true },
       privacy: { profileVisible: true, showLocation: true, showBookings: false, allowMessages: 'all' },
-      accessibility: { fontSize: 'medium', highContrast: false, reduceMotion: false, screenReader: false },
+      accessibility: { fontSize: 'medium', highContrast: false, reduceMotion: false, screenReader: false, lowData: false },
     };
   });
 
@@ -448,9 +451,33 @@ export function AppProvider({ children }: { children: ReactNode }) {
     root.dataset.fontSize = settings.accessibility.fontSize;
     root.classList.toggle('hallaqi-high-contrast', settings.accessibility.highContrast);
     root.classList.toggle('hallaqi-reduce-motion', settings.accessibility.reduceMotion);
+    root.classList.toggle('hallaqi-low-data', settings.accessibility.lowData);
     root.lang = settings.language;
     root.dir = settings.language === 'ar' ? 'rtl' : 'ltr';
   }, [settings.accessibility, settings.language]);
+
+  // #166 — sync OS prefers-reduced-motion into accessibility (once, if user hasn't toggled)
+  useEffect(() => {
+    try {
+      if (localStorage.getItem('hallaqi-reduce-motion-synced-v1') === '1') return;
+      const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+      if (mq.matches) {
+        setSettings(prev => ({
+          ...prev,
+          accessibility: { ...prev.accessibility, reduceMotion: true },
+        }));
+      }
+      localStorage.setItem('hallaqi-reduce-motion-synced-v1', '1');
+    } catch { /* ignore */ }
+  }, []);
+
+  // Ensure lowData exists on older persisted settings
+  useEffect(() => {
+    setSettings(prev => {
+      if (typeof prev.accessibility.lowData === 'boolean') return prev;
+      return { ...prev, accessibility: { ...prev.accessibility, lowData: false } };
+    });
+  }, []);
 
   const updateSettings = useCallback((newSettings: Partial<AppSettings>) => {
     if (newSettings.theme) useStore.getState().setTheme(newSettings.theme);
@@ -464,6 +491,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
           countryCode: updated.countryCode,
           currencyCode: updated.currencyCode,
         }));
+        if (typeof updated.discoveryWilaya === 'string') {
+          localStorage.setItem('hallaqi-discovery-wilaya', updated.discoveryWilaya);
+        }
       } catch { /* ignore */ }
       if (appUser && isSupabaseConfigured() && !isDeveloperMode) {
         queueMicrotask(() => {
@@ -488,7 +518,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
             countryCode: (saved as AppSettings).countryCode || prev.countryCode || 'DZ',
             currencyCode: (saved as AppSettings).currencyCode || prev.currencyCode || 'DZD',
             language: saved.language || prev.language,
+            discoveryWilaya: saved.discoveryWilaya !== undefined ? saved.discoveryWilaya : prev.discoveryWilaya,
           }));
+          if (saved.discoveryWilaya) {
+            try { localStorage.setItem('hallaqi-discovery-wilaya', saved.discoveryWilaya); } catch { /* ignore */ }
+          }
         }
       })
       .catch(err => console.warn('[AppContext] settings fetch failed:', err));

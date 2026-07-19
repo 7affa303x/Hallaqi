@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useApp } from '@/contexts/useApp';
 import { SkeletonBookingCard } from '@/components/Skeleton';
@@ -14,10 +14,11 @@ import {
 } from '@/supabase/database';
 import BarberStudioHub from '@/components/barber/BarberStudioHub';
 import { CANCEL_POLICY } from '@/lib/cancelPolicy';
+import { prepareCashReminder } from '@/lib/paymentPolicy';
 import {
   CalendarDays, Clock, MapPin, Car, CreditCard,
   CheckCircle2, XCircle, AlertCircle, MessageSquare,
-  Star, Navigation, LogIn, ArrowRight
+  Star, Navigation, LogIn, ArrowRight, Share2
 } from 'lucide-react';
 
 const statusConfig: Record<BookingStatus, { label: string; color: string; bg: string; icon: typeof CheckCircle2 }> = {
@@ -44,6 +45,64 @@ function openDirections(location: string) {
   window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(location)}`, '_blank');
 }
 
+function bookingStartMs(booking: Booking): number {
+  const iso = `${booking.date}T${booking.time.length === 5 ? `${booking.time}:00` : booking.time}`;
+  const t = new Date(iso).getTime();
+  return Number.isFinite(t) ? t : NaN;
+}
+
+function formatRemaining(ms: number): string {
+  const totalMinutes = Math.max(0, Math.floor(ms / 60000));
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (hours > 0) return `${hours} س و ${minutes} د متبقية`;
+  return `${minutes} د متبقية`;
+}
+
+function shareBookingWhatsApp(booking: Booking) {
+  const text = [
+    'تفاصيل حجزي على حلاقي:',
+    `الحلاق: ${booking.barberName}`,
+    `التاريخ: ${booking.date}`,
+    `الوقت: ${booking.time}`,
+    `المبلغ: ${booking.totalPrice} دج · نقداً عند الزيارة`,
+  ].join('\n');
+  window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
+}
+
+function printCashReceipt(booking: Booking) {
+  const services = booking.services.map(s => `${s.name} — ${s.price} دج`).join('<br/>');
+  const html = `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"/><title>إيصال ${booking.id}</title>
+    <style>body{font-family:sans-serif;padding:24px;max-width:420px;margin:auto}h1{font-size:18px}p{font-size:13px;line-height:1.6}</style></head><body>
+    <h1>إيصال زيارة — Hallaqi</h1>
+    <p><strong>${booking.barberName}</strong><br/>${booking.date} · ${booking.time}<br/>${booking.location}</p>
+    <p>${services}</p>
+    <p><strong>المجموع: ${booking.totalPrice} دج</strong><br/>الدفع عند الزيارة (نقداً)</p>
+    <p style="color:#666;font-size:11px">مرجع: ${booking.id}</p>
+    <script>window.print()</script></body></html>`;
+  const w = window.open('', '_blank', 'noopener,noreferrer,width=480,height=640');
+  if (w) {
+    w.document.write(html);
+    w.document.close();
+  }
+}
+
+const ATTENDED_KEY = 'hallaqi-client-attended-v1';
+function readAttended(): Set<string> {
+  try {
+    const raw = localStorage.getItem(ATTENDED_KEY);
+    const arr = raw ? JSON.parse(raw) as string[] : [];
+    return new Set(Array.isArray(arr) ? arr : []);
+  } catch {
+    return new Set();
+  }
+}
+function markAttendedLocal(id: string) {
+  const set = readAttended();
+  set.add(id);
+  try { localStorage.setItem(ATTENDED_KEY, JSON.stringify([...set])); } catch { /* ignore */ }
+}
+
 export default function AppointmentsTab() {
   const { bookings, themeConfig, settings, cancelBooking, navigate, setActiveTab, isLoading, refreshData } = useApp();
   const { isAuthenticated, appUser } = useAuth();
@@ -54,6 +113,22 @@ export default function AppointmentsTab() {
   const [reviewComment, setReviewComment] = useState('');
   const [reviewError, setReviewError] = useState('');
   const [isReviewing, setIsReviewing] = useState(false);
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  const [attendedIds, setAttendedIds] = useState(() => readAttended());
+
+  useEffect(() => {
+    const id = window.setInterval(() => setNowMs(Date.now()), 30000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  const nearestUpcomingId = useMemo(() => {
+    const upcoming = bookings
+      .filter(b => ['pending', 'confirmed'].includes(b.status))
+      .map(b => ({ id: b.id, start: bookingStartMs(b) }))
+      .filter(b => Number.isFinite(b.start) && b.start > nowMs)
+      .sort((a, b) => a.start - b.start);
+    return upcoming[0]?.id ?? null;
+  }, [bookings, nowMs]);
 
   const isProfessional = appUser?.user_role === 'barber' || appUser?.user_role === 'specialist';
   if (isAuthenticated && isProfessional && appUser) {
@@ -187,6 +262,9 @@ export default function AppointmentsTab() {
           filteredBookings.map((booking, index) => {
             const status = statusConfig[booking.status];
             const StatusIcon = status.icon;
+            const isNearest = booking.id === nearestUpcomingId;
+            const remainingMs = isNearest ? bookingStartMs(booking) - nowMs : 0;
+            const countdownLabel = isNearest && remainingMs > 0 ? formatRemaining(remainingMs) : null;
 
             return (
               <motion.div
@@ -203,7 +281,14 @@ export default function AppointmentsTab() {
                     <StatusIcon size={14} style={{ color: status.color }} />
                     <span className="text-xs font-bold" style={{ color: status.color }}>{status.label}</span>
                   </div>
-                  <span className="text-[10px]" style={{ color: status.color + '99' }}>#{booking.id.toUpperCase()}</span>
+                  <div className="flex items-center gap-2">
+                    {countdownLabel && (
+                      <span className="text-[10px] font-bold" style={{ color: status.color }}>
+                        {countdownLabel}
+                      </span>
+                    )}
+                    <span className="text-[10px]" style={{ color: status.color + '99' }}>#{booking.id.toUpperCase()}</span>
+                  </div>
                 </div>
 
                 {/* Content */}
@@ -258,6 +343,14 @@ export default function AppointmentsTab() {
                       <CreditCard size={12} style={{ color: themeConfig.colors.textMuted }} />
                       <span className="text-[11px]" style={{ color: themeConfig.colors.textMuted }}>{getPaymentLabel(booking.paymentMethod)}</span>
                     </div>
+                    {['pending', 'confirmed'].includes(booking.status) && (booking.paymentMethod === 'cash' || !booking.paymentMethod) && (
+                      <div
+                        className="mt-2 rounded-xl px-2.5 py-2 text-[10px] font-bold leading-5"
+                        style={{ backgroundColor: themeConfig.colors.warning + '14', color: themeConfig.colors.warning }}
+                      >
+                        {prepareCashReminder(settings.language, money(booking.totalPrice))}
+                      </div>
+                    )}
                     {booking.note && (
                       <div className="flex items-center gap-2">
                         <MessageSquare size={12} style={{ color: themeConfig.colors.textMuted }} />
@@ -266,28 +359,68 @@ export default function AppointmentsTab() {
                     )}
                   </div>
 
-                  {/* Action Buttons */}
-                  <div className="flex gap-2 pt-3 border-t" style={{ borderColor: themeConfig.colors.border }}>
+                  {/* Action Buttons — wrap so cash/attendance don't crowd one row */}
+                  <div className="flex flex-wrap gap-2 pt-3 border-t" style={{ borderColor: themeConfig.colors.border }}>
                     {['pending', 'confirmed'].includes(booking.status) && (
                       <>
+                        <button onClick={() => shareBookingWhatsApp(booking)}
+                          className="min-w-[30%] flex-1 flex items-center justify-center gap-1.5 h-9 rounded-xl text-xs font-bold transition-all"
+                          style={{ backgroundColor: '#25D36618', color: '#128C7E' }}>
+                          <Share2 size={14} /> واتساب
+                        </button>
                         <button onClick={() => openChatWith(booking.barberId, booking.barberName, booking.barberAvatar)}
-                          className="flex-1 flex items-center justify-center gap-1.5 h-9 rounded-xl text-xs font-bold transition-all"
+                          className="min-w-[30%] flex-1 flex items-center justify-center gap-1.5 h-9 rounded-xl text-xs font-bold transition-all"
                           style={{ backgroundColor: themeConfig.colors.primary + '10', color: themeConfig.colors.primary }}>
                           <MessageSquare size={14} /> تواصل
                         </button>
                         <button onClick={() => openDirections(booking.location)}
-                          className="flex-1 flex items-center justify-center gap-1.5 h-9 rounded-xl text-xs font-bold transition-all"
+                          className="min-w-[30%] flex-1 flex items-center justify-center gap-1.5 h-9 rounded-xl text-xs font-bold transition-all"
                           style={{ backgroundColor: themeConfig.colors.success + '10', color: themeConfig.colors.success }}>
                           <Navigation size={14} /> الاتجاهات
+                        </button>
+                        <button
+                          onClick={() => navigate('booking-flow', {
+                            barberId: booking.barberId,
+                            serviceIds: booking.services.map(service => service.id).join(','),
+                            preferredTime: booking.time,
+                            preferredDate: booking.date,
+                            rescheduleBookingId: booking.id,
+                          })}
+                          className="min-w-[30%] flex-1 flex items-center justify-center gap-1.5 h-9 rounded-xl text-xs font-bold transition-all"
+                          style={{ backgroundColor: themeConfig.colors.info + '12', color: themeConfig.colors.info }}
+                        >
+                          <CalendarDays size={14} /> إعادة جدولة
+                        </button>
+                        <button
+                          onClick={() => {
+                            markAttendedLocal(booking.id);
+                            setAttendedIds(readAttended());
+                          }}
+                          className="min-w-[45%] flex-1 flex items-center justify-center gap-1.5 h-9 rounded-xl text-xs font-bold transition-all"
+                          style={{ backgroundColor: themeConfig.colors.success + '12', color: themeConfig.colors.success }}
+                        >
+                          <CheckCircle2 size={14} /> {attendedIds.has(booking.id) ? 'تم تأكيد حضوري' : 'أنا هنا'}
+                        </button>
+                        <button onClick={() => printCashReceipt(booking)}
+                          className="min-w-[45%] flex-1 flex items-center justify-center gap-1.5 h-9 rounded-xl text-xs font-bold transition-all"
+                          style={{ backgroundColor: themeConfig.colors.warning + '14', color: themeConfig.colors.warning }}>
+                          إيصال نقدي
                         </button>
                         <button onClick={() => {
                           if (window.confirm(CANCEL_POLICY.confirmAr(booking.barberName))) void cancelBooking(booking.id);
                         }}
-                          className="flex-1 flex items-center justify-center gap-1.5 h-9 rounded-xl text-xs font-bold transition-all"
+                          className="min-w-[30%] flex-1 flex items-center justify-center gap-1.5 h-9 rounded-xl text-xs font-bold transition-all"
                           style={{ backgroundColor: themeConfig.colors.error + '10', color: themeConfig.colors.error }}>
                           <XCircle size={14} /> إلغاء
                         </button>
                       </>
+                    )}
+                    {booking.status === 'completed' && (
+                      <button onClick={() => printCashReceipt(booking)}
+                        className="flex-1 flex items-center justify-center gap-1.5 h-9 rounded-xl text-xs font-bold"
+                        style={{ backgroundColor: themeConfig.colors.surface, color: themeConfig.colors.text, border: `1px solid ${themeConfig.colors.border}` }}>
+                        إيصال الزيارة
+                      </button>
                     )}
                     {booking.status === 'completed' && !booking.reviewed && (
                       <button onClick={() => setReviewBooking(booking)} className="flex-1 flex items-center justify-center gap-1.5 h-9 rounded-xl text-xs font-bold transition-all"

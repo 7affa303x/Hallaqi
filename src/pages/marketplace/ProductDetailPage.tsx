@@ -1,37 +1,67 @@
-import { useEffect, useState } from 'react';
-import { ArrowLeft, ExternalLink, Star, BadgeCheck, Crown, Bookmark } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { ArrowLeft, Bell, ExternalLink, Star, BadgeCheck, Crown, Bookmark } from 'lucide-react';
 import { useApp } from '@/contexts/useApp';
-import { getMarketplaceProductById, getMarketplaceSellerById, openExternalStore } from '@/supabase/marketplace';
+import { useI18n } from '@/hooks/useI18n';
+import {
+  getMarketplaceProductById,
+  getMarketplaceProducts,
+  getMarketplaceSellerById,
+  openExternalStore,
+} from '@/supabase/marketplace';
 import { formatDzd, discountPercent } from '@/lib/marketplace/filters';
 import { trackMarketplaceEvent } from '@/lib/marketplace/analytics';
 import { createMarketplaceReport } from '@/lib/marketplace/sectionConfig';
 import { canOpenExternalStore } from '@/lib/marketplace/externalUrl';
 import { DEVICE_SAVE_HINT, isMarketplaceSaved, toggleMarketplaceSave } from '@/lib/deviceStorage';
+import { detectPriceChanges, isPriceWatched, togglePriceWatch } from '@/lib/marketplace/priceWatch';
+import { findSimilarProducts } from '@/lib/marketplace/similarProducts';
 import type { MarketplaceProduct, MarketplaceSeller } from '@/types/marketplace';
 
 export default function ProductDetailPage() {
-  const { themeConfig, screenParams, goBack, navigate } = useApp();
+  const { themeConfig, screenParams, goBack, navigate, settings } = useApp();
+  const { money } = useI18n();
   const productId = screenParams?.productId || '';
   const [product, setProduct] = useState<MarketplaceProduct | null>(null);
   const [seller, setSeller] = useState<MarketplaceSeller | null>(null);
+  const [catalog, setCatalog] = useState<MarketplaceProduct[]>([]);
   const [saved, setSaved] = useState(false);
+  const [watching, setWatching] = useState(false);
+  const [priceAlert, setPriceAlert] = useState('');
   const [reportToast, setReportToast] = useState('');
   const [visitError, setVisitError] = useState('');
 
   useEffect(() => {
     if (!productId) return;
     void (async () => {
-      const p = await getMarketplaceProductById(productId);
+      const [p, all] = await Promise.all([
+        getMarketplaceProductById(productId),
+        getMarketplaceProducts({}).catch(() => [] as MarketplaceProduct[]),
+      ]);
       if (!p) return;
       setProduct(p);
+      setCatalog(all);
       trackMarketplaceEvent('view', { productId: p.id, sellerId: p.sellerId, categoryId: p.categoryId, wilaya: p.wilaya });
       if (p.isFeatured) trackMarketplaceEvent('featured_impression', { productId: p.id, sellerId: p.sellerId });
       if (p.isProductOfTheDay) trackMarketplaceEvent('product_of_day_view', { productId: p.id, sellerId: p.sellerId });
       const s = await getMarketplaceSellerById(p.sellerId);
       if (s) setSeller(s);
       setSaved(isMarketplaceSaved(p.id));
+      setWatching(isPriceWatched(p.id));
+      const changes = detectPriceChanges(all.map(x => ({ id: x.id, priceDzd: x.priceDzd })));
+      const hit = changes.find(c => c.productId === p.id);
+      if (hit) {
+        const dir = hit.delta < 0
+          ? (settings.language === 'en' ? 'dropped' : settings.language === 'fr' ? 'baissé' : 'انخفض')
+          : (settings.language === 'en' ? 'rose' : settings.language === 'fr' ? 'augmenté' : 'ارتفع');
+        setPriceAlert(`${dir}: ${formatDzd(hit.lastSeenDzd)} → ${formatDzd(hit.currentDzd)}`);
+      }
     })();
-  }, [productId]);
+  }, [productId, settings.language]);
+
+  const similar = useMemo(
+    () => (product ? findSimilarProducts(product, catalog, 4) : []),
+    [product, catalog],
+  );
 
   if (!product) {
     return (
@@ -51,6 +81,9 @@ export default function ProductDetailPage() {
       setVisitError('رابط المتجر غير آمن أو غير متوفر (يُسمح بـ https فقط).');
       return;
     }
+    const leaveMsg =
+      'أنت على وشك مغادرة حلاقي وفتح موقع المتجر الخارجي. المتابعة؟\n\nYou are about to leave Hallaqi and open the seller’s website. Continue?\n\nVous allez quitter Hallaqi et ouvrir le site du vendeur. Continuer ?';
+    if (!window.confirm(leaveMsg)) return;
     trackMarketplaceEvent('click', { productId: product.id, sellerId: product.sellerId });
     trackMarketplaceEvent('visit_store', { productId: product.id, sellerId: product.sellerId });
     if (product.isFeatured) trackMarketplaceEvent('featured_click', { productId: product.id, sellerId: product.sellerId });
@@ -69,6 +102,15 @@ export default function ProductDetailPage() {
         wilaya: product.wilaya,
       });
     }
+  };
+
+  const toggleWatch = () => {
+    const next = togglePriceWatch({
+      productId: product.id,
+      title: product.title,
+      priceDzd: product.priceDzd,
+    });
+    setWatching(next);
   };
 
   const report = () => {
@@ -96,7 +138,11 @@ export default function ProductDetailPage() {
           <Bookmark size={18} className={saved ? 'fill-current' : ''} />
         </button>
         <div className="absolute bottom-4 left-4 flex flex-col gap-1">
-          {product.isProductOfTheDay && <span className="text-[10px] font-black px-2 py-1 rounded-full bg-amber-400 text-black">منتج اليوم</span>}
+          {product.isProductOfTheDay && (
+            <span className="text-[10px] font-black px-2 py-1 rounded-full bg-amber-400 text-black">
+              منتج اليوم · موضع إعلاني مدفوع لاحقاً
+            </span>
+          )}
           {product.isPremiumVisibility && <span className="text-[10px] font-black px-2 py-1 rounded-full text-white" style={{ backgroundColor: themeConfig.colors.primary }}>بريميوم</span>}
           {product.isFeatured && <span className="text-[10px] font-black px-2 py-1 rounded-full text-white" style={{ backgroundColor: themeConfig.colors.accent }}>مميز</span>}
         </div>
@@ -105,14 +151,22 @@ export default function ProductDetailPage() {
       <div className="px-4 mt-4 space-y-3">
         <h1 className="text-xl font-black" style={{ color: themeConfig.colors.text }}>{product.title}</h1>
         <div className="flex items-center gap-2">
-          <span className="text-lg font-black" style={{ color: themeConfig.colors.primary }}>{formatDzd(product.priceDzd)}</span>
+          <span className="text-lg font-black" style={{ color: themeConfig.colors.primary }}>{money(product.priceDzd)}</span>
           {product.compareAtPriceDzd && (
             <>
-              <span className="text-sm line-through" style={{ color: themeConfig.colors.textMuted }}>{formatDzd(product.compareAtPriceDzd)}</span>
+              <span className="text-sm line-through" style={{ color: themeConfig.colors.textMuted }}>{money(product.compareAtPriceDzd)}</span>
               {pct != null && <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-rose-500 text-white">-{pct}%</span>}
             </>
           )}
         </div>
+        {settings.currencyCode !== 'DZD' && (
+          <p className="text-[10px]" style={{ color: themeConfig.colors.textMuted }}>{formatDzd(product.priceDzd)} · عرض فقط</p>
+        )}
+        {priceAlert && (
+          <p className="text-[11px] font-bold px-3 py-2 rounded-xl" style={{ backgroundColor: themeConfig.colors.warning + '18', color: themeConfig.colors.warning }}>
+            تغيّر السعر: {priceAlert}
+          </p>
+        )}
         {product.offerText && (
           <p className="text-xs font-bold px-3 py-2 rounded-xl" style={{ backgroundColor: `${themeConfig.colors.accent}18`, color: themeConfig.colors.accent }}>
             {product.offerText}
@@ -129,6 +183,20 @@ export default function ProductDetailPage() {
         <p className="text-xs flex items-center gap-1" style={{ color: themeConfig.colors.textMuted }}>
           <Star size={12} className="fill-amber-400 text-amber-400" /> {product.rating.toFixed(1)} · {product.reviewCount} · {product.brand}
         </p>
+
+        <button
+          type="button"
+          onClick={toggleWatch}
+          className="w-full h-10 rounded-xl text-xs font-bold border flex items-center justify-center gap-2"
+          style={{
+            borderColor: watching ? themeConfig.colors.primary : themeConfig.colors.border,
+            color: watching ? themeConfig.colors.primary : themeConfig.colors.text,
+            backgroundColor: themeConfig.colors.surface,
+          }}
+        >
+          <Bell size={14} />
+          {watching ? 'إيقاف تنبيه تغيّر السعر' : 'تنبيه عند تغيّر السعر (على الجهاز)'}
+        </button>
 
         {seller && (
           <button
@@ -150,6 +218,27 @@ export default function ProductDetailPage() {
               </div>
             </div>
           </button>
+        )}
+
+        {similar.length > 0 && (
+          <section className="space-y-2">
+            <h2 className="text-sm font-black" style={{ color: themeConfig.colors.text }}>مقارنة منتجات مشابهة</h2>
+            <div className="grid grid-cols-2 gap-2">
+              {similar.map(s => (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => navigate('product-detail', { productId: s.id })}
+                  className="rounded-xl border p-2 text-right"
+                  style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}
+                >
+                  <p className="text-[11px] font-bold line-clamp-2" style={{ color: themeConfig.colors.text }}>{s.title}</p>
+                  <p className="text-[10px] mt-1 font-black" style={{ color: themeConfig.colors.primary }}>{money(s.priceDzd)}</p>
+                  <p className="text-[9px]" style={{ color: themeConfig.colors.textMuted }}>{s.brand}</p>
+                </button>
+              ))}
+            </div>
+          </section>
         )}
 
         <button type="button" onClick={report} className="text-[11px] font-bold underline" style={{ color: themeConfig.colors.textMuted }}>

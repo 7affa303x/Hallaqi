@@ -62,6 +62,14 @@ export default function CreateForumPostPage() {
       setError('يجب تسجيل الدخول للنشر');
       return;
     }
+    // #158 client spam cooldown
+    try {
+      const last = Number(localStorage.getItem('hallaqi-forum-last-post-at') || '0');
+      if (Date.now() - last < 45_000) {
+        setError('انتظر قليلاً قبل نشر منشور آخر (حماية من السبام)');
+        return;
+      }
+    } catch { /* ignore */ }
     setError('');
     try {
       const imageUrl = image ? await uploadForumImage(appUser.id, image) : null;
@@ -75,6 +83,7 @@ export default function CreateForumPostPage() {
         is_pinned: false,
         is_locked: false,
       });
+      try { localStorage.setItem('hallaqi-forum-last-post-at', String(Date.now())); } catch { /* ignore */ }
       trackProductEvent('Forum Post Created', {
         categoryId: data.categoryId,
         hasImage: Boolean(imageUrl),

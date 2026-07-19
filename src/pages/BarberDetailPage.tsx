@@ -20,7 +20,10 @@ import {
 import type { PortfolioItem } from '@/types/supabase-aliases';
 import type { Barber } from '@/types';
 import BrandLogo from '@/components/BrandLogo';
+import { pushRecentBarber } from '@/lib/deviceStorage';
 import { useI18n } from '@/hooks/useI18n';
+import { upsertJsonLdScript } from '@/lib/seo/jsonLd';
+import { addSessionBytes } from '@/lib/sessionDataMeter';
 
 // Saturday=0, Sunday=1, Monday=2, Tuesday=3, Wednesday=4, Thursday=5, Friday=6
 const daysArSchedule = ['السبت', 'الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة'];
@@ -40,9 +43,10 @@ function viewOnMap(location: string, wilaya: string) {
 }
 
 export default function BarberDetailPage() {
-  const { themeConfig, screenParams, navigate, goBack, barbers, toggleFollow } = useApp();
+  const { themeConfig, screenParams, navigate, goBack, barbers, toggleFollow, settings } = useApp();
   const { appUser, isAuthenticated } = useAuth();
   const { money } = useI18n();
+  const lowData = settings.accessibility.lowData;
   const [activeSection, setActiveSection] = useState<'services' | 'reviews' | 'portfolio' | 'hours'>('services');
   const [portfolioItems, setPortfolioItems] = useState<PortfolioItem[]>([]);
   const [loadingPortfolio, setLoadingPortfolio] = useState(false);
@@ -58,6 +62,7 @@ export default function BarberDetailPage() {
     acceptance_rate: 0,
     completed_bookings: 0,
   });
+  const [mapLoaded, setMapLoaded] = useState(false);
 
   const listedBarber = barbers.find(b => b.id === screenParams?.barberId);
   const [barber, setBarber] = useState<Barber | undefined>(listedBarber);
@@ -69,6 +74,7 @@ export default function BarberDetailPage() {
       setLoadingDetails(false);
       return;
     }
+    pushRecentBarber(barberId);
     if (listedBarber) setBarber(listedBarber);
     setLoadingDetails(true);
     void getProfessionalById(barberId)
@@ -125,10 +131,7 @@ export default function BarberDetailPage() {
     const description = document.querySelector<HTMLMetaElement>('meta[name="description"]');
     const previousDescription = description?.content;
     if (description) description.content = `احجز خدمات ${barber.name} في ${barber.wilaya}. التقييم ${barber.rating} من 5.`;
-    const script = document.createElement('script');
-    script.type = 'application/ld+json';
-    script.id = 'hallaqi-local-business';
-    script.text = JSON.stringify({
+    const cleanup = upsertJsonLdScript('hallaqi-local-business', {
       '@context': 'https://schema.org',
       '@type': 'HairSalon',
       name: barber.name,
@@ -153,11 +156,10 @@ export default function BarberDetailPage() {
       } : undefined,
       priceRange: barber.priceRange,
     });
-    document.head.appendChild(script);
     return () => {
       document.title = previousTitle;
       if (description && previousDescription) description.content = previousDescription;
-      script.remove();
+      cleanup();
     };
   }, [barber]);
 
@@ -366,6 +368,9 @@ export default function BarberDetailPage() {
           <MessageSquare size={18} />
         </button>
       </div>
+      <p className="px-4 mt-2 text-[10px] font-bold" style={{ color: themeConfig.colors.success }}>
+        الدفع عند الزيارة فقط · نقداً (DZD)
+      </p>
 
       {/* === QR MODAL === */}
       {showQR && (
@@ -434,8 +439,28 @@ export default function BarberDetailPage() {
           </span>
         </div>
         <div className="relative rounded-2xl overflow-hidden border aspect-[2/1] flex items-center justify-center" style={{ borderColor: themeConfig.colors.border, backgroundColor: themeConfig.colors.surface }}>
-          {mapSrc ? (
+          {mapSrc && mapLoaded && !lowData ? (
             <iframe title={`خريطة ${barber.name}`} width="100%" height="100%" style={{ border: 0, minHeight: '160px' }} loading="lazy" allowFullScreen referrerPolicy="no-referrer-when-downgrade" src={mapSrc} />
+          ) : mapSrc ? (
+            <button
+              type="button"
+              onClick={() => {
+                setMapLoaded(true);
+                addSessionBytes(350_000);
+              }}
+              className="text-center px-4 py-6"
+              disabled={lowData}
+            >
+              <MapPin size={28} className="mx-auto mb-2" style={{ color: themeConfig.colors.primary }} />
+              <p className="text-xs font-bold" style={{ color: themeConfig.colors.text }}>
+                {lowData
+                  ? 'وضع بيانات منخفضة — استخدم زر الخريطة الخارجية'
+                  : 'اضغط لتحميل الخريطة'}
+              </p>
+              <p className="text-[10px] mt-1" style={{ color: themeConfig.colors.textMuted }}>
+                لا نحمّل الخريطة حتى تطلبها (#173)
+              </p>
+            </button>
           ) : (
             <div className="text-center px-4">
               <MapPin size={28} className="mx-auto mb-2" style={{ color: themeConfig.colors.primary }} />

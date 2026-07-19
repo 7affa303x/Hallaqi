@@ -13,6 +13,7 @@ import BrandLogo from '@/components/BrandLogo';
 import InstallPrompt from '@/components/InstallPrompt';
 import SoftOnboarding from '@/components/SoftOnboarding';
 import CookieConsent from '@/components/CookieConsent';
+import { FEATURE_FLAGS } from '@/lib/featureFlags';
 import { readAnalyticsConsent } from '@/lib/analyticsConsent';
 import { reportClientError } from '@/lib/error-reporting';
 import { translate } from '@/lib/i18n';
@@ -51,6 +52,7 @@ const SellerPlacementsPage = lazy(() => import('@/pages/store/SellerPlacementsPa
 const SellerProfileEditPage = lazy(() => import('@/pages/store/SellerProfileEditPage'));
 const MarketplaceAnalyticsPage = lazy(() => import('@/pages/analytics/MarketplaceAnalyticsPage'));
 const AiListingToolsPage = lazy(() => import('@/pages/marketplace/AiListingToolsPage'));
+const CompareBarbersPage = lazy(() => import('@/pages/CompareBarbersPage'));
 
 function TabContent({ tab }: { tab: string }) {
   let content;
@@ -85,6 +87,8 @@ function ScreenRouter() {
   switch (screen) {
     case 'barber-detail':
       return <Suspense fallback={<LoadingFallback />}><BarberDetailPage /></Suspense>;
+    case 'compare-barbers':
+      return <Suspense fallback={<LoadingFallback />}><CompareBarbersPage /></Suspense>;
     case 'booking-flow':
       return <Suspense fallback={<LoadingFallback />}><BookingFlowPage /></Suspense>;
     case 'chat-room':
@@ -202,6 +206,14 @@ function AppContent() {
   const [analyticsOn, setAnalyticsOn] = useState(() => readAnalyticsConsent() === 'accepted');
 
   useEffect(() => {
+    // Prefetch appointments chunk after home settles (#165)
+    const t = window.setTimeout(() => {
+      void import('@/tabs/AppointmentsTab');
+    }, 2500);
+    return () => window.clearTimeout(t);
+  }, []);
+
+  useEffect(() => {
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
     window.addEventListener('online', handleOnline);
@@ -269,6 +281,19 @@ function AppContent() {
         {translate(settings.language, 'skipToContent')}
       </a>
       <NetworkStatusBar />
+      {FEATURE_FLAGS.maintenanceModeEnabled && (
+        <div
+          role="status"
+          className="fixed top-0 left-0 right-0 z-[95] px-3 py-2 text-center text-[11px] font-bold text-white"
+          style={{ backgroundColor: themeConfig.colors.warning }}
+        >
+          {settings.language === 'en'
+            ? 'Scheduled maintenance — some features may be slow.'
+            : settings.language === 'fr'
+              ? 'Maintenance planifiée — certaines fonctions peuvent être lentes.'
+              : 'صيانة مجدولة — قد تبطئ بعض الميزات مؤقتاً.'}
+        </div>
+      )}
       {dataError && (
         <div
           role="alert"

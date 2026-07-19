@@ -1,18 +1,34 @@
 import { useEffect, useRef, useState } from 'react';
 import { useApp } from '@/contexts/useApp';
 import { translate } from '@/lib/i18n';
+import { shouldNudgeFrench } from '@/lib/wilayaExpansion';
 import { X, CalendarDays, ShoppingBag, Sparkles } from 'lucide-react';
 
 const STORAGE_KEY = 'hallaqi-onboarding-v1-done';
+const DEVICE_LANG_KEY = 'hallaqi-device-lang-applied-v1';
+const FR_NUDGE_KEY = 'hallaqi-fr-nudge-dismissed-v1';
+
+function detectDeviceLanguage(): 'ar' | 'fr' | 'en' {
+  try {
+    const raw = (navigator.language || (navigator as Navigator & { userLanguage?: string }).userLanguage || 'ar').toLowerCase();
+    if (raw.startsWith('fr')) return 'fr';
+    if (raw.startsWith('en')) return 'en';
+    if (raw.startsWith('ar')) return 'ar';
+  } catch {
+    /* ignore */
+  }
+  return 'ar';
+}
 
 /**
  * First-visit soft onboarding — one composition, three short steps.
  * Skippable; never blocks the app. Focus trap + Escape for a11y.
  */
 export default function SoftOnboarding() {
-  const { themeConfig, setActiveTab, navigate, settings } = useApp();
+  const { themeConfig, setActiveTab, navigate, settings, updateSettings } = useApp();
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState(0);
+  const [frNudge, setFrNudge] = useState(false);
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const reduceMotion = settings.accessibility.reduceMotion;
@@ -20,16 +36,39 @@ export default function SoftOnboarding() {
 
   useEffect(() => {
     try {
+      // #103 — respect device language once on first open (before user picks)
+      if (localStorage.getItem(DEVICE_LANG_KEY) !== '1') {
+        const hasExplicit = Boolean(localStorage.getItem('hallaqi-locale-prefs-v1'));
+        if (!hasExplicit) {
+          updateSettings({ language: detectDeviceLanguage() });
+        }
+        localStorage.setItem(DEVICE_LANG_KEY, '1');
+      }
+      // #190 — soft FR nudge for big-city wilayas when still on Arabic
+      const wilaya = settings.discoveryWilaya || localStorage.getItem('hallaqi-discovery-wilaya') || '';
+      if (
+        settings.language === 'ar'
+        && shouldNudgeFrench(wilaya)
+        && localStorage.getItem(FR_NUDGE_KEY) !== '1'
+        && localStorage.getItem(STORAGE_KEY) === '1'
+      ) {
+        setFrNudge(true);
+      }
       if (localStorage.getItem(STORAGE_KEY) === '1') return;
       setOpen(true);
     } catch {
       // ignore
     }
-  }, []);
+  }, [updateSettings, settings.discoveryWilaya, settings.language]);
 
   const finish = () => {
     try { localStorage.setItem(STORAGE_KEY, '1'); } catch { /* ignore */ }
     setOpen(false);
+  };
+
+  const dismissFrNudge = () => {
+    try { localStorage.setItem(FR_NUDGE_KEY, '1'); } catch { /* ignore */ }
+    setFrNudge(false);
   };
 
   useEffect(() => {
@@ -58,6 +97,33 @@ export default function SoftOnboarding() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [open]);
+
+  if (!open && frNudge) {
+    return (
+      <div className="fixed bottom-20 inset-x-0 z-[90] px-4 pointer-events-none">
+        <div
+          className="max-w-md mx-auto rounded-2xl border p-3 shadow-lg pointer-events-auto flex items-center gap-2"
+          style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}
+          role="status"
+        >
+          <p className="flex-1 text-[11px] leading-5" style={{ color: themeConfig.colors.textMuted }}>
+            Interface aussi en français pour Oran, Alger et les grandes villes — basculez quand تريد.
+          </p>
+          <button
+            type="button"
+            onClick={() => { updateSettings({ language: 'fr' }); dismissFrNudge(); }}
+            className="h-8 px-3 rounded-lg text-[10px] font-bold text-white shrink-0"
+            style={{ backgroundColor: themeConfig.colors.primary }}
+          >
+            FR
+          </button>
+          <button type="button" onClick={dismissFrNudge} aria-label="إغلاق" className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: themeConfig.colors.background }}>
+            <X size={14} style={{ color: themeConfig.colors.textMuted }} />
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (!open) return null;
 
@@ -109,16 +175,37 @@ export default function SoftOnboarding() {
           <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ backgroundColor: `${themeConfig.colors.primary}15` }}>
             <Icon size={22} style={{ color: themeConfig.colors.primary }} />
           </div>
-          <button
-            ref={closeRef}
-            type="button"
-            onClick={finish}
-            aria-label="إغلاق"
-            className="w-9 h-9 rounded-xl flex items-center justify-center"
-            style={{ backgroundColor: themeConfig.colors.background }}
-          >
-            <X size={16} style={{ color: themeConfig.colors.textMuted }} />
-          </button>
+          <div className="flex items-center gap-1">
+            {([
+              { key: 'ar' as const, label: 'ع' },
+              { key: 'fr' as const, label: 'FR' },
+              { key: 'en' as const, label: 'EN' },
+            ]).map(lang => (
+              <button
+                key={lang.key}
+                type="button"
+                onClick={() => updateSettings({ language: lang.key })}
+                className="h-8 min-w-8 px-2 rounded-lg text-[10px] font-bold"
+                style={{
+                  backgroundColor: settings.language === lang.key ? themeConfig.colors.primary : themeConfig.colors.background,
+                  color: settings.language === lang.key ? '#fff' : themeConfig.colors.textMuted,
+                }}
+                aria-label={lang.key}
+              >
+                {lang.label}
+              </button>
+            ))}
+            <button
+              ref={closeRef}
+              type="button"
+              onClick={finish}
+              aria-label="إغلاق"
+              className="w-9 h-9 rounded-xl flex items-center justify-center"
+              style={{ backgroundColor: themeConfig.colors.background }}
+            >
+              <X size={16} style={{ color: themeConfig.colors.textMuted }} />
+            </button>
+          </div>
         </div>
         <p className="text-[10px] font-bold mt-3" style={{ color: themeConfig.colors.textMuted }}>
           خطوة {step + 1} من {steps.length}

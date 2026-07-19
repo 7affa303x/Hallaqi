@@ -32,6 +32,11 @@ export default function BarberAssistSheet({
   const submit = async (intent: 'client_brief' | 'message_draft' | 'free' = 'free') => {
     const q = question.trim() || defaultQuestion.trim();
     if (q.length < 3) return;
+    // #131 — prefer appointment-bound context
+    if (!context?.clientName && !context?.serviceName && intent !== 'free') {
+      setError('افتح المساعد من بطاقة موعد لربطه بالعميل/الخدمة.');
+      return;
+    }
     setLoading(true);
     setError('');
     try {
@@ -72,10 +77,14 @@ export default function BarberAssistSheet({
               </button>
             </div>
 
-            {(context?.clientName || context?.serviceName) && (
+            {(context?.clientName || context?.serviceName) ? (
               <div className="mb-3 rounded-xl px-3 py-2 text-[11px]" style={{ backgroundColor: themeConfig.colors.background, color: themeConfig.colors.textMuted }}>
                 {context.clientName && <span>العميل: {context.clientName} · </span>}
                 {context.serviceName && <span>الخدمة: {context.serviceName}</span>}
+              </div>
+            ) : (
+              <div className="mb-3 rounded-xl px-3 py-2 text-[11px]" style={{ backgroundColor: themeConfig.colors.warning + '14', color: themeConfig.colors.warning }}>
+                للأفضل: افتح المساعد من بطاقة موعد لربطه بالعميل والخدمة فقط (#131).
               </div>
             )}
 

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Check, CheckCircle2, Clock, MessageSquare, PlayCircle, Plus, Sparkles,
+  Check, CheckCircle2, Clock, MessageSquare, PlayCircle, Plus, Printer, Sparkles,
   User as UserIcon, Wallet, X, XCircle, AlertCircle, CalendarDays,
 } from 'lucide-react';
 import { useApp } from '@/contexts/useApp';
@@ -14,11 +14,17 @@ import {
   getProfessionalBookings,
   getProfessionalMetrics,
   updateBookingStatus,
+  updateProfessionalProfile,
   sendNotification,
   getOrCreateConversation,
   sendMessage,
 } from '@/supabase/database';
-import { BARBER_MESSAGE_TEMPLATES, fillTemplate } from '@/lib/barber/messageTemplates';
+import {
+  BARBER_MESSAGE_TEMPLATES,
+  fillTemplate,
+  templateBody,
+  templateLabel,
+} from '@/lib/barber/messageTemplates';
 import {
   computeDayStats,
   displayClientName,
@@ -27,6 +33,7 @@ import {
   serviceLabel,
   type StudioBooking,
 } from '@/lib/barber/studioHelpers';
+import { barberFirstBookingSteps } from '@/lib/barber/firstBookingGuide';
 import type { BookingStatus } from '@/types';
 import type { Database } from '@/types/supabase';
 
@@ -50,7 +57,7 @@ const statusConfig: Record<BookingStatus, { label: string; color: string; bg: st
 };
 
 export default function BarberStudioHub({ proId }: { proId: string }) {
-  const { themeConfig, navigate } = useApp();
+  const { themeConfig, navigate, settings } = useApp();
   const [rows, setRows] = useState<StudioBooking[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -61,6 +68,15 @@ export default function BarberStudioHub({ proId }: { proId: string }) {
   const [templateFor, setTemplateFor] = useState<StudioBooking | null>(null);
   const [metrics, setMetrics] = useState({ average_response_minutes: 0, acceptance_rate: 0, completed_bookings: 0 });
   const [toast, setToast] = useState('');
+  const [acceptingBookings, setAcceptingBookings] = useState(true);
+  const [availabilityBusy, setAvailabilityBusy] = useState(false);
+  const [showFirstGuide, setShowFirstGuide] = useState(() => {
+    try {
+      return localStorage.getItem('hallaqi-barber-first-guide-v1') !== '1';
+    } catch {
+      return true;
+    }
+  });
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -109,12 +125,13 @@ export default function BarberStudioHub({ proId }: { proId: string }) {
       await updateBookingStatus(b.id, status as DbBookingStatus);
       if (b.client_id) {
         try {
+          const amountLabel = `${Math.round(b.total_price ?? 0).toLocaleString('ar-DZ')} د.ج`;
           await sendNotification({
             userId: b.client_id,
             title: 'تحديث حالة الحجز',
-            message: clientMessage,
+            message: `${clientMessage} · ${amountLabel}`,
             type: 'booking',
-            metadata: { booking_id: b.id },
+            metadata: { booking_id: b.id, amount: b.total_price ?? 0 },
           });
         } catch { /* best-effort */ }
       }
@@ -170,15 +187,71 @@ export default function BarberStudioHub({ proId }: { proId: string }) {
     setAssistOpen(true);
   };
 
+  const toggleAccepting = async () => {
+    if (availabilityBusy) return;
+    setAvailabilityBusy(true);
+    const next = !acceptingBookings;
+    try {
+      await updateProfessionalProfile(proId, { is_active: next });
+      setAcceptingBookings(next);
+      setToast(next ? 'أنت متاح للحجوزات الجديدة' : 'تم إيقاف الحجوزات الجديدة مؤقتاً');
+    } catch {
+      setToast('تعذر تحديث التوفر');
+    } finally {
+      setAvailabilityBusy(false);
+    }
+  };
+
   return (
     <div className="pb-28 relative">
-      <div className="sticky top-0 z-30 px-4 pt-3 pb-3 backdrop-blur-lg" style={{ backgroundColor: `${themeConfig.colors.background}ee` }}>
+      <style>{`
+        @media print {
+          body * { visibility: hidden !important; }
+          #studio-day-print, #studio-day-print * { visibility: visible !important; }
+          #studio-day-print {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            display: block !important;
+          }
+          .studio-print-chrome { display: none !important; }
+        }
+      `}</style>
+      <div className="sticky top-0 z-30 px-4 pt-3 pb-3 backdrop-blur-lg studio-print-chrome print:hidden" style={{ backgroundColor: `${themeConfig.colors.background}ee` }}>
         <div className="flex items-center gap-2 mb-3">
           <BrandLogo className="w-9 h-9 shadow-sm" priority />
           <div className="flex-1">
             <h1 className="text-lg font-bold leading-tight" style={{ color: themeConfig.colors.text }}>استوديو العمل</h1>
             <p className="text-[10px]" style={{ color: themeConfig.colors.textMuted }}>{formatDayLabel()} · إدارة سلسة ليومك</p>
           </div>
+          <button
+            type="button"
+            onClick={() => window.print()}
+            className="h-10 px-3 rounded-xl text-[10px] font-bold border flex items-center gap-1"
+            style={{
+              backgroundColor: themeConfig.colors.surface,
+              borderColor: themeConfig.colors.border,
+              color: themeConfig.colors.text,
+            }}
+            aria-label="طباعة اليوم"
+          >
+            <Printer size={14} />
+            طباعة اليوم
+          </button>
+          <button
+            type="button"
+            onClick={() => void toggleAccepting()}
+            disabled={availabilityBusy}
+            className="h-10 px-3 rounded-xl text-[10px] font-bold border disabled:opacity-50"
+            style={{
+              backgroundColor: acceptingBookings ? themeConfig.colors.success + '18' : themeConfig.colors.error + '12',
+              borderColor: acceptingBookings ? themeConfig.colors.success + '40' : themeConfig.colors.error + '40',
+              color: acceptingBookings ? themeConfig.colors.success : themeConfig.colors.error,
+            }}
+            aria-pressed={acceptingBookings}
+          >
+            {acceptingBookings ? 'متاح' : 'مشغول'}
+          </button>
           <button
             type="button"
             onClick={() => openAssist()}
@@ -190,6 +263,35 @@ export default function BarberStudioHub({ proId }: { proId: string }) {
           </button>
         </div>
 
+        {showFirstGuide && (
+          <div
+            className="rounded-2xl border p-3 mb-3 space-y-2 print:hidden"
+            style={{ backgroundColor: themeConfig.colors.info + '10', borderColor: themeConfig.colors.border }}
+          >
+            <div className="flex items-start justify-between gap-2">
+              <p className="text-xs font-bold" style={{ color: themeConfig.colors.text }}>
+                {settings.language === 'en' ? 'First booking checklist' : settings.language === 'fr' ? 'Checklist premier RDV' : 'دليل أول حجز'}
+              </p>
+              <button
+                type="button"
+                className="text-[10px] font-bold"
+                style={{ color: themeConfig.colors.primary }}
+                onClick={() => {
+                  try { localStorage.setItem('hallaqi-barber-first-guide-v1', '1'); } catch { /* ignore */ }
+                  setShowFirstGuide(false);
+                }}
+              >
+                {settings.language === 'en' ? 'Got it' : settings.language === 'fr' ? 'OK' : 'فهمت'}
+              </button>
+            </div>
+            <ol className="space-y-1 list-decimal list-inside">
+              {barberFirstBookingSteps(settings.language).map(step => (
+                <li key={step} className="text-[10px] leading-5" style={{ color: themeConfig.colors.textMuted }}>{step}</li>
+              ))}
+            </ol>
+          </div>
+        )}
+
         <div
           className="rounded-2xl p-3 mb-3 relative overflow-hidden"
           style={{
@@ -197,7 +299,7 @@ export default function BarberStudioHub({ proId }: { proId: string }) {
             border: `1px solid ${themeConfig.colors.border}`,
           }}
         >
-          <div className="grid grid-cols-3 gap-2 mb-3">
+          <div className="grid grid-cols-5 gap-2 mb-3">
             <div>
               <p className="text-[10px]" style={{ color: themeConfig.colors.textMuted }}>اليوم</p>
               <p className="text-lg font-bold" style={{ color: themeConfig.colors.text }}>{stats.todayCount}</p>
@@ -209,6 +311,14 @@ export default function BarberStudioHub({ proId }: { proId: string }) {
             <div>
               <p className="text-[10px]" style={{ color: themeConfig.colors.textMuted }}>إيراد اليوم</p>
               <p className="text-lg font-bold" style={{ color: themeConfig.colors.primary }}>{stats.revenueToday}<span className="text-[10px] font-medium"> دج</span></p>
+            </div>
+            <div>
+              <p className="text-[10px]" style={{ color: themeConfig.colors.textMuted }}>ملغي</p>
+              <p className="text-lg font-bold" style={{ color: themeConfig.colors.error }}>{stats.cancelledToday}</p>
+            </div>
+            <div>
+              <p className="text-[10px]" style={{ color: themeConfig.colors.textMuted }}>لم يحضر</p>
+              <p className="text-lg font-bold" style={{ color: '#78716C' }}>{stats.noShowToday}</p>
             </div>
           </div>
 
@@ -275,7 +385,7 @@ export default function BarberStudioHub({ proId }: { proId: string }) {
         </div>
       </div>
 
-      <div className="px-4 space-y-3 mt-2">
+      <div id="studio-day-print" className="px-4 space-y-3 mt-2 print:block">
         {loading ? (
           <><SkeletonBookingCard /><SkeletonBookingCard /></>
         ) : shown.map((b, index) => {
@@ -403,7 +513,7 @@ export default function BarberStudioHub({ proId }: { proId: string }) {
       <button
         type="button"
         onClick={() => setQuickOpen(true)}
-        className="fixed bottom-24 left-1/2 -translate-x-1/2 z-40 w-14 h-14 rounded-full text-white shadow-lg flex items-center justify-center"
+        className="fixed bottom-24 left-1/2 -translate-x-1/2 z-40 w-14 h-14 rounded-full text-white shadow-lg flex items-center justify-center studio-print-chrome print:hidden"
         style={{ backgroundColor: themeConfig.colors.primary }}
         aria-label="إدخال سريع"
       >
@@ -416,7 +526,7 @@ export default function BarberStudioHub({ proId }: { proId: string }) {
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
-            className="fixed bottom-40 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full text-xs font-bold text-white shadow-lg"
+            className="fixed bottom-40 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full text-xs font-bold text-white shadow-lg studio-print-chrome print:hidden"
             style={{ backgroundColor: themeConfig.colors.text }}
           >
             {toast}
@@ -456,7 +566,10 @@ export default function BarberStudioHub({ proId }: { proId: string }) {
                     key={tpl.id}
                     type="button"
                     onClick={() => {
-                      const body = fillTemplate(tpl.body, displayClientName(templateFor));
+                      const body = fillTemplate(
+                        templateBody(tpl, settings.language),
+                        displayClientName(templateFor),
+                      );
                       const target = templateFor;
                       setTemplateFor(null);
                       void openChat(target, body);
@@ -464,8 +577,12 @@ export default function BarberStudioHub({ proId }: { proId: string }) {
                     className="text-right rounded-xl p-3"
                     style={{ backgroundColor: themeConfig.colors.background }}
                   >
-                    <span className="block text-xs font-bold" style={{ color: themeConfig.colors.text }}>{tpl.label}</span>
-                    <span className="block text-[11px] mt-0.5" style={{ color: themeConfig.colors.textMuted }}>{tpl.body}</span>
+                    <span className="block text-xs font-bold" style={{ color: themeConfig.colors.text }}>
+                      {templateLabel(tpl, settings.language)}
+                    </span>
+                    <span className="block text-[11px] mt-0.5" style={{ color: themeConfig.colors.textMuted }}>
+                      {templateBody(tpl, settings.language)}
+                    </span>
                   </button>
                 ))}
                 <button

@@ -24,11 +24,20 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { bookingStep3Schema } from '@/lib/validation';
 import type { BookingStep3FormData } from '@/lib/validation';
 import { preferredBookingHour, rankAvailableSlots } from '@/lib/scheduling';
-import { FEATURE_FLAGS, PAUSED_LABEL } from '@/lib/featureFlags';
-import { CANCEL_POLICY } from '@/lib/cancelPolicy';
+import { FEATURE_FLAGS, PAUSED_LABEL, COMING_SOON_LABEL, isCashOnlyPayments } from '@/lib/featureFlags';
+import { cancelPolicyDetails, cancelPolicySummary } from '@/lib/cancelPolicy';
+import { refundPolicySummary } from '@/lib/paymentPolicy';
 import { trackProductEvent } from '@/lib/product-analytics';
 import { reportClientError } from '@/lib/error-reporting';
 import { useI18n } from '@/hooks/useI18n';
+
+const BOOKING_DRAFT_KEY = 'hallaqi-booking-draft-v1';
+
+const NOTE_QUICK_CHIPS = [
+  'قصة قصيرة من الجوانب',
+  'بدون منتجات كيميائية',
+  'أول زيارة لي',
+] as const;
 
 const ALL_TIME_SLOTS = [
   '08:00', '08:30', '09:00', '09:30', '10:00', '10:30',
@@ -110,7 +119,7 @@ const generateDates = () => {
 };
 
 export default function BookingFlowPage() {
-  const { themeConfig, screenParams, barbers, bookings: userBookings, addBooking, navigate, setActiveTab, goBack, refreshData } = useApp();
+  const { themeConfig, screenParams, barbers, bookings: userBookings, addBooking, navigate, setActiveTab, goBack, refreshData, settings } = useApp();
   const { money } = useI18n();
   const { appUser } = useAuth();
   const [step, setStep] = useState<1 | 2 | 3>(1);
@@ -139,10 +148,12 @@ export default function BookingFlowPage() {
   const [isLoadingSlots, setIsLoadingSlots] = useState(false);
   const [availableVouchers, setAvailableVouchers] = useState<AvailableVoucher[]>([]);
   const [selectedVoucherId, setSelectedVoucherId] = useState('');
+  const [draftRestored, setDraftRestored] = useState(false);
 
   const {
     register: registerStep3,
     handleSubmit: handleStep3Submit,
+    setValue: setStep3Value,
     formState: { errors: step3Errors },
     watch: watchStep3,
   } = useForm<BookingStep3FormData>({
@@ -157,6 +168,7 @@ export default function BookingFlowPage() {
 
   const watchedPaymentMethod = watchStep3('paymentMethod');
   const watchedIsMobileService = watchStep3('isMobileService');
+  const watchedNote = watchStep3('note');
 
   const barber = barbers.find(b => b.id === screenParams?.barberId);
   const dates = generateDates();
@@ -168,8 +180,67 @@ export default function BookingFlowPage() {
       const validIds = requestedServices.filter(id => barber.services.some(service => service.id === id));
       setSelectedServices(validIds);
     }
+    if (screenParams?.preferredDate) setSelectedDate(screenParams.preferredDate);
+    if (screenParams?.preferredTime) setSelectedTime(screenParams.preferredTime);
+    if (screenParams?.rescheduleBookingId && (screenParams?.serviceIds || screenParams?.preferredTime)) {
+      setStep(2);
+    }
     setInitializedFromParams(true);
-  }, [barber, initializedFromParams, screenParams?.serviceIds]);
+  }, [barber, initializedFromParams, screenParams?.preferredDate, screenParams?.preferredTime, screenParams?.rescheduleBookingId, screenParams?.serviceIds]);
+
+  // Restore offline booking draft for this barber (#57)
+  useEffect(() => {
+    if (!barber || draftRestored) return;
+    try {
+      const raw = localStorage.getItem(BOOKING_DRAFT_KEY);
+      if (!raw) {
+        setDraftRestored(true);
+        return;
+      }
+      const draft = JSON.parse(raw) as {
+        barberId?: string;
+        serviceIds?: string[];
+        date?: string;
+        time?: string;
+        step?: 1 | 2 | 3;
+      };
+      if (draft.barberId !== barber.id) {
+        setDraftRestored(true);
+        return;
+      }
+      if (Array.isArray(draft.serviceIds) && draft.serviceIds.length) {
+        setSelectedServices(draft.serviceIds.filter(id => barber.services.some(s => s.id === id)));
+      }
+      if (draft.date) setSelectedDate(draft.date);
+      if (draft.time) setSelectedTime(draft.time);
+      if (draft.step === 2 || draft.step === 3) setStep(draft.step);
+    } catch {
+      // ignore corrupt draft
+    } finally {
+      setDraftRestored(true);
+    }
+  }, [barber, draftRestored]);
+
+  // Persist draft while composing (#57)
+  useEffect(() => {
+    if (!barber || !draftRestored || confirmed) return;
+    try {
+      if (!selectedServices.length && !selectedDate && !selectedTime) {
+        localStorage.removeItem(BOOKING_DRAFT_KEY);
+        return;
+      }
+      localStorage.setItem(BOOKING_DRAFT_KEY, JSON.stringify({
+        barberId: barber.id,
+        serviceIds: selectedServices,
+        date: selectedDate,
+        time: selectedTime,
+        step,
+        savedAt: Date.now(),
+      }));
+    } catch {
+      // ignore quota
+    }
+  }, [barber, confirmed, draftRestored, selectedDate, selectedServices, selectedTime, step]);
 
   // Cancel orphan booking if user returned from Stripe cancel URL
   useEffect(() => {
@@ -421,7 +492,19 @@ export default function BookingFlowPage() {
           paymentMethod: data.paymentMethod,
           total: saved.total_price,
           usedVoucher: Boolean(selectedVoucher),
+          reschedule: Boolean(screenParams?.rescheduleBookingId),
         });
+
+        // Soft reschedule (#58): cancel the previous booking after the new one is created
+        if (screenParams?.rescheduleBookingId && screenParams.rescheduleBookingId !== saved.id) {
+          try {
+            await updateBookingStatus(screenParams.rescheduleBookingId, 'cancelled');
+          } catch (rescheduleErr) {
+            console.error('Failed to cancel previous booking after reschedule:', rescheduleErr);
+            reportClientError(rescheduleErr instanceof Error ? rescheduleErr : new Error(String(rescheduleErr)));
+          }
+        }
+
         // If card payment selected, redirect to Stripe Checkout
         if (data.paymentMethod === 'card') {
           const baseUrl = window.location.origin;
@@ -491,27 +574,27 @@ export default function BookingFlowPage() {
         }
 
         // For non-card payments, proceed as before
-        // Notify the barber that they received a new booking
+        // #147 — include payable amount in booking notifications
+        const amountLabel = `${Math.round(saved.total_price).toLocaleString('ar-DZ')} د.ج`;
         try {
           await sendNotification({
             userId: barber.id,
             title: 'حجز جديد',
-            message: `لديك حجز جديد من ${appUser.full_name || 'عميل'} - ${selectedDate} ${selectedTime}`,
+            message: `لديك حجز جديد من ${appUser.full_name || 'عميل'} — ${selectedDate} ${selectedTime} · ${amountLabel}`,
             type: 'booking',
-            metadata: { booking_id: saved.id },
+            metadata: { booking_id: saved.id, amount: saved.total_price },
           });
         } catch (err) {
           console.error('Failed to notify barber:', err);
         }
 
-        // Notify the client that their booking was submitted
         try {
           await sendNotification({
             userId: appUser.id,
             title: 'تم إرسال طلب الحجز',
-            message: `تم إرسال طلب الحجز إلى ${barber.name} - سيتم تأكيده قريباً`,
+            message: `طلب إلى ${barber.name} — ${selectedDate} ${selectedTime} · ${amountLabel} (يُدفع عند الزيارة إن كان نقداً)`,
             type: 'booking',
-            metadata: { booking_id: saved.id },
+            metadata: { booking_id: saved.id, amount: saved.total_price },
           });
         } catch (err) {
           console.error('Failed to notify client:', err);
@@ -544,6 +627,7 @@ export default function BookingFlowPage() {
         await refreshData();
 
         setConfirmed(true);
+        try { localStorage.removeItem(BOOKING_DRAFT_KEY); } catch { /* ignore */ }
       }
     } catch (err) {
       console.error('Booking save failed:', err);
@@ -688,9 +772,33 @@ export default function BookingFlowPage() {
         </div>
       </div>
 
+      {!FEATURE_FLAGS.guestBookingEnabled && (
+        <div
+          role="status"
+          className="mx-4 mt-3 rounded-xl border px-3 py-2 flex items-center justify-between gap-2"
+          style={{ backgroundColor: `${themeConfig.colors.info}10`, borderColor: themeConfig.colors.border }}
+        >
+          <p className="text-[11px] font-bold" style={{ color: themeConfig.colors.text }}>
+            حجز الزائر بدون حساب
+          </p>
+          <span
+            className="text-[9px] font-black px-2 py-0.5 rounded-full shrink-0"
+            style={{ backgroundColor: `${themeConfig.colors.info}22`, color: themeConfig.colors.info }}
+          >
+            {COMING_SOON_LABEL}
+          </span>
+        </div>
+      )}
+
       {/* === STEP 1: SERVICES === */}
       {step === 1 && (
         <div className="px-4 mt-4">
+          <div className="rounded-xl border p-3 mb-3" style={{ backgroundColor: `${themeConfig.colors.info}08`, borderColor: themeConfig.colors.border }}>
+            <p className="text-[11px] font-bold" style={{ color: themeConfig.colors.text }}>سياسة الإلغاء</p>
+            <p className="text-[10px] mt-1 leading-5" style={{ color: themeConfig.colors.textMuted }}>
+              {cancelPolicySummary(settings.language)}
+            </p>
+          </div>
           <div className="flex items-center gap-2 mb-3">
             <img src={barber.avatar} alt={barber.name} className="w-8 h-8 rounded-lg object-cover" />
             <div><p className="text-xs font-bold" style={{ color: themeConfig.colors.text }}>{barber.name}</p><p className="text-[10px]" style={{ color: themeConfig.colors.textMuted }}>اختر الخدمات المطلوبة</p></div>
@@ -720,6 +828,12 @@ export default function BookingFlowPage() {
       {/* === STEP 2: DATE & TIME === */}
       {step === 2 && (
         <div className="px-4 mt-4">
+          <div className="rounded-xl border p-3 mb-3" style={{ backgroundColor: `${themeConfig.colors.info}08`, borderColor: themeConfig.colors.border }}>
+            <p className="text-[11px] font-bold" style={{ color: themeConfig.colors.text }}>سياسة الإلغاء</p>
+            <p className="text-[10px] mt-1 leading-5" style={{ color: themeConfig.colors.textMuted }}>
+              {cancelPolicySummary(settings.language)}
+            </p>
+          </div>
           {/* Date selector */}
           <div className="mb-4">
             <div className="flex items-center gap-2 mb-3"><Calendar size={16} style={{ color: themeConfig.colors.primary }} /><p className="text-xs font-bold" style={{ color: themeConfig.colors.text }}>اختر التاريخ</p></div>
@@ -843,40 +957,61 @@ export default function BookingFlowPage() {
             </div>
           )}
 
-          {/* Payment method */}
+          {/* Payment method — DZ launch: cash-first; Stripe/CCP hidden unless explicitly enabled (#137/#144) */}
           <div>
             <p className="text-xs font-bold mb-2" style={{ color: themeConfig.colors.text }}>طريقة الدفع</p>
-            <div className="grid grid-cols-4 gap-2">
-              {([
-                { key: 'cash' as const, label: 'نقداً', icon: Banknote, disabled: false, badge: null as string | null },
-                { key: 'card' as const, label: 'بطاقة', icon: CreditCard, disabled: !cardEnabled, badge: cardEnabled ? null : PAUSED_LABEL },
-                { key: 'ccp' as const, label: 'CCP', icon: CreditCard, disabled: !ccpEnabled, badge: ccpEnabled ? null : PAUSED_LABEL },
-                { key: 'baridi-mob' as const, label: 'بريدي موب', icon: Wallet, disabled: !ccpEnabled, badge: ccpEnabled ? null : PAUSED_LABEL },
-              ]).map(pm => (
-                <button key={pm.key} type="button" disabled={pm.disabled} onClick={() => {
-                  registerStep3('paymentMethod').onChange({ target: { value: pm.key } });
-                  trackProductEvent('Payment Method Selected', { method: pm.key, barberId: barber.id });
-                }}
-                  className="relative flex flex-col items-center gap-1 p-3 rounded-xl border transition-all disabled:opacity-45"
-                  title={pm.disabled ? 'هذه الطريقة متوقفة حالياً' : undefined}
-                  style={{ backgroundColor: watchedPaymentMethod === pm.key ? themeConfig.colors.primary + '08' : themeConfig.colors.surface, borderColor: watchedPaymentMethod === pm.key ? themeConfig.colors.primary : themeConfig.colors.border }}>
-                  {pm.badge && (
-                    <span className="absolute -top-1.5 left-1 text-[8px] font-black px-1 rounded bg-amber-100 text-amber-700">{pm.badge}</span>
-                  )}
-                  <pm.icon size={20} style={{ color: watchedPaymentMethod === pm.key ? themeConfig.colors.primary : themeConfig.colors.textMuted }} />
-                  <span className="text-[10px] font-bold" style={{ color: watchedPaymentMethod === pm.key ? themeConfig.colors.primary : themeConfig.colors.textMuted }}>{pm.label}</span>
-                </button>
-              ))}
-            </div>
+            {isCashOnlyPayments() || settings.countryCode === 'DZ' ? (
+              <div
+                className="flex items-center gap-3 p-3 rounded-xl border"
+                style={{ backgroundColor: themeConfig.colors.primary + '08', borderColor: themeConfig.colors.primary }}
+              >
+                <Banknote size={22} style={{ color: themeConfig.colors.primary }} />
+                <div className="flex-1 text-right">
+                  <p className="text-xs font-bold" style={{ color: themeConfig.colors.text }}>نقداً عند الزيارة</p>
+                  <p className="text-[10px] mt-0.5" style={{ color: themeConfig.colors.textMuted }}>
+                    الدفع عند الزيارة فقط · التسوية بالدينار الجزائري (DZD)
+                  </p>
+                </div>
+                <span className="text-[9px] font-black px-2 py-1 rounded-lg" style={{ backgroundColor: themeConfig.colors.success + '22', color: themeConfig.colors.success }}>
+                  الدفع عند الزيارة فقط
+                </span>
+              </div>
+            ) : (
+              <div className="grid grid-cols-4 gap-2">
+                {([
+                  { key: 'cash' as const, label: 'نقداً', icon: Banknote, disabled: false, badge: 'عند الزيارة' as string | null },
+                  { key: 'card' as const, label: 'بطاقة', icon: CreditCard, disabled: !cardEnabled, badge: cardEnabled ? null : PAUSED_LABEL },
+                  { key: 'ccp' as const, label: 'CCP', icon: CreditCard, disabled: !ccpEnabled, badge: ccpEnabled ? null : PAUSED_LABEL },
+                  { key: 'baridi-mob' as const, label: 'بريدي موب', icon: Wallet, disabled: !ccpEnabled, badge: ccpEnabled ? null : PAUSED_LABEL },
+                ]).map(pm => (
+                  <button key={pm.key} type="button" disabled={pm.disabled} onClick={() => {
+                    registerStep3('paymentMethod').onChange({ target: { value: pm.key } });
+                    trackProductEvent('Payment Method Selected', { method: pm.key, barberId: barber.id });
+                  }}
+                    className="relative flex flex-col items-center gap-1 p-3 rounded-xl border transition-all disabled:opacity-45"
+                    title={pm.disabled ? 'هذه الطريقة متوقفة حالياً' : undefined}
+                    style={{ backgroundColor: watchedPaymentMethod === pm.key ? themeConfig.colors.primary + '08' : themeConfig.colors.surface, borderColor: watchedPaymentMethod === pm.key ? themeConfig.colors.primary : themeConfig.colors.border }}>
+                    {pm.badge && (
+                      <span className="absolute -top-1.5 left-1 text-[8px] font-black px-1 rounded bg-amber-100 text-amber-700">{pm.badge}</span>
+                    )}
+                    <pm.icon size={20} style={{ color: watchedPaymentMethod === pm.key ? themeConfig.colors.primary : themeConfig.colors.textMuted }} />
+                    <span className="text-[10px] font-bold" style={{ color: watchedPaymentMethod === pm.key ? themeConfig.colors.primary : themeConfig.colors.textMuted }}>{pm.label}</span>
+                  </button>
+                ))}
+              </div>
+            )}
             <p className="text-[10px] mt-2 leading-5" style={{ color: themeConfig.colors.textMuted }}>
-              عند الإطلاق: الدفع النقدي عند الزيارة متاح. البطاقة وCCP وبريدي موب <span className="font-bold" style={{ color: themeConfig.colors.warning }}>{PAUSED_LABEL}</span> حتى تفعيل التحصيل.
+              المبلغ المعروض بعملة العرض للتقريب؛ التسوية عند الزيارة بالدينار الجزائري (DZD). البطاقة وStripe وCCP غير معروضة كخيار رئيسي في الجزائر حالياً.
+            </p>
+            <p className="text-[10px] mt-1 leading-5" style={{ color: themeConfig.colors.textMuted }}>
+              {refundPolicySummary(settings.language)}
             </p>
           </div>
 
           <div className="rounded-xl border p-3" style={{ backgroundColor: `${themeConfig.colors.info}08`, borderColor: themeConfig.colors.border }}>
             <p className="text-[11px] font-bold" style={{ color: themeConfig.colors.text }}>سياسة الإلغاء</p>
             <p className="text-[10px] mt-1 leading-5" style={{ color: themeConfig.colors.textMuted }}>
-              {CANCEL_POLICY.detailsAr}
+              {cancelPolicyDetails(settings.language)}
             </p>
           </div>
 
@@ -903,6 +1038,26 @@ export default function BookingFlowPage() {
           {/* Note */}
           <div>
             <p className="text-xs font-bold mb-2" style={{ color: themeConfig.colors.text }}>ملاحظات (اختياري)</p>
+            <div className="flex flex-wrap gap-2 mb-2">
+              {NOTE_QUICK_CHIPS.map(chip => {
+                const active = watchedNote === chip;
+                return (
+                  <button
+                    key={chip}
+                    type="button"
+                    onClick={() => setStep3Value('note', chip, { shouldDirty: true, shouldValidate: true })}
+                    className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg border transition-all"
+                    style={{
+                      backgroundColor: active ? themeConfig.colors.primary + '14' : themeConfig.colors.surface,
+                      borderColor: active ? themeConfig.colors.primary : themeConfig.colors.border,
+                      color: active ? themeConfig.colors.primary : themeConfig.colors.textMuted,
+                    }}
+                  >
+                    {chip}
+                  </button>
+                );
+              })}
+            </div>
             <textarea {...registerStep3('note')} placeholder="أي ملاحظات خاصة..." rows={2} className="w-full p-3 rounded-xl border text-xs resize-none" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border, color: themeConfig.colors.text }} />
           </div>
 

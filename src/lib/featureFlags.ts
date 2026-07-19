@@ -51,6 +51,40 @@ export const FEATURE_FLAGS = {
    * Gemini hairstyle image generation — paused (quota / cost).
    */
   aiImageGenerationEnabled: false,
+  /**
+   * Third-party APM (Sentry) — قريباً; client beacon to /api/client-error remains.
+   */
+  sentryApmEnabled: false,
+  /**
+   * SMS notifications (OTP / booking accept) — قريباً; in-app + web push used instead.
+   */
+  smsNotificationsEnabled: false,
+  /**
+   * Capacitor native shell split from SPA — قريباً.
+   */
+  capacitorSplitEnabled: false,
+  /**
+   * Partial SSR / prerender for barber & product pages — قريباً.
+   */
+  partialSsrEnabled: false,
+  /**
+   * In-app map clusters for discovery — قريباً (external Maps link remains).
+   */
+  mapClustersEnabled: false,
+  /**
+   * Guest (no-account) booking checkout — قريباً.
+   */
+  guestBookingEnabled: false,
+  /**
+   * Maintenance mode banner — enable with VITE_MAINTENANCE_MODE=true.
+   */
+  get maintenanceModeEnabled() {
+    try {
+      return String(import.meta.env.VITE_MAINTENANCE_MODE || '').toLowerCase() === 'true';
+    } catch {
+      return false;
+    }
+  },
 } as const;
 
 /** User-facing label for deferred launch features. */
