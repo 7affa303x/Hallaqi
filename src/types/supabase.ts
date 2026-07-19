@@ -1645,6 +1645,7 @@ export type Database = {
           accessibility_preferences: Json
           country_code: string
           currency_code: string
+          discovery_wilaya: string
           language: string
           notification_preferences: Json
           privacy_preferences: Json
@@ -1655,6 +1656,7 @@ export type Database = {
           accessibility_preferences?: Json
           country_code?: string
           currency_code?: string
+          discovery_wilaya?: string
           language?: string
           notification_preferences?: Json
           privacy_preferences?: Json
@@ -1665,6 +1667,7 @@ export type Database = {
           accessibility_preferences?: Json
           country_code?: string
           currency_code?: string
+          discovery_wilaya?: string
           language?: string
           notification_preferences?: Json
           privacy_preferences?: Json

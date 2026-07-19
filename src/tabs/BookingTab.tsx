@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useApp } from '@/contexts/useApp';
 import { barberTags, serviceCategories } from '@/data/mockData';
@@ -10,13 +10,15 @@ import type { BarberTag, ServiceCategory } from '@/types';
 import { rankBarberRecommendations } from '@/lib/recommendations';
 import { useI18n } from '@/hooks/useI18n';
 import { isBarberOpenNow, isDisplayableBarber } from '@/lib/utils';
+import { getNextAvailableSlotHint, nextSlotLabel } from '@/lib/scheduling';
+import { getRecentBarberIds } from '@/lib/deviceStorage';
 import { trackProductEvent } from '@/lib/product-analytics';
 import type { TranslationKey } from '@/lib/i18n';
 import { translate } from '@/lib/i18n';
 import {
   Search, SlidersHorizontal, MapPin, Star, Clock, Car, Heart,
   Scissors, BadgeCheck, Zap, TrendingUp, ChevronLeft, X,
-  Filter, Navigation, Globe, Sparkles, ShoppingBag, CalendarDays
+  Filter, Navigation, Globe, Sparkles, ShoppingBag, CalendarDays, GitCompare
 } from 'lucide-react';
 
 const tagIcons: Record<string, typeof Zap> = {
@@ -49,18 +51,22 @@ function distanceInKm(
 }
 
 export default function BookingTab() {
-  const { barbers, bookings, currentUser, themeConfig, settings, toggleFollow, navigate, isLoading, setActiveTab } = useApp();
+  const { barbers, bookings, currentUser, themeConfig, settings, updateSettings, toggleFollow, navigate, isLoading, setActiveTab } = useApp();
   const { isAuthenticated } = useAuth();
   const { t, money } = useI18n();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTags, setSelectedTags] = useState<BarberTag[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [onlyFavorites, setOnlyFavorites] = useState(false);
-  const [selectedWilaya, setSelectedWilaya] = useState(() => localStorage.getItem('hallaqi-discovery-wilaya') || '');
+  const [selectedWilaya, setSelectedWilaya] = useState(
+    () => settings.discoveryWilaya || localStorage.getItem('hallaqi-discovery-wilaya') || ''
+  );
   const [showFilters, setShowFilters] = useState(false);
   const [sortBy, setSortBy] = useState<'smart' | 'rating' | 'distance' | 'price' | 'newest'>('smart');
   const [openNowOnly, setOpenNowOnly] = useState(false);
   const [mobileOnly, setMobileOnly] = useState(false);
+  const [compareIds, setCompareIds] = useState<string[]>([]);
+  const [recentIds, setRecentIds] = useState<string[]>(() => getRecentBarberIds());
   const [userCoordinates, setUserCoordinates] = useState<{ lat: number; lng: number } | null>(null);
   const [locationMessage, setLocationMessage] = useState('');
   const userLocation = currentUser as { city?: string; wilaya?: string } | null;
@@ -70,6 +76,18 @@ export default function BookingTab() {
     () => [...new Set(barbers.filter(isDisplayableBarber).map(barber => barber.wilaya).filter(Boolean))].sort(),
     [barbers]
   );
+
+  useEffect(() => {
+    if (settings.discoveryWilaya !== undefined && settings.discoveryWilaya !== selectedWilaya) {
+      setSelectedWilaya(settings.discoveryWilaya);
+    }
+  // Only sync when server prefs arrive / change
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings.discoveryWilaya]);
+
+  useEffect(() => {
+    setRecentIds(getRecentBarberIds());
+  }, [barbers]);
 
   const popularServiceNames = useMemo(() => {
     const counts = new Map<string, number>();
@@ -90,7 +108,24 @@ export default function BookingTab() {
     setSelectedWilaya(wilaya);
     if (wilaya) localStorage.setItem('hallaqi-discovery-wilaya', wilaya);
     else localStorage.removeItem('hallaqi-discovery-wilaya');
+    updateSettings({ discoveryWilaya: wilaya });
   };
+
+  const toggleCompare = (barberId: string) => {
+    setCompareIds(prev => {
+      if (prev.includes(barberId)) return prev.filter(id => id !== barberId);
+      if (prev.length >= 3) return prev;
+      return [...prev, barberId];
+    });
+  };
+
+  const recentBarbers = useMemo(
+    () => recentIds
+      .map(id => barbers.find(b => b.id === id))
+      .filter((b): b is NonNullable<typeof b> => Boolean(b && isDisplayableBarber(b)))
+      .slice(0, 8),
+    [barbers, recentIds]
+  );
 
   const distances = useMemo(() => new Map(
     barbers.map(barber => [
@@ -327,7 +362,7 @@ export default function BookingTab() {
               return;
             }
             setOnlyFavorites(value => !value);
-          }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all" style={{ backgroundColor: onlyFavorites ? '#EF444420' : themeConfig.colors.surface, color: onlyFavorites ? '#EF4444' : themeConfig.colors.textMuted, border: `1.5px solid ${onlyFavorites ? '#EF4444' : themeConfig.colors.border}` }}><Heart size={12} className={onlyFavorites ? 'fill-current' : ''} />المفضلة</button>
+          }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all" style={{ backgroundColor: onlyFavorites ? '#EF444420' : themeConfig.colors.surface, color: onlyFavorites ? '#EF4444' : themeConfig.colors.textMuted, border: `1.5px solid ${onlyFavorites ? '#EF4444' : themeConfig.colors.border}` }}><Heart size={12} className={onlyFavorites ? 'fill-current' : ''} />{tx('favoritesOnly')}</button>
           <button
             type="button"
             onClick={() => setOpenNowOnly(value => !value)}
@@ -338,7 +373,7 @@ export default function BookingTab() {
               border: `1.5px solid ${openNowOnly ? themeConfig.colors.success : themeConfig.colors.border}`,
             }}
           >
-            <Clock size={12} /> مفتوح الآن
+            <Clock size={12} /> {tx('openNowFilter')}
           </button>
           <button
             type="button"
@@ -350,7 +385,7 @@ export default function BookingTab() {
               border: `1.5px solid ${mobileOnly ? '#3B82F6' : themeConfig.colors.border}`,
             }}
           >
-            <Car size={12} /> متنقل فقط
+            <Car size={12} /> {tx('mobileOnlyFilter')}
           </button>
           {barberTags.slice(0, 6).map(tag => {
             const isSelected = selectedTags.includes(tag.key as BarberTag);
@@ -408,11 +443,11 @@ export default function BookingTab() {
               <p className="text-xs font-medium mb-2" style={{ color: themeConfig.colors.textMuted }}>الترتيب حسب</p>
               <div className="flex gap-2 flex-wrap">
                 {[
-                  { key: 'smart' as const, label: 'ذكي', icon: Sparkles },
-                  { key: 'rating' as const, label: 'التقييم', icon: Star },
-                  { key: 'distance' as const, label: 'المسافة', icon: MapPin },
-                  { key: 'price' as const, label: 'السعر', icon: Filter },
-                  { key: 'newest' as const, label: 'الأحدث', icon: Clock },
+                  { key: 'smart' as const, label: tx('sortSmart'), icon: Sparkles },
+                  { key: 'rating' as const, label: tx('sortRating'), icon: Star },
+                  { key: 'distance' as const, label: tx('sortDistance'), icon: MapPin },
+                  { key: 'price' as const, label: tx('sortPrice'), icon: Filter },
+                  { key: 'newest' as const, label: tx('sortNewest'), icon: Clock },
                 ].map(opt => (
                   <button
                     key={opt.key}
@@ -437,6 +472,36 @@ export default function BookingTab() {
         )}
         {locationMessage && <p role="status" className="text-[10px] mt-2 text-center" style={{ color: themeConfig.colors.textMuted }}>{locationMessage}</p>}
       </div>
+
+      {recentBarbers.length > 0 && !searchQuery && (
+        <section className="px-4 mt-3" aria-labelledby="recent-title">
+          <div className="flex items-center gap-2 mb-2">
+            <Clock size={14} style={{ color: themeConfig.colors.textMuted }} />
+            <h2 id="recent-title" className="text-sm font-bold" style={{ color: themeConfig.colors.text }}>
+              {tx('recentlyVisited')}
+            </h2>
+          </div>
+          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+            {recentBarbers.map(barber => (
+              <button
+                key={`recent-${barber.id}`}
+                type="button"
+                onClick={() => navigate('barber-detail', { barberId: barber.id })}
+                className="min-w-[140px] p-2.5 rounded-2xl border text-right"
+                style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}
+              >
+                <div className="flex items-center gap-2">
+                  <img src={barber.avatar} alt="" className="w-9 h-9 rounded-xl object-cover" loading="lazy" />
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-bold truncate" style={{ color: themeConfig.colors.text }}>{barber.name}</p>
+                    <p className="text-[9px] truncate" style={{ color: themeConfig.colors.textMuted }}>{barber.wilaya}</p>
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
 
       {isAuthenticated && !searchQuery && selectedTags.length === 0 && recommendations.length > 0 && (
         <section className="px-4 mt-3" aria-labelledby="recommended-title">
@@ -481,7 +546,7 @@ export default function BookingTab() {
       <div className="px-4 space-y-3 mt-2">
         {!showSkeletons && filteredBarbers.length > 0 && (
           <p className="text-xs font-medium pt-1" style={{ color: themeConfig.colors.textMuted }}>
-            {filteredBarbers.length} حلاقاً
+            {tx('barbersCount').replace('{n}', String(filteredBarbers.length))}
           </p>
         )}
         {showSkeletons ? (
@@ -493,6 +558,8 @@ export default function BookingTab() {
         ) : (
           filteredBarbers.map((barber, index) => {
             const openNow = isBarberOpenNow(barber.workingHours);
+            const nextSlot = nextSlotLabel(getNextAvailableSlotHint(barber.workingHours), settings.language);
+            const inCompare = compareIds.includes(barber.id);
             const servicePrices = barber.services.map(s => s.price).filter(p => p > 0);
             const minPrice = servicePrices.length ? Math.min(...servicePrices) : null;
             const maxPrice = servicePrices.length ? Math.max(...servicePrices) : null;
@@ -508,27 +575,45 @@ export default function BookingTab() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.04, duration: 0.35 }}
               className="rounded-2xl overflow-hidden border transition-shadow duration-300 hover:shadow-md"
-              style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}
+              style={{
+                backgroundColor: themeConfig.colors.surface,
+                borderColor: inCompare ? themeConfig.colors.primary : themeConfig.colors.border,
+              }}
             >
               {/* Cover */}
               <div className="relative h-32 overflow-hidden">
                 <img src={barber.coverImage} alt={barber.name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                <div className="absolute top-2 left-2 flex gap-1 flex-wrap justify-end">
+                <button
+                  type="button"
+                  onClick={() => toggleCompare(barber.id)}
+                  className="absolute top-2 right-2 w-8 h-8 rounded-lg flex items-center justify-center text-white text-[10px] font-bold"
+                  style={{ backgroundColor: inCompare ? themeConfig.colors.primary : 'rgba(0,0,0,.45)' }}
+                  aria-pressed={inCompare}
+                  title={tx('compare')}
+                >
+                  <GitCompare size={14} />
+                </button>
+                <div className="absolute top-2 left-2 flex gap-1 flex-wrap justify-end max-w-[70%]">
                   <span
                     className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold text-white"
                     style={{ backgroundColor: openNow ? themeConfig.colors.success : '#6B7280' }}
                   >
-                    <Clock size={10} /> {openNow ? 'مفتوح الآن' : 'مغلق'}
+                    <Clock size={10} /> {openNow ? tx('openNow') : tx('closedNow')}
                   </span>
+                  {nextSlot && (
+                    <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold text-white bg-black/50">
+                      <CalendarDays size={10} /> {nextSlot}
+                    </span>
+                  )}
                   {barber.isMobile && (
                     <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold text-white bg-blue-500">
-                      <Car size={10} /> متنقل
+                      <Car size={10} /> {tx('mobileBarber')}
                     </span>
                   )}
                   {barber.isVerified && (
                     <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold text-white bg-sky-500">
-                      <BadgeCheck size={10} /> موثق
+                      <BadgeCheck size={10} /> {tx('verified')}
                     </span>
                   )}
                 </div>
@@ -664,9 +749,9 @@ export default function BookingTab() {
       {!showSkeletons && filteredBarbers.length === 0 && (
         <EmptyState
           icon={Search}
-          title="لا توجد نتائج مطابقة"
-          description="جرب تغيير كلمات البحث أو الفلاتر"
-          actionLabel="إعادة تعيين الفلاتر"
+          title={tx('noResults')}
+          description={settings.language === 'en' ? 'Try changing search or filters' : settings.language === 'fr' ? 'Modifiez la recherche ou les filtres' : 'جرب تغيير كلمات البحث أو الفلاتر'}
+          actionLabel={tx('resetFilters')}
           onAction={() => {
             setSearchQuery('');
             setSelectedTags([]);
@@ -675,10 +760,25 @@ export default function BookingTab() {
             setOnlyFavorites(false);
             setOpenNowOnly(false);
             setMobileOnly(false);
+            setCompareIds([]);
             setSortBy('smart');
           }}
           themeConfig={themeConfig}
         />
+      )}
+
+      {compareIds.length >= 2 && (
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-[80] w-[calc(100%-2rem)] max-w-md">
+          <button
+            type="button"
+            onClick={() => navigate('compare-barbers', { barberIds: compareIds.join(',') })}
+            className="w-full h-12 rounded-2xl text-sm font-bold text-white shadow-lg flex items-center justify-center gap-2"
+            style={{ backgroundColor: themeConfig.colors.primary }}
+          >
+            <GitCompare size={16} />
+            {tx('compareNow')} ({compareIds.length})
+          </button>
+        </div>
       )}
 
       <div className="px-4 mt-6 mb-4 text-center space-y-2">

@@ -171,8 +171,13 @@ export default function BookingFlowPage() {
       const validIds = requestedServices.filter(id => barber.services.some(service => service.id === id));
       setSelectedServices(validIds);
     }
+    if (screenParams?.preferredDate) setSelectedDate(screenParams.preferredDate);
+    if (screenParams?.preferredTime) setSelectedTime(screenParams.preferredTime);
+    if (screenParams?.rescheduleBookingId && (screenParams?.serviceIds || screenParams?.preferredTime)) {
+      setStep(2);
+    }
     setInitializedFromParams(true);
-  }, [barber, initializedFromParams, screenParams?.serviceIds]);
+  }, [barber, initializedFromParams, screenParams?.preferredDate, screenParams?.preferredTime, screenParams?.rescheduleBookingId, screenParams?.serviceIds]);
 
   // Restore offline booking draft for this barber (#57)
   useEffect(() => {
@@ -478,7 +483,19 @@ export default function BookingFlowPage() {
           paymentMethod: data.paymentMethod,
           total: saved.total_price,
           usedVoucher: Boolean(selectedVoucher),
+          reschedule: Boolean(screenParams?.rescheduleBookingId),
         });
+
+        // Soft reschedule (#58): cancel the previous booking after the new one is created
+        if (screenParams?.rescheduleBookingId && screenParams.rescheduleBookingId !== saved.id) {
+          try {
+            await updateBookingStatus(screenParams.rescheduleBookingId, 'cancelled');
+          } catch (rescheduleErr) {
+            console.error('Failed to cancel previous booking after reschedule:', rescheduleErr);
+            reportClientError(rescheduleErr instanceof Error ? rescheduleErr : new Error(String(rescheduleErr)));
+          }
+        }
+
         // If card payment selected, redirect to Stripe Checkout
         if (data.paymentMethod === 'card') {
           const baseUrl = window.location.origin;
