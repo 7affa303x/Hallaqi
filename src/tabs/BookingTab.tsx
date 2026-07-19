@@ -74,6 +74,7 @@ export default function BookingTab() {
   const [recentIds, setRecentIds] = useState<string[]>(() => getRecentBarberIds());
   const [userCoordinates, setUserCoordinates] = useState<{ lat: number; lng: number } | null>(null);
   const [locationMessage, setLocationMessage] = useState('');
+  const [serviceHint, setServiceHint] = useState<string | null>(null);
   const userLocation = currentUser as { city?: string; wilaya?: string } | null;
   const preferredCity = userLocation?.city || userLocation?.wilaya || 'الجزائر';
   const tx = (key: TranslationKey) => translate(settings.language, key);
@@ -93,6 +94,17 @@ export default function BookingTab() {
   useEffect(() => {
     setRecentIds(getRecentBarberIds());
   }, [barbers]);
+
+  // #154 — apply service hint from forum tags once
+  useEffect(() => {
+    try {
+      const hint = localStorage.getItem('hallaqi-discovery-service-hint');
+      if (!hint) return;
+      localStorage.removeItem('hallaqi-discovery-service-hint');
+      setServiceHint(hint);
+      setSearchQuery(hint);
+    } catch { /* ignore */ }
+  }, []);
 
   // Restore discovery filters from shareable URL params
   useEffect(() => {
@@ -398,6 +410,13 @@ export default function BookingTab() {
             </button>
           )}
         </div>
+
+        {serviceHint && (
+          <div className="mb-2 flex items-center justify-between gap-2 px-3 py-2 rounded-xl text-[11px]" style={{ backgroundColor: themeConfig.colors.primary + '12', color: themeConfig.colors.primary }}>
+            <span>من المنتدى: بحث عن «{serviceHint}»</span>
+            <button type="button" onClick={() => { setServiceHint(null); setSearchQuery(''); }} className="font-bold underline shrink-0">مسح</button>
+          </div>
+        )}
 
         {popularServiceNames.length > 0 && (
           <div className="flex gap-2 overflow-x-auto pb-2 mb-1 scrollbar-hide">

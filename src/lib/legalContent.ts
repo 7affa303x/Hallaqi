@@ -160,6 +160,39 @@ const whyHallaqi: Record<Lang, { title: string; sections: Section[] }> = {
   },
 };
 
+const mentions: Record<Lang, { title: string; sections: Section[] }> = {
+  ar: {
+    title: 'الإشعارات القانونية (Mentions légales)',
+    sections: [
+      ['المحرّر', 'منصة Hallaqi (حلاقي) — خدمة رقمية لاكتشاف الحلاقين والمنتجات في الجزائر. للتواصل: support@hallaqi.app'],
+      ['الاستضافة', 'التطبيق مستضاف عبر بنية سحابية (Vercel) مع قاعدة بيانات Supabase.'],
+      ['الملكية الفكرية', 'اسم وشعار Hallaqi وأصوله البصرية ملك للمنتج. مكتبات مفتوحة المصدر تخضع لتراخيصها.'],
+      ['المسؤولية', 'الحجز والدفع النقدي يتمّان بين العميل والحلاق. الروابط الخارجية (Visit Store) على مسؤولية الطرفين.'],
+      ['البيانات', 'انظر سياسة الخصوصية. التحليلات اختيارية بموافقة صريحة.'],
+    ],
+  },
+  fr: {
+    title: 'Mentions légales',
+    sections: [
+      ['Éditeur', 'Hallaqi — service numérique de découverte coiffeurs/produits en Algérie. Contact : support@hallaqi.app'],
+      ['Hébergement', 'Application hébergée (Vercel) avec base Supabase.'],
+      ['Propriété intellectuelle', 'Marque et assets Hallaqi ; libs open-source selon leurs licences.'],
+      ['Responsabilité', 'Réservation et paiement cash entre client et coiffeur. Liens externes Visit Store sous responsabilité des parties.'],
+      ['Données', 'Voir la politique de confidentialité. Analytics optionnelles avec consentement.'],
+    ],
+  },
+  en: {
+    title: 'Legal notice',
+    sections: [
+      ['Publisher', 'Hallaqi — digital discovery for barbers/products in Algeria. Contact: support@hallaqi.app'],
+      ['Hosting', 'App hosted on Vercel with Supabase database.'],
+      ['IP', 'Hallaqi brand/assets; open-source libs under their licenses.'],
+      ['Liability', 'Booking and cash payment are between client and barber. Visit Store links are between buyer and seller.'],
+      ['Data', 'See Privacy Policy. Analytics are optional with explicit consent.'],
+    ],
+  },
+};
+
 export function getLegalContent(kind: 'privacy' | 'terms' | 'licenses', lang: Lang) {
   const table = kind === 'privacy' ? privacy : kind === 'terms' ? terms : licenses;
   return table[lang] || table.ar;
@@ -171,4 +204,8 @@ export function getHelpContent(lang: Lang) {
 
 export function getWhyHallaqiContent(lang: Lang) {
   return whyHallaqi[lang] || whyHallaqi.ar;
+}
+
+export function getMentionsLegales(lang: Lang) {
+  return mentions[lang] || mentions.ar;
 }

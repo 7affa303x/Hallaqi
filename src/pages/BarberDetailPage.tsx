@@ -22,6 +22,8 @@ import type { Barber } from '@/types';
 import BrandLogo from '@/components/BrandLogo';
 import { pushRecentBarber } from '@/lib/deviceStorage';
 import { useI18n } from '@/hooks/useI18n';
+import { upsertJsonLdScript } from '@/lib/seo/jsonLd';
+import { addSessionBytes } from '@/lib/sessionDataMeter';
 
 // Saturday=0, Sunday=1, Monday=2, Tuesday=3, Wednesday=4, Thursday=5, Friday=6
 const daysArSchedule = ['السبت', 'الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة'];
@@ -129,10 +131,7 @@ export default function BarberDetailPage() {
     const description = document.querySelector<HTMLMetaElement>('meta[name="description"]');
     const previousDescription = description?.content;
     if (description) description.content = `احجز خدمات ${barber.name} في ${barber.wilaya}. التقييم ${barber.rating} من 5.`;
-    const script = document.createElement('script');
-    script.type = 'application/ld+json';
-    script.id = 'hallaqi-local-business';
-    script.text = JSON.stringify({
+    const cleanup = upsertJsonLdScript('hallaqi-local-business', {
       '@context': 'https://schema.org',
       '@type': 'HairSalon',
       name: barber.name,
@@ -157,11 +156,10 @@ export default function BarberDetailPage() {
       } : undefined,
       priceRange: barber.priceRange,
     });
-    document.head.appendChild(script);
     return () => {
       document.title = previousTitle;
       if (description && previousDescription) description.content = previousDescription;
-      script.remove();
+      cleanup();
     };
   }, [barber]);
 
@@ -446,7 +444,10 @@ export default function BarberDetailPage() {
           ) : mapSrc ? (
             <button
               type="button"
-              onClick={() => setMapLoaded(true)}
+              onClick={() => {
+                setMapLoaded(true);
+                addSessionBytes(350_000);
+              }}
               className="text-center px-4 py-6"
               disabled={lowData}
             >

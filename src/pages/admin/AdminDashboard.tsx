@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
+import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useApp } from '@/contexts/useApp';
 import { supabase } from '@/supabase/client';
@@ -27,6 +27,8 @@ import {
 import type { SellerPlacementRequest } from '@/lib/marketplace/sellerInventory';
 import { FEATURE_FLAGS } from '@/lib/featureFlags';
 import PausedFeatureBanner from '@/components/PausedFeatureBanner';
+import { buildFraudAlerts } from '@/lib/adminFraudAlerts';
+import { currentWeekDecisions } from '@/lib/weeklyDecisions';
 import {
   listMarketplaceReports,
   readMarketplaceSectionConfig,
@@ -284,6 +286,12 @@ export default function AdminDashboard() {
     return labels[role] || role;
   };
 
+  const fraudAlerts = useMemo(
+    () => buildFraudAlerts(recentPayments, recentBookings),
+    [recentPayments, recentBookings],
+  );
+  const weekDecisions = useMemo(() => currentWeekDecisions(), []);
+
   if (!isAdmin) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4" style={{ backgroundColor: themeConfig.colors.background }}>
@@ -363,6 +371,43 @@ export default function AdminDashboard() {
         )}
         <div className="p-3 rounded-xl text-[11px] leading-5" style={{ backgroundColor: `${themeConfig.colors.warning}12`, color: themeConfig.colors.warning }}>
           تنبيه الإطلاق: دفع البطاقة/CCP وترقية الاشتراكات المدفوعة <strong>متوقفة</strong> في الواجهة حتى التفعيل اليدوي.
+        </div>
+        {/* #146 simple fraud / anomaly signals */}
+        {fraudAlerts.length > 0 && (
+          <div className="space-y-2">
+            <h3 className="text-sm font-bold" style={{ color: themeConfig.colors.text }}>تنبيهات احتيال / شذوذ</h3>
+            {fraudAlerts.map(alert => (
+              <div
+                key={alert.id}
+                className="p-3 rounded-xl text-[11px] leading-5"
+                style={{
+                  backgroundColor: alert.severity === 'warn' ? `${themeConfig.colors.error}12` : `${themeConfig.colors.info}12`,
+                  color: alert.severity === 'warn' ? themeConfig.colors.error : themeConfig.colors.textMuted,
+                }}
+              >
+                <p className="font-bold">{alert.titleAr}</p>
+                <p className="mt-0.5 opacity-90">{alert.detailAr}</p>
+              </div>
+            ))}
+          </div>
+        )}
+        {/* #199 weekly product decisions */}
+        <div className="rounded-xl border p-3 space-y-2" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
+          <h3 className="text-sm font-bold" style={{ color: themeConfig.colors.text }}>قرارات المنتج هذا الأسبوع</h3>
+          {weekDecisions.map((d, i) => (
+            <div key={`${d.week}-${i}`} className="flex items-start gap-2 text-[11px]">
+              <span
+                className="shrink-0 px-1.5 py-0.5 rounded font-bold"
+                style={{
+                  backgroundColor: d.status === 'done' ? `${themeConfig.colors.success}18` : d.status === 'doing' ? `${themeConfig.colors.warning}18` : `${themeConfig.colors.info}18`,
+                  color: d.status === 'done' ? themeConfig.colors.success : d.status === 'doing' ? themeConfig.colors.warning : themeConfig.colors.info,
+                }}
+              >
+                {d.status === 'done' ? 'تم' : d.status === 'doing' ? 'جارٍ' : 'قادم'}
+              </span>
+              <p style={{ color: themeConfig.colors.textMuted }}>{d.ar}</p>
+            </div>
+          ))}
         </div>
         {(!FEATURE_FLAGS.adminAuditLogEnabled || !FEATURE_FLAGS.moderatorConsoleEnabled) && (
           <PausedFeatureBanner

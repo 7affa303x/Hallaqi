@@ -9,6 +9,9 @@ import { looksLikeMedicalQuestion, medicalRefusalMessage } from '@/lib/ai/medica
 import { aiAdviceExamples, AI_DAILY_QUOTA_HINT } from '@/lib/ai/adviceExamples';
 import { getCachedAdvice, matchStaticFaq, setCachedAdvice } from '@/lib/ai/faqCache';
 import { algeriaSeasonContextLine } from '@/lib/algeriaSeasons';
+import { addSessionBytes } from '@/lib/sessionDataMeter';
+import { getMarketplaceProducts } from '@/supabase/marketplace';
+import type { MarketplaceProduct } from '@/types/marketplace';
 import { translateApiError } from '@/lib/apiErrors';
 import { trackProductEvent } from '@/lib/product-analytics';
 import {
@@ -62,6 +65,7 @@ export default function AIAdvisorPage() {
   const [recentQuestions, setRecentQuestions] = useState<string[]>([]);
   const [rating, setRating] = useState<'up' | 'down' | null>(null);
   const [replyStyle, setReplyStyle] = useState<'ar' | 'darija' | 'fr'>('ar');
+  const [marketHints, setMarketHints] = useState<MarketplaceProduct[]>([]);
 
   useEffect(() => {
     void getAICapabilities().then(setCapabilities).catch(() => {
@@ -133,8 +137,24 @@ export default function AIAdvisorPage() {
     setAdvice(null);
     setStyleImage('');
     setRating(null);
+    setMarketHints([]);
     try {
       if (mode === 'advice') {
+        // #133 — low-data / light path: FAQ cache only, no network model
+        if (settings.accessibility.lowData) {
+          const light = matchStaticFaq(q) || getCachedAdvice(q);
+          if (light) {
+            setAdvice(light);
+            setRecentQuestions(prev => [q, ...prev.filter(x => x !== q)].slice(0, 3));
+            return;
+          }
+          setError(settings.language === 'en'
+            ? 'Low-data mode: only cached FAQ answers. Disable low-data for full AI.'
+            : settings.language === 'fr'
+              ? 'Mode données faibles : FAQ en cache seulement. Désactivez pour l’IA complète.'
+              : 'وضع بيانات منخفضة: إجابات FAQ المخزّنة فقط. عطّله لاستخدام المساعد الكامل.');
+          return;
+        }
         const faq = matchStaticFaq(q) || getCachedAdvice(q);
         if (faq) {
           setAdvice(faq);
@@ -155,6 +175,14 @@ export default function AIAdvisorPage() {
         setAdvice(result);
         setCachedAdvice(q, result);
         setRecentQuestions(prev => [q, ...prev.filter(x => x !== q)].slice(0, 3));
+        addSessionBytes(8_000);
+        // #130 cautious marketplace hints (rule-based, not invented)
+        if (/منتج|سوق|زيت|شامبو|product|market|huile|shampoing/i.test(q)) {
+          try {
+            const products = await getMarketplaceProducts({});
+            setMarketHints(products.filter(p => p.isActive).slice(0, 3));
+          } catch { /* ignore */ }
+        }
       } else {
         setStyleImage(await requestStyleImage(q));
       }
@@ -350,6 +378,25 @@ export default function AIAdvisorPage() {
             <p className="text-sm leading-relaxed" style={{ color: themeConfig.colors.text }}>{advice.answer}</p>
             {advice.suggestedServices.length > 0 && <div className="flex flex-wrap gap-1">{advice.suggestedServices.map(service => <span key={service} className="text-[10px] px-2 py-1 rounded-full" style={{ backgroundColor: themeConfig.colors.primary + '12', color: themeConfig.colors.primary }}>{service}</span>)}</div>}
             {advice.cautions.map(caution => <p key={caution} className="text-[10px]" style={{ color: themeConfig.colors.warning }}>• {caution}</p>)}
+            {marketHints.length > 0 && (
+              <div className="pt-2 border-t space-y-2" style={{ borderColor: themeConfig.colors.border }}>
+                <p className="text-[11px] font-bold" style={{ color: themeConfig.colors.text }}>منتجات سوق ذات صلة (اكتشف بحذر)</p>
+                <div className="flex flex-wrap gap-2">
+                  {marketHints.map(p => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => navigate('product-detail', { productId: p.id })}
+                      className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg border"
+                      style={{ borderColor: themeConfig.colors.border, color: themeConfig.colors.textMuted, backgroundColor: themeConfig.colors.background }}
+                    >
+                      {p.title.slice(0, 28)}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[9px]" style={{ color: themeConfig.colors.textMuted }}>الشراء عبر Visit Store خارج التطبيق</p>
+              </div>
+            )}
             {suggestedBarbers.length > 0 && (
               <div className="pt-2 border-t space-y-2" style={{ borderColor: themeConfig.colors.border }}>
                 <p className="text-[11px] font-bold" style={{ color: themeConfig.colors.text }}>حلاقون على المنصة</p>

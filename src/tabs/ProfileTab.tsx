@@ -25,10 +25,15 @@ import ChangelogPage from '@/pages/ChangelogPage';
 import { useI18n } from '@/hooks/useI18n';
 import { FEATURE_FLAGS, isWebPushConfigured, isWhatsAppSupportConfigured, PAUSED_LABEL, COMING_SOON_LABEL } from '@/lib/featureFlags';
 import { CANCEL_POLICY } from '@/lib/cancelPolicy';
-import { getLegalContent, getHelpContent, getWhyHallaqiContent } from '@/lib/legalContent';
+import { getLegalContent, getHelpContent, getWhyHallaqiContent, getMentionsLegales } from '@/lib/legalContent';
 import { refundPolicySummary, paymentMethodsLegalNote } from '@/lib/paymentPolicy';
 import { BARBER_GLOSSARY, glossaryLabel, glossaryMeaning } from '@/lib/barberGlossary';
 import { ALGERIA_SEASONS, currentSeasonHints, seasonLabel, seasonTip } from '@/lib/algeriaSeasons';
+import { collectTestimonials } from '@/lib/testimonials';
+import { WILAYA_EXPANSION } from '@/lib/wilayaExpansion';
+import { PUBLIC_ROADMAP } from '@/lib/publicRoadmap';
+import { weeklyRetentionSummary } from '@/lib/retention';
+import { formatSessionData, getSessionBytes } from '@/lib/sessionDataMeter';
 import { readConsentLog } from '@/lib/analyticsConsent';
 import {
   createIdVerificationRequest,
@@ -85,7 +90,7 @@ const iconMap: Record<string, LucideIcon> = {
 type ProfileSubPage = 'main' | 'theme' | 'animation' | 'language' | 'country' | 'currency' | 'region' | 'notifications' |
   'privacy' | 'account' | 'subscription' | 'payment' | 'id-verification' |
   'linked-accounts' | 'help' | 'about' | 'changelog' | 'badges' | 'stats' | 'edit-profile' | 'services' | 'loyalty' |
-  'accessibility' | 'privacy-policy' | 'terms' | 'licenses' | 'security' | 'saves' | 'glossary' | 'why' | 'seasons';
+  'accessibility' | 'privacy-policy' | 'terms' | 'licenses' | 'security' | 'saves' | 'glossary' | 'why' | 'seasons' | 'testimonials' | 'roadmap' | 'expansion' | 'mentions';
 
 export default function ProfileTab() {
   const { themeConfig, settings, navigate, setActiveTab, unreadCount, bookings, barbers, screenParams } = useApp();
@@ -125,6 +130,10 @@ export default function ProfileTab() {
   if (subPage === 'why') return <InformationPage onBack={() => setSubPage('main')} kind="why" />;
   if (subPage === 'glossary') return <GlossaryPage onBack={() => setSubPage('main')} />;
   if (subPage === 'seasons') return <SeasonsPage onBack={() => setSubPage('main')} />;
+  if (subPage === 'testimonials') return <TestimonialsPage onBack={() => setSubPage('main')} />;
+  if (subPage === 'roadmap') return <PublicRoadmapPage onBack={() => setSubPage('main')} />;
+  if (subPage === 'expansion') return <ExpansionGuidePage onBack={() => setSubPage('main')} />;
+  if (subPage === 'mentions') return <MentionsPage onBack={() => setSubPage('main')} />;
   if (subPage === 'privacy-policy') return <LegalPage onBack={() => setSubPage('main')} kind="privacy" />;
   if (subPage === 'terms') return <LegalPage onBack={() => setSubPage('main')} kind="terms" />;
   if (subPage === 'licenses') return <LegalPage onBack={() => setSubPage('main')} kind="licenses" />;
@@ -530,7 +539,7 @@ export default function ProfileTab() {
                   if (item.id === 'featureRequest') { window.location.href = 'mailto:support@hallaqi.app?subject=Hallaqi%20Feature%20Request'; return; }
                   const pageMap: Record<string, ProfileSubPage> = {
                     theme: 'theme', animation: 'animation', language: 'region', country: 'region', currency: 'region', fontSize: 'accessibility',
-                    regionSettings: 'region', aboutApp: 'about', whyHallaqi: 'why', glossary: 'glossary', seasons: 'seasons',
+                    regionSettings: 'region', aboutApp: 'about', whyHallaqi: 'why', glossary: 'glossary', seasons: 'seasons', testimonials: 'testimonials', publicRoadmap: 'roadmap', expansionGuide: 'expansion', mentionsLegales: 'mentions',
                     pushNotifications: 'notifications', emailNotifications: 'notifications', smsNotifications: 'notifications',
                     bookingReminders: 'notifications', promotions: 'notifications', forumReplies: 'notifications',
                     competitionUpdates: 'notifications', newFollowers: 'notifications',
@@ -660,8 +669,8 @@ function SecuritySettings({ onBack }: { onBack: () => void }) {
       <div className="p-4">
         <div className="rounded-2xl border p-5 text-center" style={{ backgroundColor: themeConfig.colors.surface, borderColor: verifiedFactorId ? themeConfig.colors.success : themeConfig.colors.border }}>
           <Shield size={34} className="mx-auto" style={{ color: verifiedFactorId ? themeConfig.colors.success : themeConfig.colors.primary }} />
-          <h3 className="text-sm font-bold mt-2" style={{ color: themeConfig.colors.text }}>{verifiedFactorId ? 'المصادقة الثنائية مفعلة' : 'احمِ حسابك بتطبيق مصادقة'}</h3>
-          <p className="text-xs mt-1 leading-5" style={{ color: themeConfig.colors.textMuted }}>استخدم Google Authenticator أو أي تطبيق TOTP لإضافة رمز عند تسجيل الدخول.</p>
+          <h3 className="text-sm font-bold mt-2" style={{ color: themeConfig.colors.text }}>{verifiedFactorId ? 'المصادقة الثنائية مفعلة' : 'المصادقة الثنائية لكل الحسابات'}</h3>
+          <p className="text-xs mt-1 leading-5" style={{ color: themeConfig.colors.textMuted }}>متاحة للعملاء والحلاقين والبائعين — ليست للأدمن فقط. استخدم Google Authenticator أو أي تطبيق TOTP.</p>
           {!verifiedFactorId && !enrollment && <button onClick={() => void enroll()} disabled={loading} className="w-full h-10 rounded-xl text-xs font-bold text-white mt-4 disabled:opacity-50" style={{ backgroundColor: themeConfig.colors.primary }}>بدء الإعداد</button>}
           {verifiedFactorId && <button onClick={() => void disable()} disabled={loading} className="w-full h-10 rounded-xl text-xs font-bold mt-4 disabled:opacity-50" style={{ backgroundColor: themeConfig.colors.error + '10', color: themeConfig.colors.error }}>إيقاف المصادقة الثنائية</button>}
         </div>
@@ -685,6 +694,8 @@ function SecuritySettings({ onBack }: { onBack: () => void }) {
 
 function AccessibilitySettings({ onBack }: { onBack: () => void }) {
   const { themeConfig, settings, updateSettings } = useApp();
+  const lang = settings.language;
+  const sessionNote = formatSessionData(getSessionBytes(), lang);
   return (
     <div className="pb-20">
       <div className="sticky top-0 z-30 flex items-center gap-3 px-4 py-3 border-b" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
@@ -717,9 +728,13 @@ function AccessibilitySettings({ onBack }: { onBack: () => void }) {
             </div>
           );
         })}
+        {/* #174 live session data estimate */}
+        <p className="text-[11px] text-center px-3 py-2 rounded-xl" style={{ backgroundColor: themeConfig.colors.info + '12', color: themeConfig.colors.textMuted }}>
+          {sessionNote}
+        </p>
         <PausedFeatureBanner
           title="تحسين قارئ الشاشة المتقدم"
-          description={`وضع أوصاف موسّعة لكل عنصر ${PAUSED_LABEL}. حجم الخط والتباين وتقليل الحركة تعمل الآن.`}
+          description={`وضع أوصاف موسّعة لكل عنصر ${PAUSED_LABEL}. حجم الخط والتباين وتقليل الحركة ووضع البيانات المنخفضة تعمل الآن.`}
           kind="paused"
           colors={themeConfig.colors}
         />
@@ -999,6 +1014,99 @@ function SeasonsPage({ onBack }: { onBack: () => void }) {
           <section key={h.id} className="rounded-2xl border p-4" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
             <p className="text-sm font-bold" style={{ color: themeConfig.colors.text }}>{seasonLabel(h, lang)}</p>
             <p className="text-xs mt-2 leading-relaxed" style={{ color: themeConfig.colors.textMuted }}>{seasonTip(h, lang)}</p>
+          </section>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+
+function TestimonialsPage({ onBack }: { onBack: () => void }) {
+  const { themeConfig, settings, barbers, navigate } = useApp();
+  const lang = settings.language;
+  const items = collectTestimonials(barbers, 10);
+  return (
+    <div className="pb-20">
+      <div className="sticky top-0 z-30 flex items-center gap-3 px-4 py-3 border-b" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
+        <button type="button" onClick={onBack} aria-label="رجوع" className="w-9 h-9 rounded-xl flex items-center justify-center"><ArrowLeft size={20} style={{ color: themeConfig.colors.text }} /></button>
+        <h2 className="text-base font-bold" style={{ color: themeConfig.colors.text }}>{lang === 'en' ? 'Testimonials' : lang === 'fr' ? 'Témoignages' : 'شهادات عملاء'}</h2>
+      </div>
+      <div className="p-4 space-y-3">
+        {items.length === 0 ? (
+          <p className="text-xs" style={{ color: themeConfig.colors.textMuted }}>لا شهادات منشورة بعد — ستظهر من تقييمات 4★ فأكثر.</p>
+        ) : items.map(t => (
+          <button key={t.id} type="button" onClick={() => navigate('barber-detail', { barberId: t.barberId })} className="w-full text-right rounded-2xl border p-4" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
+            <p className="text-xs font-bold" style={{ color: themeConfig.colors.text }}>{t.authorName} · {t.rating}★</p>
+            <p className="text-xs mt-2 leading-relaxed" style={{ color: themeConfig.colors.textMuted }}>{t.comment}</p>
+            <p className="text-[10px] mt-2" style={{ color: themeConfig.colors.primary }}>{t.barberName}</p>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function PublicRoadmapPage({ onBack }: { onBack: () => void }) {
+  const { themeConfig, settings, bookings } = useApp();
+  const lang = settings.language;
+  const retention = weeklyRetentionSummary(bookings);
+  const statusLabel = (s: 'shipped' | 'soon' | 'later') => s === 'shipped' ? (lang === 'en' ? 'Shipped' : lang === 'fr' ? 'Livré' : 'متوفر') : s === 'soon' ? (lang === 'en' ? 'Soon' : lang === 'fr' ? 'Bientôt' : 'قريباً') : (lang === 'en' ? 'Later' : lang === 'fr' ? 'Plus tard' : 'لاحقاً');
+  return (
+    <div className="pb-20">
+      <div className="sticky top-0 z-30 flex items-center gap-3 px-4 py-3 border-b" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
+        <button type="button" onClick={onBack} aria-label="رجوع" className="w-9 h-9 rounded-xl flex items-center justify-center"><ArrowLeft size={20} style={{ color: themeConfig.colors.text }} /></button>
+        <h2 className="text-base font-bold" style={{ color: themeConfig.colors.text }}>{lang === 'en' ? 'Public roadmap' : lang === 'fr' ? 'Feuille de route' : 'خارطة الطريق'}</h2>
+      </div>
+      <div className="p-4 space-y-3">
+        <p className="text-[11px] px-3 py-2 rounded-xl" style={{ backgroundColor: themeConfig.colors.info + '12', color: themeConfig.colors.textMuted }}>{retention.labelAr}</p>
+        {PUBLIC_ROADMAP.map(item => (
+          <div key={item.id} className="rounded-2xl border p-4 flex items-start justify-between gap-3" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
+            <p className="text-xs font-bold" style={{ color: themeConfig.colors.text }}>{lang === 'en' ? item.en : lang === 'fr' ? item.fr : item.ar}</p>
+            <span className="text-[10px] font-black shrink-0 px-2 py-1 rounded-lg" style={{ backgroundColor: item.status === 'shipped' ? themeConfig.colors.success + '18' : themeConfig.colors.warning + '18', color: item.status === 'shipped' ? themeConfig.colors.success : themeConfig.colors.warning }}>{statusLabel(item.status)}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ExpansionGuidePage({ onBack }: { onBack: () => void }) {
+  const { themeConfig, settings } = useApp();
+  const lang = settings.language;
+  return (
+    <div className="pb-20">
+      <div className="sticky top-0 z-30 flex items-center gap-3 px-4 py-3 border-b" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
+        <button type="button" onClick={onBack} aria-label="رجوع" className="w-9 h-9 rounded-xl flex items-center justify-center"><ArrowLeft size={20} style={{ color: themeConfig.colors.text }} /></button>
+        <h2 className="text-base font-bold" style={{ color: themeConfig.colors.text }}>{lang === 'en' ? 'Wilaya expansion' : lang === 'fr' ? 'Expansion des wilayas' : 'دليل توسّع الولايات'}</h2>
+      </div>
+      <div className="p-4 space-y-3">
+        {WILAYA_EXPANSION.map(tier => (
+          <section key={tier.phase} className="rounded-2xl border p-4" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
+            <p className="text-sm font-bold" style={{ color: themeConfig.colors.text }}>{lang === 'en' ? tier.phaseEn : lang === 'fr' ? tier.phaseFr : tier.phase}</p>
+            <p className="text-[11px] mt-2" style={{ color: themeConfig.colors.primary }}>{tier.wilayas.join(' · ')}</p>
+            <p className="text-xs mt-2 leading-relaxed" style={{ color: themeConfig.colors.textMuted }}>{lang === 'en' ? tier.noteEn : lang === 'fr' ? tier.noteFr : tier.noteAr}</p>
+          </section>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function MentionsPage({ onBack }: { onBack: () => void }) {
+  const { themeConfig, settings } = useApp();
+  const content = getMentionsLegales(settings.language);
+  return (
+    <div className="pb-20">
+      <div className="sticky top-0 z-30 flex items-center gap-3 px-4 py-3 border-b" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
+        <button type="button" onClick={onBack} aria-label="رجوع" className="w-9 h-9 rounded-xl flex items-center justify-center"><ArrowLeft size={20} style={{ color: themeConfig.colors.text }} /></button>
+        <h2 className="text-base font-bold" style={{ color: themeConfig.colors.text }}>{content.title}</h2>
+      </div>
+      <div className="p-4 space-y-3">
+        {content.sections.map(([title, body]) => (
+          <section key={title} className="rounded-2xl border p-4" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
+            <h3 className="text-sm font-bold" style={{ color: themeConfig.colors.text }}>{title}</h3>
+            <p className="text-xs mt-2 leading-6" style={{ color: themeConfig.colors.textMuted }}>{body}</p>
           </section>
         ))}
       </div>

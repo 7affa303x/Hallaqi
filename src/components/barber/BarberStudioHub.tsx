@@ -125,12 +125,13 @@ export default function BarberStudioHub({ proId }: { proId: string }) {
       await updateBookingStatus(b.id, status as DbBookingStatus);
       if (b.client_id) {
         try {
+          const amountLabel = `${Math.round(b.total_price ?? 0).toLocaleString('ar-DZ')} د.ج`;
           await sendNotification({
             userId: b.client_id,
             title: 'تحديث حالة الحجز',
-            message: clientMessage,
+            message: `${clientMessage} · ${amountLabel}`,
             type: 'booking',
-            metadata: { booking_id: b.id },
+            metadata: { booking_id: b.id, amount: b.total_price ?? 0 },
           });
         } catch { /* best-effort */ }
       }

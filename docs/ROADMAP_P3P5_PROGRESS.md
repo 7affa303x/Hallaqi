@@ -23,8 +23,37 @@
 - #178 analytics consent log (device)
 - #195 seasons calendar page
 
+## Second 100 — batch D
+- #130 AI marketplace product chips (cautious)
+- #131 barber assist prefers appointment context
+- #133 low-data → FAQ-only AI path
+- #136/#139 cash attendance + printable cash receipt
+- #146 admin fraud/anomaly alerts on dashboard
+- #147 booking notifications include amount
+- #153 forum competition before/after hint
+- #154 forum tags → discovery service hint
+- #157 clearer barber author link in forum
+- #169 minify/upsert JSON-LD on barber detail
+- #174 session data-usage estimate (accessibility)
+- #181 MFA copy for all roles (not admin-only)
+- #182 Mentions légales page
+- #190 soft FR nudge for big-city wilayas
+- #194 curated testimonials (4★+)
+- #196 wilaya expansion guide
+- #197 weekly retention summary on public roadmap
+- #199 weekly product decisions on admin home
+- #200 public roadmap page
+
 ## Still قريباً / external / ops
 - Sentry, SMS, Capacitor, SSR, map clusters, CCP/Baridi
 - Guest checkout, dialect picker productization beyond AI style
 - #186–187 ops acquisition/cleanup
 - Bundle/Lighthouse CI, OpenAPI, Storybook
+- #101 UI language screenshots in CI, #115 category SEO pages
+- #132 AI JSON quality logging, #135 admin AI quality board
+- #142 partial deposit, #149 mock payment provider tests
+- #155 auto-translate forum comments, #156 pin useful posts
+- #161–168/#175 performance CI / SW / fonts / TTFB
+- #179–180 account delete/export polish if incomplete
+- #183–185 security reports / service-role / PII scrubbing
+- #189/#191/#192 growth campaigns, schools, referral

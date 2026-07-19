@@ -574,27 +574,27 @@ export default function BookingFlowPage() {
         }
 
         // For non-card payments, proceed as before
-        // Notify the barber that they received a new booking
+        // #147 — include payable amount in booking notifications
+        const amountLabel = `${Math.round(saved.total_price).toLocaleString('ar-DZ')} د.ج`;
         try {
           await sendNotification({
             userId: barber.id,
             title: 'حجز جديد',
-            message: `لديك حجز جديد من ${appUser.full_name || 'عميل'} - ${selectedDate} ${selectedTime}`,
+            message: `لديك حجز جديد من ${appUser.full_name || 'عميل'} — ${selectedDate} ${selectedTime} · ${amountLabel}`,
             type: 'booking',
-            metadata: { booking_id: saved.id },
+            metadata: { booking_id: saved.id, amount: saved.total_price },
           });
         } catch (err) {
           console.error('Failed to notify barber:', err);
         }
 
-        // Notify the client that their booking was submitted
         try {
           await sendNotification({
             userId: appUser.id,
             title: 'تم إرسال طلب الحجز',
-            message: `تم إرسال طلب الحجز إلى ${barber.name} - سيتم تأكيده قريباً`,
+            message: `طلب إلى ${barber.name} — ${selectedDate} ${selectedTime} · ${amountLabel} (يُدفع عند الزيارة إن كان نقداً)`,
             type: 'booking',
-            metadata: { booking_id: saved.id },
+            metadata: { booking_id: saved.id, amount: saved.total_price },
           });
         } catch (err) {
           console.error('Failed to notify client:', err);

@@ -201,6 +201,7 @@ export default function ForumTab() {
                   <p className="text-[11px] font-bold" style={{ color: themeConfig.colors.text }}>{comp.title}</p>
                   <p className="text-[10px] mt-0.5" style={{ color: themeConfig.colors.textMuted }}>{comp.competition_entries?.[0]?.count || 0} مشارك &bull; {comp.prize}</p>
                   <p className="text-[9px] mt-0.5" style={{ color: themeConfig.colors.textMuted }}>تنتهي {new Date(comp.ends_at).toLocaleDateString('ar-DZ')}</p>
+                  <p className="text-[9px] mt-1 font-bold" style={{ color: themeConfig.colors.warning }}>قبل/بعد: أرفق صورتين واضحتين في منشورك عند المشاركة</p>
                 </div>
                 <button disabled={busyCompetition === comp.id} onClick={() => void joinCompetition(comp.id)} className="px-3 h-8 rounded-lg text-[10px] font-bold text-white disabled:opacity-50" style={{ backgroundColor: themeConfig.colors.primary }}>شارك</button>
               </div>
@@ -351,6 +352,11 @@ function ForumPostCard({ post, isPinned = false, navigate, themeConfig }: PostCa
                 <span className="text-[9px] font-medium px-1.5 py-0.5 rounded" style={{ backgroundColor: rColor + '10', color: rColor }}>
                   {roleLabels[post.authorRole]}
                 </span>
+                {isBarberAuthor && (
+                  <button type="button" onClick={() => nav('barber-detail', { barberId: post.authorId })} className="text-[9px] font-bold underline" style={{ color: themeConfig.colors.primary }}>
+                    ملف الحلاق
+                  </button>
+                )}
                 {catInfo && (
                   <span className="text-[9px] font-medium px-1.5 py-0.5 rounded" style={{ backgroundColor: catInfo.color + '10', color: catInfo.color }}>
                     {catInfo.label}
@@ -396,9 +402,20 @@ function ForumPostCard({ post, isPinned = false, navigate, themeConfig }: PostCa
         )}
         <div className="flex gap-1 mt-2 flex-wrap">
           {post.tags.map((tag: string) => (
-            <span key={tag} className="text-[10px] px-2 py-0.5 rounded-md" style={{ backgroundColor: themeConfig.colors.textMuted + '15', color: themeConfig.colors.textMuted }}>
+            <button
+              key={tag}
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                // #154 — service-like tags jump to booking discovery
+                nav('home');
+                try { localStorage.setItem('hallaqi-discovery-service-hint', tag); } catch { /* ignore */ }
+              }}
+              className="text-[10px] px-2 py-0.5 rounded-md"
+              style={{ backgroundColor: themeConfig.colors.textMuted + '15', color: themeConfig.colors.textMuted }}
+            >
               #{tag}
-            </span>
+            </button>
           ))}
         </div>
       </div>
