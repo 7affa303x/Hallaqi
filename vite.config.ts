@@ -4,47 +4,28 @@ import { defineConfig } from "vite"
 import { VitePWA } from "vite-plugin-pwa"
 
 export default defineConfig({
-  base: './',
+  // Absolute base — relative `./` broke asset/SW resolution on mobile & preview URLs.
+  base: '/',
   plugins: [
     react(),
     VitePWA({
+      /**
+       * Soft-launch: unregister every old service worker.
+       * Stale precached shells were remounting an "old app" after Google OAuth.
+       * Re-enable a careful NetworkOnly PWA after the stale fleet is cleared.
+       */
+      selfDestroying: true,
       registerType: "autoUpdate",
       injectRegister: "auto",
       devOptions: {
-        enabled: true,
-        type: "module",
+        enabled: false,
       },
       manifest: false,
       includeAssets: ["logo-icon.png", "logo-symbol.png", "logo-wordmark.png", "push-handler.js", "offline.html", "robots.txt"],
       workbox: {
-        navigateFallback: "/index.html",
-        navigateFallbackDenylist: [/^\/api\//],
-        offlineGoogleAnalytics: false,
-        importScripts: ["/push-handler.js"],
-        globPatterns: ["**/*.{js,css,html,png,svg,webp,woff2}"],
-        runtimeCaching: [
-          {
-            urlPattern: /^https:\/\/[^/]+\.supabase\.co\/storage\/v1\/object\/public\//,
-            handler: "CacheFirst",
-            options: {
-              cacheName: "hallaqi-images",
-              expiration: { maxEntries: 100, maxAgeSeconds: 60 * 60 * 24 * 7 },
-            },
-          },
-          {
-            urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
-            handler: "StaleWhileRevalidate",
-            options: { cacheName: "google-fonts-stylesheets" },
-          },
-          {
-            urlPattern: /^https:\/\/fonts\.gstatic\.com\/.*/i,
-            handler: "CacheFirst",
-            options: {
-              cacheName: "google-fonts-webfonts",
-              expiration: { maxEntries: 20, maxAgeSeconds: 60 * 60 * 24 * 365 },
-            },
-          },
-        ],
+        cleanupOutdatedCaches: true,
+        clientsClaim: true,
+        skipWaiting: true,
       },
     }),
   ],

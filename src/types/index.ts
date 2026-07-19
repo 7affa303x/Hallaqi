@@ -45,7 +45,9 @@ export type BarberTag =
   | 'new'
   | 'top-rated'
   | 'quick'
-  | 'premium';
+  | 'premium'
+  | 'cash'
+  | 'home-service';
 
 export interface Service {
   id: string;
@@ -320,6 +322,8 @@ export interface AppSettings {
   countryCode: string;
   /** Display currency code (prices stored in DZD; conversion is indicative). */
   currencyCode: string;
+  /** Preferred wilaya for booking discovery (device + optional account sync). */
+  discoveryWilaya?: string;
   notifications: {
     pushEnabled: boolean;
     emailEnabled: boolean;

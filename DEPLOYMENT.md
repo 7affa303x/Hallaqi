@@ -22,12 +22,18 @@ Buckets and policies are migration-managed. Public: `avatars`, `covers`,
 `portfolio`, `forum-images`, `review-images`. Private: `id-cards`,
 `payment-receipts`.
 
-### 1.4 Auth Settings
-1. Go to Authentication → Settings
-2. Enable Email provider
-3. Enable Google OAuth
-4. Set Site URL to `https://www.hallaqi.app`
-5. Allow `https://hallaqi.app/**` and local development callback URLs
+### 1.4 Auth Settings (critical — wrong Site URL = “old app after Google login”)
+1. Go to Authentication → URL Configuration
+2. Enable Email provider + Google OAuth
+3. Set **Site URL** to the canonical apex only: `https://hallaqi.app`  
+   - Never use `www.hallaqi.app` or an old `*.vercel.app` URL as Site URL  
+   - If `redirectTo` is not allow-listed, Supabase **falls back to Site URL** — that is how users land on an old build after login
+4. Redirect URLs allow-list (all required):
+   - `https://hallaqi.app/**`
+   - `https://www.hallaqi.app/**` (safety; Vercel also redirects www→apex)
+   - `http://localhost:3000/**` and `http://localhost:5173/**`
+   - Vercel PR previews: `https://*-souf303x.vercel.app/**` (or your team slug)
+5. After changing Site URL / allow-list, test Google login from both `hallaqi.app` and a fresh preview URL
 
 ## Step 2: Vercel
 

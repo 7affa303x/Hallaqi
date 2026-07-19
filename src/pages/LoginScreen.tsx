@@ -1,8 +1,5 @@
-import { useState, useCallback } from 'react';
-import { useAuth } from '@/hooks/useAuth';
 import { useApp } from '@/contexts/useApp';
-import type { ScreenParams, TabName } from '@/types';
-import { useStore } from '@/store/useStore';
+import type { ScreenParams } from '@/types';
 import { getErrMsg } from '@/lib/error';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -13,6 +10,10 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { loginSchema } from '@/lib/validation';
 import type { LoginFormData } from '@/lib/validation';
+import { isSafeAuthRedirectScreen, isSafeAuthRedirectTab } from '@/lib/authRedirect';
+import { useState, useCallback } from 'react';
+import { useAuth } from '@/hooks/useAuth';
+import { useStore } from '@/store/useStore';
 
 /* ------------------------------------------------------------------ */
 /*  Component                                                          */
@@ -25,7 +26,6 @@ interface LoginScreenProps {
 export default function LoginScreen({ redirectScreen, redirectParams }: LoginScreenProps) {
   const { themeConfig, navigate, setActiveTab } = useApp();
   const { googleSignIn, login, error: authError } = useAuth();
-  const setAuthenticated = useStore(s => s.setAuthenticated);
   const isOnline = useStore(s => s.isOnline);
 
   const {
@@ -48,12 +48,13 @@ export default function LoginScreen({ redirectScreen, redirectParams }: LoginScr
 
   const completeRedirect = () => {
     const redirectTab = redirectParams?.redirectTab;
-    if (redirectScreen && redirectScreen !== 'login' && redirectScreen !== 'home') {
-      if (typeof redirectTab === 'string') setActiveTab(redirectTab as TabName);
-      navigate(redirectScreen as 'home', redirectParams as ScreenParams);
+    const safeTab = isSafeAuthRedirectTab(redirectTab) ? redirectTab : undefined;
+    if (redirectScreen && isSafeAuthRedirectScreen(redirectScreen) && redirectScreen !== 'home') {
+      if (safeTab) setActiveTab(safeTab);
+      navigate(redirectScreen, redirectParams as ScreenParams);
       return;
     }
-    setActiveTab(typeof redirectTab === 'string' ? (redirectTab as TabName) : 'booking');
+    setActiveTab(safeTab || 'booking');
   };
 
   const clearError = useCallback(() => {
@@ -64,7 +65,6 @@ export default function LoginScreen({ redirectScreen, redirectParams }: LoginScr
     clearError();
     try {
       await login(data.email, data.password);
-      setAuthenticated(true);
       completeRedirect();
     } catch (err) {
       const msg = getErrMsg(err);
@@ -87,11 +87,10 @@ export default function LoginScreen({ redirectScreen, redirectParams }: LoginScr
     clearError();
     try {
       sessionStorage.setItem('hallaqi-auth-redirect', JSON.stringify({
-        screen: redirectScreen,
+        screen: isSafeAuthRedirectScreen(redirectScreen) ? redirectScreen : undefined,
         params: redirectParams,
       }));
       await googleSignIn();
-      setAuthenticated(true);
     } catch {
       setLocalError('فشل تسجيل الدخول بـ Google. حاول مرة أخرى.');
     }

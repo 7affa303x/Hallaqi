@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { AppProvider } from '@/contexts/AppContext';
+import { AuthProvider } from '@/contexts/AuthProvider';
 import { useApp } from '@/contexts/useApp';
 import { useAuth } from '@/hooks/useAuth';
 import { useStore } from '@/store/useStore';
@@ -16,6 +17,7 @@ import CookieConsent from '@/components/CookieConsent';
 import { readAnalyticsConsent } from '@/lib/analyticsConsent';
 import { reportClientError } from '@/lib/error-reporting';
 import { translate } from '@/lib/i18n';
+import { consumeAuthUrlError } from '@/lib/authRedirect';
 import BookingTab from '@/tabs/BookingTab';
 import './App.css';
 
@@ -53,26 +55,47 @@ const MarketplaceAnalyticsPage = lazy(() => import('@/pages/analytics/Marketplac
 const AiListingToolsPage = lazy(() => import('@/pages/marketplace/AiListingToolsPage'));
 
 function TabContent({ tab }: { tab: string }) {
-  let content;
-  switch (tab) {
-    case 'booking': content = <BookingTab />; break;
-    case 'appointments': content = <AppointmentsTab />; break;
-    case 'camera': content = <CameraTab />; break;
-    case 'ai-hub': content = <AIAdvisorPage />; break;
-    case 'forum': content = <ForumTab />; break;
-    case 'marketplace': content = <MarketplaceTab />; break;
-    case 'profile': content = <ProfileTab />; break;
-    default: content = <BookingTab />;
-  }
-  return <Suspense fallback={<LoadingFallback />}>{content}</Suspense>;
+  // Keep primary tabs mounted so auth/UI state does not remount and flash Login CTAs.
+  return (
+    <>
+      <div className={tab === 'booking' ? 'block' : 'hidden'} aria-hidden={tab !== 'booking'}>
+        <BookingTab />
+      </div>
+      <div className={tab === 'appointments' ? 'block' : 'hidden'} aria-hidden={tab !== 'appointments'}>
+        <Suspense fallback={<LoadingFallback />}><AppointmentsTab /></Suspense>
+      </div>
+      <div className={tab === 'camera' ? 'block' : 'hidden'} aria-hidden={tab !== 'camera'}>
+        <Suspense fallback={<LoadingFallback />}><CameraTab /></Suspense>
+      </div>
+      <div className={tab === 'ai-hub' ? 'block' : 'hidden'} aria-hidden={tab !== 'ai-hub'}>
+        <Suspense fallback={<LoadingFallback />}><AIAdvisorPage /></Suspense>
+      </div>
+      <div className={tab === 'forum' ? 'block' : 'hidden'} aria-hidden={tab !== 'forum'}>
+        <Suspense fallback={<LoadingFallback />}><ForumTab /></Suspense>
+      </div>
+      <div className={tab === 'marketplace' ? 'block' : 'hidden'} aria-hidden={tab !== 'marketplace'}>
+        <Suspense fallback={<LoadingFallback />}><MarketplaceTab /></Suspense>
+      </div>
+      <div className={tab === 'profile' ? 'block' : 'hidden'} aria-hidden={tab !== 'profile'}>
+        <Suspense fallback={<LoadingFallback />}><ProfileTab /></Suspense>
+      </div>
+    </>
+  );
 }
 
 function ScreenRouter() {
   const { screen, screenParams, activeTab } = useApp();
-  const { isAuthenticated, appUser } = useAuth();
+  const { isAuthenticated, isLoading: authLoading, appUser } = useAuth();
 
   const authRequiredScreens = ['booking-flow', 'chat-room', 'messages', 'create-post', 'admin-dashboard', 'seller-dashboard', 'seller-products', 'seller-placements', 'seller-profile-edit'];
-  const needsAuth = authRequiredScreens.includes(screen) && !isAuthenticated;
+  const requiresAuth = authRequiredScreens.includes(screen);
+
+  // Never treat "session still restoring" as logged-out — that flashed LoginScreen on every nav.
+  if (requiresAuth && authLoading) {
+    return <LoadingFallback />;
+  }
+
+  const needsAuth = requiresAuth && !isAuthenticated;
 
   if (needsAuth) {
     return (
@@ -200,6 +223,18 @@ function AppContent() {
   const showNav = screen === 'home' || screen === 'ai-advisor';
   const setIsOnline = useStore(s => s.setIsOnline);
   const [analyticsOn, setAnalyticsOn] = useState(() => readAnalyticsConsent() === 'accepted');
+  const [authUrlError, setAuthUrlError] = useState<string | null>(null);
+  const [dismissDataError, setDismissDataError] = useState(false);
+
+  useEffect(() => {
+    const msg = consumeAuthUrlError();
+    if (msg) setAuthUrlError(msg);
+  }, []);
+
+  useEffect(() => {
+    // Re-show banner when a new error arrives after dismiss
+    setDismissDataError(false);
+  }, [dataError]);
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -269,19 +304,35 @@ function AppContent() {
         {translate(settings.language, 'skipToContent')}
       </a>
       <NetworkStatusBar />
-      {dataError && (
+      {authUrlError && (
         <div
           role="alert"
-          className="fixed top-2 left-1/2 -translate-x-1/2 z-[90] w-[calc(100%-2rem)] max-w-md rounded-xl px-3 py-2 flex items-center gap-3 shadow-lg"
+          className="fixed top-2 left-1/2 -translate-x-1/2 z-[90] w-[calc(100%-2rem)] max-w-lg rounded-xl px-3 py-2 flex items-center gap-3 shadow-lg"
           style={{ backgroundColor: themeConfig.colors.error, color: '#fff' }}
         >
-          <span className="text-xs flex-1">{dataError}</span>
-          <button type="button" onClick={() => void refreshData()} className="text-xs font-bold underline">
-            {translate(settings.language, 'retry')}
+          <span className="text-xs flex-1">{authUrlError}</span>
+          <button type="button" onClick={() => setAuthUrlError(null)} className="text-xs font-bold underline">
+            حسناً
           </button>
         </div>
       )}
-      <main id="main-content" className={`max-w-lg mx-auto min-h-screen ${showNav ? 'pb-16' : ''}`}>
+      {dataError && !dismissDataError && (
+        <div
+          role="alert"
+          className="fixed top-2 left-1/2 -translate-x-1/2 z-[90] w-[calc(100%-2rem)] max-w-lg rounded-xl px-3 py-2 flex items-center gap-3 shadow-lg"
+          style={{ backgroundColor: themeConfig.colors.error, color: '#fff' }}
+        >
+          <span className="text-xs flex-1">{dataError}</span>
+          <button type="button" onClick={() => void refreshData()} className="text-xs font-bold underline shrink-0">
+            {translate(settings.language, 'retry')}
+          </button>
+          <button type="button" onClick={() => setDismissDataError(true)} className="text-xs font-bold shrink-0" aria-label="إغلاق">
+            ✕
+          </button>
+        </div>
+      )}
+      {/* Full-bleed on phones; phone-column only from tablet/desktop up */}
+      <main id="main-content" className={`w-full max-w-none sm:max-w-lg sm:mx-auto min-h-screen min-h-[100dvh] ${showNav ? 'pb-[calc(4rem+env(safe-area-inset-bottom,0px))]' : ''}`}>
         {/* Developer Mode toggle — dev builds only; stripped from production. */}
         {import.meta.env.DEV && (
           <>
@@ -318,9 +369,11 @@ function AppContent() {
 export default function App() {
   return (
     <ErrorBoundary>
-      <AppProvider>
-        <AppContent />
-      </AppProvider>
+      <AuthProvider>
+        <AppProvider>
+          <AppContent />
+        </AppProvider>
+      </AuthProvider>
     </ErrorBoundary>
   );
 }
