@@ -26,8 +26,8 @@ jobs:
       - run: npm ci
 
       - name: Install Vercel CLI
-        # Upload API requires >=47.2.2; project Node is forced to 22.x below for local build.
-        run: npm install -g vercel@47.2.2
+        # Upload API requires a recent CLI; Node project setting is forced to 22.x below.
+        run: npm install -g vercel@56.3.2
 
       - name: Link project + pull production env
         env:
