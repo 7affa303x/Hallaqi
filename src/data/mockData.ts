@@ -373,6 +373,8 @@ export const barberTags = [
   { key: 'top-rated', label: 'الأعلى تقييماً', color: '#EAB308', icon: 'Star' },
   { key: 'quick', label: 'سريع', color: '#06B6D4', icon: 'Clock' },
   { key: 'premium', label: 'فاخر', color: '#A855F7', icon: 'Crown' },
+  { key: 'cash', label: 'نقد عند الزيارة', color: '#059669', icon: 'Wallet' },
+  { key: 'home-service', label: 'خدمة منزلية', color: '#DB2777', icon: 'Home' },
 ] as const;
 
 export const serviceCategories = [
