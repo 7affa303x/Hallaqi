@@ -22,11 +22,14 @@ import ServicesManagement from '@/components/ServicesManagement';
 import PausedFeatureBanner from '@/components/PausedFeatureBanner';
 import SavedItemsPage from '@/components/SavedItemsPage';
 import ChangelogPage from '@/pages/ChangelogPage';
+import { useI18n } from '@/hooks/useI18n';
 import { FEATURE_FLAGS, isWebPushConfigured, isWhatsAppSupportConfigured, PAUSED_LABEL, COMING_SOON_LABEL } from '@/lib/featureFlags';
 import { CANCEL_POLICY } from '@/lib/cancelPolicy';
 import { getLegalContent, getHelpContent, getWhyHallaqiContent } from '@/lib/legalContent';
 import { refundPolicySummary, paymentMethodsLegalNote } from '@/lib/paymentPolicy';
 import { BARBER_GLOSSARY, glossaryLabel, glossaryMeaning } from '@/lib/barberGlossary';
+import { ALGERIA_SEASONS, currentSeasonHints, seasonLabel, seasonTip } from '@/lib/algeriaSeasons';
+import { readConsentLog } from '@/lib/analyticsConsent';
 import {
   createIdVerificationRequest,
   getLatestIdVerificationRequest,
@@ -76,13 +79,13 @@ const iconMap: Record<string, LucideIcon> = {
   UserPlus, Lock, Smartphone, CreditCard, Wallet, HelpCircle, Phone,
   Bug, Lightbulb, Info, FileText, FileCode, Trash2, Download, AlertTriangle,
   Check, X, Sparkles, Scissors, Clock, TrendingUp, Award, Zap, Gift,
-  Crown: CrownIcon, BookOpen, Store, Building2, Stethoscope, Bookmark,
+  Crown: CrownIcon, BookOpen, Store, Building2, Stethoscope, Bookmark, CalendarDays,
 };
 
 type ProfileSubPage = 'main' | 'theme' | 'animation' | 'language' | 'country' | 'currency' | 'region' | 'notifications' |
   'privacy' | 'account' | 'subscription' | 'payment' | 'id-verification' |
   'linked-accounts' | 'help' | 'about' | 'changelog' | 'badges' | 'stats' | 'edit-profile' | 'services' | 'loyalty' |
-  'accessibility' | 'privacy-policy' | 'terms' | 'licenses' | 'security' | 'saves' | 'glossary' | 'why';
+  'accessibility' | 'privacy-policy' | 'terms' | 'licenses' | 'security' | 'saves' | 'glossary' | 'why' | 'seasons';
 
 export default function ProfileTab() {
   const { themeConfig, settings, navigate, setActiveTab, unreadCount, bookings, barbers, screenParams } = useApp();
@@ -121,6 +124,7 @@ export default function ProfileTab() {
   if (subPage === 'about') return <InformationPage onBack={() => setSubPage('main')} kind="about" />;
   if (subPage === 'why') return <InformationPage onBack={() => setSubPage('main')} kind="why" />;
   if (subPage === 'glossary') return <GlossaryPage onBack={() => setSubPage('main')} />;
+  if (subPage === 'seasons') return <SeasonsPage onBack={() => setSubPage('main')} />;
   if (subPage === 'privacy-policy') return <LegalPage onBack={() => setSubPage('main')} kind="privacy" />;
   if (subPage === 'terms') return <LegalPage onBack={() => setSubPage('main')} kind="terms" />;
   if (subPage === 'licenses') return <LegalPage onBack={() => setSubPage('main')} kind="licenses" />;
@@ -526,7 +530,7 @@ export default function ProfileTab() {
                   if (item.id === 'featureRequest') { window.location.href = 'mailto:support@hallaqi.app?subject=Hallaqi%20Feature%20Request'; return; }
                   const pageMap: Record<string, ProfileSubPage> = {
                     theme: 'theme', animation: 'animation', language: 'region', country: 'region', currency: 'region', fontSize: 'accessibility',
-                    regionSettings: 'region', aboutApp: 'about', whyHallaqi: 'why', glossary: 'glossary',
+                    regionSettings: 'region', aboutApp: 'about', whyHallaqi: 'why', glossary: 'glossary', seasons: 'seasons',
                     pushNotifications: 'notifications', emailNotifications: 'notifications', smsNotifications: 'notifications',
                     bookingReminders: 'notifications', promotions: 'notifications', forumReplies: 'notifications',
                     competitionUpdates: 'notifications', newFollowers: 'notifications',
@@ -703,8 +707,9 @@ function AccessibilitySettings({ onBack }: { onBack: () => void }) {
         {([
           ['highContrast', 'تباين مرتفع', 'ألوان أوضح للنصوص والعناصر'] as const,
           ['reduceMotion', 'تقليل الحركة', 'تقليل الانتقالات والمؤثرات'] as const,
+          ['lowData', 'وضع بيانات منخفضة', 'لا تحمّل الخرائط الثقيلة تلقائياً'] as const,
         ]).map(([key, label, description]) => {
-          const enabled = settings.accessibility[key];
+          const enabled = Boolean(settings.accessibility[key]);
           return (
             <div key={key} className="rounded-2xl border p-4 flex items-center gap-3" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
               <div className="flex-1"><p className="text-xs font-bold" style={{ color: themeConfig.colors.text }}>{label}</p><p className="text-[10px]" style={{ color: themeConfig.colors.textMuted }}>{description}</p></div>
@@ -962,6 +967,38 @@ function GlossaryPage({ onBack }: { onBack: () => void }) {
             <p className="text-sm font-bold" style={{ color: themeConfig.colors.text }}>{glossaryLabel(term, lang)}</p>
             <p className="text-[10px] mt-0.5" style={{ color: themeConfig.colors.textMuted }}>{term.ar} · {term.fr} · {term.en}</p>
             <p className="text-xs mt-2 leading-relaxed" style={{ color: themeConfig.colors.textMuted }}>{glossaryMeaning(term, lang)}</p>
+          </section>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SeasonsPage({ onBack }: { onBack: () => void }) {
+  const { themeConfig, settings } = useApp();
+  const lang = settings.language;
+  const active = currentSeasonHints();
+  return (
+    <div className="pb-20">
+      <div className="sticky top-0 z-30 flex items-center gap-3 px-4 py-3 border-b" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
+        <button type="button" onClick={onBack} aria-label="رجوع" className="w-9 h-9 rounded-xl flex items-center justify-center">
+          <ArrowLeft size={20} style={{ color: themeConfig.colors.text }} />
+        </button>
+        <h2 className="text-base font-bold" style={{ color: themeConfig.colors.text }}>
+          {lang === 'en' ? 'Season calendar' : lang === 'fr' ? 'Calendrier des saisons' : 'تقويم المواسم'}
+        </h2>
+      </div>
+      <div className="p-4 space-y-3">
+        {active.length > 0 && (
+          <p className="text-[11px] font-bold px-3 py-2 rounded-xl" style={{ backgroundColor: themeConfig.colors.primary + '12', color: themeConfig.colors.primary }}>
+            {lang === 'en' ? 'Now relevant: ' : lang === 'fr' ? 'Pertinent maintenant : ' : 'الآن: '}
+            {active.map(h => seasonLabel(h, lang)).join(' · ')}
+          </p>
+        )}
+        {ALGERIA_SEASONS.map(h => (
+          <section key={h.id} className="rounded-2xl border p-4" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
+            <p className="text-sm font-bold" style={{ color: themeConfig.colors.text }}>{seasonLabel(h, lang)}</p>
+            <p className="text-xs mt-2 leading-relaxed" style={{ color: themeConfig.colors.textMuted }}>{seasonTip(h, lang)}</p>
           </section>
         ))}
       </div>
@@ -1409,6 +1446,21 @@ function PrivacySettings({ onBack }: { onBack: () => void }) {
           {blocked.length === 0 && contacts.length === 0 && <p className="text-[10px] text-center py-4" style={{ color: themeConfig.colors.textMuted }}>لا توجد حسابات محظورة أو محادثات سابقة</p>}
           {privacyError && <p role="alert" className="text-[10px] mt-2" style={{ color: themeConfig.colors.error }}>{privacyError}</p>}
         </div>
+        <div className="rounded-2xl border p-4" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
+          <h3 className="text-xs font-bold" style={{ color: themeConfig.colors.text }}>سجل موافقة التحليلات</h3>
+          <p className="text-[10px] mt-1" style={{ color: themeConfig.colors.textMuted }}>محفوظ على هذا الجهاز فقط (#178)</p>
+          <div className="mt-2 space-y-1">
+            {readConsentLog().length === 0 ? (
+              <p className="text-[10px]" style={{ color: themeConfig.colors.textMuted }}>لا اختيارات مسجّلة بعد</p>
+            ) : (
+              readConsentLog().slice(0, 5).map((e, i) => (
+                <p key={`${e.at}-${i}`} className="text-[10px]" style={{ color: themeConfig.colors.textMuted }}>
+                  {e.at.slice(0, 16).replace('T', ' ')} · {e.value === 'accepted' ? 'موافقة' : 'رفض'}
+                </p>
+              ))
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -1505,12 +1557,18 @@ function SubscriptionPage({ onBack }: { onBack: () => void }) {
 }
 
 function PaymentMethods({ onBack }: { onBack: () => void }) {
-  const { themeConfig } = useApp();
+  const { themeConfig, bookings, settings } = useApp();
+  const { money } = useI18n();
   const ccpAccount = import.meta.env.VITE_CCP_ACCOUNT_NUMBER as string | undefined;
   const ccpCard = import.meta.env.VITE_CCP_CARD_NUMBER as string | undefined;
   const envReady = Boolean(ccpAccount && ccpCard);
   const ccpLive = FEATURE_FLAGS.ccpPaymentsEnabled && envReady;
   const cardLive = FEATURE_FLAGS.cardPaymentsEnabled;
+  const paymentHistory = bookings
+    .filter(b => b.paymentMethod || b.totalPrice > 0)
+    .slice()
+    .sort((a, b) => Date.parse(b.date) - Date.parse(a.date))
+    .slice(0, 12);
   return (
     <div className="pb-20">
       <div className="sticky top-0 z-30 flex items-center gap-3 px-4 py-3 backdrop-blur-lg border-b" style={{ backgroundColor: `${themeConfig.colors.background}ee`, borderColor: themeConfig.colors.border }}>
@@ -1535,6 +1593,23 @@ function PaymentMethods({ onBack }: { onBack: () => void }) {
         </div>
         <div className="rounded-2xl border p-4" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
           <div className="flex items-center gap-3"><div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ backgroundColor: '#22C55E15' }}><CreditCard size={24} style={{ color: '#22C55E' }} /></div><div className="flex-1"><h3 className="text-sm font-bold" style={{ color: themeConfig.colors.text }}>الدفع النقدي</h3><p className="text-xs" style={{ color: themeConfig.colors.textMuted }}>الدفع مباشرة عند الزيارة</p></div><span className="text-[10px] px-2 py-0.5 rounded-full bg-green-100 text-green-600 font-bold">متاح</span></div>
+        </div>
+
+        {/* #140 simplified payment / booking amount history */}
+        <div className="rounded-2xl border p-4 space-y-2" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
+          <h3 className="text-sm font-bold" style={{ color: themeConfig.colors.text }}>
+            {settings.language === 'en' ? 'Recent amounts' : settings.language === 'fr' ? 'Montants récents' : 'مبالغ الحجوزات الأخيرة'}
+          </h3>
+          {paymentHistory.length === 0 ? (
+            <p className="text-[11px]" style={{ color: themeConfig.colors.textMuted }}>لا سجل بعد</p>
+          ) : (
+            paymentHistory.map(b => (
+              <div key={b.id} className="flex items-center justify-between text-[11px] py-1.5 border-b last:border-0" style={{ borderColor: themeConfig.colors.border }}>
+                <span style={{ color: themeConfig.colors.textMuted }}>{b.date} · {b.barberName}</span>
+                <span className="font-bold" style={{ color: themeConfig.colors.text }}>{money(b.totalPrice)}</span>
+              </div>
+            ))
+          )}
         </div>
       </div>
     </div>

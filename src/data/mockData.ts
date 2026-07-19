@@ -479,6 +479,7 @@ export const settingsSections = [
       { id: 'aboutApp', label: 'عن التطبيق', icon: 'Info', description: 'Hallaqi v12 — العناية الشخصية الموثوقة', type: 'link' },
       { id: 'whyHallaqi', label: 'لماذا حلاقي؟', icon: 'Sparkles', description: 'لماذا نبني المنصة للجزائر', type: 'link' },
       { id: 'glossary', label: 'قاموس الحلاقة', icon: 'BookOpen', description: 'مصطلحات ar / fr / en', type: 'link' },
+      { id: 'seasons', label: 'تقويم المواسم', icon: 'CalendarDays', description: 'عيد، رمضان، دخول مدرسي…', type: 'link' },
       { id: 'changelog', label: 'سجل التغييرات', icon: 'FileText', description: 'ما الجديد في حلاقي', type: 'link' },
       { id: 'privacyPolicy', label: 'سياسة الخصوصية', icon: 'FileText', description: 'قراءة سياسة الخصوصية', type: 'link' },
       { id: 'termsOfService', label: 'شروط الاستخدام', icon: 'FileText', description: 'قراءة الشروط والأحكام', type: 'link' },

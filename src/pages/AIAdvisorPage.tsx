@@ -7,6 +7,8 @@ import { FEATURE_FLAGS, PAUSED_LABEL } from '@/lib/featureFlags';
 import { buildClientSiteContext } from '@/lib/ai/siteContext';
 import { looksLikeMedicalQuestion, medicalRefusalMessage } from '@/lib/ai/medicalGuard';
 import { aiAdviceExamples, AI_DAILY_QUOTA_HINT } from '@/lib/ai/adviceExamples';
+import { getCachedAdvice, matchStaticFaq, setCachedAdvice } from '@/lib/ai/faqCache';
+import { algeriaSeasonContextLine } from '@/lib/algeriaSeasons';
 import { translateApiError } from '@/lib/apiErrors';
 import { trackProductEvent } from '@/lib/product-analytics';
 import {
@@ -59,6 +61,7 @@ export default function AIAdvisorPage() {
   /** Short session memory — last 3 questions (#123) */
   const [recentQuestions, setRecentQuestions] = useState<string[]>([]);
   const [rating, setRating] = useState<'up' | 'down' | null>(null);
+  const [replyStyle, setReplyStyle] = useState<'ar' | 'darija' | 'fr'>('ar');
 
   useEffect(() => {
     void getAICapabilities().then(setCapabilities).catch(() => {
@@ -104,6 +107,8 @@ export default function AIAdvisorPage() {
     ? `مرتبط بمنطقة ${siteContext.wilaya}`
     : 'مرتبط بمنصة حلاقي';
 
+  const seasonLine = useMemo(() => algeriaSeasonContextLine(settings.language), [settings.language]);
+
   const submit = async () => {
     if (question.trim().length < 5) return;
     if (!isAuthenticated) {
@@ -130,10 +135,25 @@ export default function AIAdvisorPage() {
     setRating(null);
     try {
       if (mode === 'advice') {
-        setAdvice(await requestGroomingAdvice({
-          question: q,
+        const faq = matchStaticFaq(q) || getCachedAdvice(q);
+        if (faq) {
+          setAdvice(faq);
+          setRecentQuestions(prev => [q, ...prev.filter(x => x !== q)].slice(0, 3));
+          return;
+        }
+        const styleHint =
+          replyStyle === 'fr'
+            ? ' Réponds en français clair.'
+            : replyStyle === 'darija'
+              ? ' جاوب بالدارجة الجزائرية بطريقة طبيعية.'
+              : ' أجب بالعربية الفصحى المبسّطة.';
+        const seasonHint = seasonLine ? ` ${seasonLine}` : '';
+        const result = await requestGroomingAdvice({
+          question: `${q}${styleHint}${seasonHint}`,
           siteContext,
-        }));
+        });
+        setAdvice(result);
+        setCachedAdvice(q, result);
         setRecentQuestions(prev => [q, ...prev.filter(x => x !== q)].slice(0, 3));
       } else {
         setStyleImage(await requestStyleImage(q));
@@ -219,6 +239,36 @@ export default function AIAdvisorPage() {
               colors={themeConfig.colors}
             />
           ) : null
+        )}
+
+        {mode === 'advice' && (
+          <div className="flex flex-wrap gap-2">
+            {([
+              { key: 'ar' as const, label: 'فصحى' },
+              { key: 'darija' as const, label: 'دارجة' },
+              { key: 'fr' as const, label: 'Français' },
+            ]).map(opt => (
+              <button
+                key={opt.key}
+                type="button"
+                onClick={() => setReplyStyle(opt.key)}
+                className="text-[10px] px-2.5 py-1.5 rounded-lg border font-bold"
+                style={{
+                  borderColor: replyStyle === opt.key ? themeConfig.colors.primary : themeConfig.colors.border,
+                  color: replyStyle === opt.key ? themeConfig.colors.primary : themeConfig.colors.textMuted,
+                  backgroundColor: themeConfig.colors.surface,
+                }}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {mode === 'advice' && seasonLine && (
+          <p className="text-[10px] px-3 py-2 rounded-xl leading-5" style={{ backgroundColor: themeConfig.colors.info + '12', color: themeConfig.colors.textMuted }}>
+            {seasonLine}
+          </p>
         )}
 
         {mode === 'advice' && (

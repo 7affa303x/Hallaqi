@@ -343,6 +343,8 @@ export interface AppSettings {
     highContrast: boolean;
     reduceMotion: boolean;
     screenReader: boolean;
+    /** Skip heavy media (maps iframe, large images) — #172 */
+    lowData: boolean;
   };
 }
 

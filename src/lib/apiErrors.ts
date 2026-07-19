@@ -12,6 +12,7 @@ const MAP: Array<{ match: RegExp; ar: string; fr: string; en: string }> = [
   { match: /slot.*(taken|available)|overlap|conflict/i, ar: 'هذا الموعد لم يعد متاحاً', fr: 'Ce créneau n’est plus disponible', en: 'This time slot is no longer available' },
   { match: /not authenticated|jwt|session/i, ar: 'سجّل الدخول للمتابعة', fr: 'Connectez-vous pour continuer', en: 'Sign in to continue' },
   { match: /payload too large|413/i, ar: 'الملف كبير جداً', fr: 'Fichier trop volumineux', en: 'File too large' },
+  { match: /stripe|payment.*(fail|error|declined)|card.*(declined|error)/i, ar: 'تعذّر الدفع — جرّب لاحقاً أو اختر النقد عند الزيارة', fr: 'Paiement échoué — réessayez ou choisissez le paiement à la visite', en: 'Payment failed — try later or pay cash at the visit' },
 ];
 
 export function translateApiError(error: unknown, lang: Lang = 'ar'): string {

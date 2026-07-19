@@ -440,7 +440,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       })(),
       notifications: { pushEnabled: true, emailEnabled: true, smsEnabled: false, bookingReminders: true, promotions: true, forumReplies: true, competitionUpdates: true, newFollowers: true },
       privacy: { profileVisible: true, showLocation: true, showBookings: false, allowMessages: 'all' },
-      accessibility: { fontSize: 'medium', highContrast: false, reduceMotion: false, screenReader: false },
+      accessibility: { fontSize: 'medium', highContrast: false, reduceMotion: false, screenReader: false, lowData: false },
     };
   });
 
@@ -451,6 +451,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     root.dataset.fontSize = settings.accessibility.fontSize;
     root.classList.toggle('hallaqi-high-contrast', settings.accessibility.highContrast);
     root.classList.toggle('hallaqi-reduce-motion', settings.accessibility.reduceMotion);
+    root.classList.toggle('hallaqi-low-data', settings.accessibility.lowData);
     root.lang = settings.language;
     root.dir = settings.language === 'ar' ? 'rtl' : 'ltr';
   }, [settings.accessibility, settings.language]);
@@ -468,6 +469,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
       localStorage.setItem('hallaqi-reduce-motion-synced-v1', '1');
     } catch { /* ignore */ }
+  }, []);
+
+  // Ensure lowData exists on older persisted settings
+  useEffect(() => {
+    setSettings(prev => {
+      if (typeof prev.accessibility.lowData === 'boolean') return prev;
+      return { ...prev, accessibility: { ...prev.accessibility, lowData: false } };
+    });
   }, []);
 
   const updateSettings = useCallback((newSettings: Partial<AppSettings>) => {
