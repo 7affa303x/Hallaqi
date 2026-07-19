@@ -1,7 +1,8 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { AppProvider } from '@/contexts/AppContext';
+import { AuthProvider } from '@/contexts/AuthProvider';
 import { useApp } from '@/contexts/useApp';
-import { useAuth, AuthProvider } from '@/hooks/useAuth';
+import { useAuth } from '@/hooks/useAuth';
 import { useStore } from '@/store/useStore';
 import { isDeveloperMode } from '@/supabase/client';
 import { Analytics } from '@vercel/analytics/react';

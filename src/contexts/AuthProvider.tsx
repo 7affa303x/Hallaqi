@@ -1,7 +1,5 @@
 import {
-  createContext,
   useCallback,
-  useContext,
   useEffect,
   useMemo,
   useState,
@@ -10,6 +8,7 @@ import {
 import { supabase, isDeveloperMode } from '@/supabase/client';
 import { signIn, signUp, signOut, resetPassword, fetchUserProfile } from '@/supabase/auth';
 import { getAuthRedirectUrl } from '@/lib/authRedirect';
+import { AuthContext, type AuthContextValue, type AuthState } from '@/contexts/authContext';
 import type { Profile } from '@/types/supabase-aliases';
 import type { Session, User } from '@supabase/supabase-js';
 
@@ -29,29 +28,6 @@ function clearStaleAuthStorage() {
   } catch {
     // Storage may be unavailable in private browser contexts.
   }
-}
-
-export interface AuthState {
-  user: User | null;
-  appUser: Profile | null;
-  isLoading: boolean;
-  isAuthenticated: boolean;
-  error: string | null;
-  session: Session | null;
-}
-
-export interface AuthContextValue extends AuthState {
-  login: (email: string, password: string) => Promise<void>;
-  register: (
-    email: string,
-    password: string,
-    displayName: string,
-    accountType?: 'client' | 'barber' | 'store' | 'company' | 'doctor',
-  ) => Promise<{ user: User | null; session: Session | null }>;
-  googleSignIn: () => Promise<unknown>;
-  logout: () => Promise<void>;
-  forgotPassword: (email: string) => Promise<void>;
-  clearError: () => void;
 }
 
 const INITIAL_STATE: AuthState = {
@@ -78,8 +54,6 @@ const DEV_PROFILE: Profile = {
   verification_status: 'unverified',
   updated_at: new Date().toISOString(),
 };
-
-const AuthContext = createContext<AuthContextValue | null>(null);
 
 /**
  * Single shared auth state for the whole app.
@@ -286,12 +260,4 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }), [state, login, register, googleSignIn, logout, forgotPassword, clearError]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-}
-
-export function useAuth(): AuthContextValue {
-  const ctx = useContext(AuthContext);
-  if (!ctx) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return ctx;
 }
