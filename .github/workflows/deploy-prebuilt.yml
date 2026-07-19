@@ -1,0 +1,73 @@
+name: Deploy Prebuilt to Production
+
+# Builds on GitHub Actions and uploads artifacts — bypasses Vercel remote build rate limits.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/deploy-prebuilt.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Install Vercel CLI
+        run: npm install -g vercel@41.7.8
+
+      - name: Link project + pull production env
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          set -euo pipefail
+          TEAM=$(curl -sS -H "Authorization: Bearer $VERCEL_TOKEN" \
+            "https://api.vercel.com/v2/teams?slug=souf303x")
+          TEAM_ID=$(echo "$TEAM" | python3 -c 'import sys,json; d=json.load(sys.stdin); print(d.get("id") or (d.get("teams") or [{}])[0].get("id") or "")')
+          test -n "$TEAM_ID"
+
+          PROJ=$(curl -sS -H "Authorization: Bearer $VERCEL_TOKEN" \
+            "https://api.vercel.com/v9/projects/hallaqi?teamId=$TEAM_ID")
+          PROJECT_ID=$(echo "$PROJ" | python3 -c 'import sys,json; d=json.load(sys.stdin); print(d.get("id") or "")')
+          test -n "$PROJECT_ID"
+
+          mkdir -p .vercel
+          printf '{"orgId":"%s","projectId":"%s"}\n' "$TEAM_ID" "$PROJECT_ID" > .vercel/project.json
+          vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
+
+      - name: Build locally and deploy prebuilt to production
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          set -euo pipefail
+          vercel build --prod --token="$VERCEL_TOKEN"
+          URL=$(vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN" --yes)
+          echo "Deployed: $URL"
+          echo "DEPLOY_URL=$URL" >> "$GITHUB_ENV"
+
+      - name: Verify auth-shell hash fix on production
+        run: |
+          set -euo pipefail
+          for i in 1 2 3 4 5 6 7 8 9 10 11 12; do
+            sleep 5
+            BODY=$(curl -sS "https://hallaqi.app/auth-shell.js")
+            if echo "$BODY" | grep -q 'hasHashToken'; then
+              echo "Production auth-shell has hash-token fix"
+              exit 0
+            fi
+            echo "attempt $i: fix not live yet"
+          done
+          echo "$BODY" | head -c 800
+          exit 1
