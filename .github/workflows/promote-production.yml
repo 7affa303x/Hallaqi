@@ -1,0 +1,45 @@
+name: Promote Preview to Production
+
+# Instant alias move — does NOT rebuild (bypasses Vercel build rate limits).
+on:
+  workflow_dispatch:
+    inputs:
+      deployment_url:
+        description: Preview deployment URL to promote to production
+        required: true
+        default: https://hallaqi-git-cursor-prod-auth-discovery-hard-fix-93d3-souf303x.vercel.app
+
+permissions:
+  contents: read
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Install Vercel CLI
+        run: npm install -g vercel@41.7.8
+
+      - name: Promote preview to production
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${VERCEL_TOKEN:-}" ]; then
+            echo "VERCEL_TOKEN secret is missing"
+            exit 1
+          fi
+          URL="${{ inputs.deployment_url }}"
+          echo "Promoting: $URL"
+          # --yes skips confirmation prompts in CI
+          vercel promote "$URL" --token "$VERCEL_TOKEN" --yes
+
+      - name: Verify auth-shell.js on production
+        run: |
+          set -euo pipefail
+          sleep 5
+          CT=$(curl -sSI "https://hallaqi.app/auth-shell.js" | tr -d '\r' | awk -F': ' 'tolower($1)=="content-type"{print tolower($2)}')
+          echo "content-type: $CT"
+          echo "$CT" | grep -q 'javascript'
+          curl -sS "https://hallaqi.app/" | grep -q 'auth-shell.js'
+          echo "Production auth-shell OK"
