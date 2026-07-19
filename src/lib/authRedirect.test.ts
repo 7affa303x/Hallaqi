@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { getAuthRedirectUrl, getCanonicalOrigin, consumeAuthUrlError, stripAuthHashFromUrl } from '@/lib/authRedirect';
+import { getAuthRedirectUrl, getCanonicalOrigin, consumeAuthUrlError, stripOAuthCallbackFromUrl, isOAuthCallbackUrl } from '@/lib/authRedirect';
 
 describe('authRedirect', () => {
   afterEach(() => {
@@ -118,6 +118,12 @@ describe('authRedirect', () => {
     expect(replaceState).toHaveBeenCalled();
   });
 
+  it('detects oauth callback urls', () => {
+    expect(isOAuthCallbackUrl('https://hallaqi.app/?code=abc')).toBe(true);
+    expect(isOAuthCallbackUrl('https://hallaqi.app/#access_token=x')).toBe(true);
+    expect(isOAuthCallbackUrl('https://hallaqi.app/')).toBe(false);
+  });
+
   it('strips access_token hash after session is applied', () => {
     const replaceState = vi.fn();
     vi.stubGlobal('window', {
@@ -133,7 +139,26 @@ describe('authRedirect', () => {
       },
       history: { ...window.history, state: null, replaceState },
     });
-    expect(stripAuthHashFromUrl()).toBe(true);
+    expect(stripOAuthCallbackFromUrl()).toBe(true);
+    expect(replaceState).toHaveBeenCalledWith(null, '', '/');
+  });
+
+  it('strips pkce code query after session is applied', () => {
+    const replaceState = vi.fn();
+    vi.stubGlobal('window', {
+      ...window,
+      location: {
+        ...window.location,
+        hostname: 'hallaqi.app',
+        origin: 'https://hallaqi.app',
+        href: 'https://hallaqi.app/?code=83cc9c62-902a-49ab-b123',
+        pathname: '/',
+        search: '?code=83cc9c62-902a-49ab-b123',
+        hash: '',
+      },
+      history: { ...window.history, state: null, replaceState },
+    });
+    expect(stripOAuthCallbackFromUrl()).toBe(true);
     expect(replaceState).toHaveBeenCalledWith(null, '', '/');
   });
 
@@ -152,7 +177,7 @@ describe('authRedirect', () => {
       },
       history: { ...window.history, state: null, replaceState },
     });
-    expect(stripAuthHashFromUrl()).toBe(false);
+    expect(stripOAuthCallbackFromUrl()).toBe(false);
     expect(replaceState).not.toHaveBeenCalled();
   });
 });

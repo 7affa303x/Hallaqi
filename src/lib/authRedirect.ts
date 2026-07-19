@@ -111,6 +111,18 @@ export function getCanonicalOrigin(): string {
   return getSiteUrl();
 }
 
+/** True when URL carries Supabase/OAuth callback params that must be consumed before any reload. */
+export function isOAuthCallbackUrl(href = typeof window !== 'undefined' ? window.location.href : ''): boolean {
+  try {
+    const url = new URL(href);
+    if (url.searchParams.has('code') || url.searchParams.has('error')) return true;
+    const hash = url.hash || '';
+    return hash.includes('access_token=') || hash.includes('type=recovery');
+  } catch {
+    return false;
+  }
+}
+
 /** Strip Supabase/OAuth error query params and return a user-facing message if any. */
 export function consumeAuthUrlError(): string | null {
   if (typeof window === 'undefined') return null;
@@ -140,18 +152,29 @@ export function consumeAuthUrlError(): string | null {
 }
 
 /**
- * After Supabase has consumed `#access_token=...` / recovery hashes into a session,
- * strip them from the address bar so tokens are not left visible or shareable.
+ * After Supabase has consumed OAuth callback params into a session,
+ * strip them from the address bar so tokens/codes are not left visible.
  */
-export function stripAuthHashFromUrl(): boolean {
+export function stripOAuthCallbackFromUrl(): boolean {
   if (typeof window === 'undefined') return false;
   try {
-    const hash = window.location.hash || '';
-    if (!hash || (!hash.includes('access_token=') && !hash.includes('type=recovery'))) {
-      return false;
-    }
     const url = new URL(window.location.href);
+    const hash = url.hash || '';
+    const hadHashAuth = hash.includes('access_token=') || hash.includes('type=recovery');
+    const hadQueryAuth = url.searchParams.has('code')
+      || url.searchParams.has('state')
+      || url.searchParams.has('error')
+      || url.searchParams.has('error_code')
+      || url.searchParams.has('error_description');
+
+    if (!hadHashAuth && !hadQueryAuth) return false;
+
     url.hash = '';
+    url.searchParams.delete('code');
+    url.searchParams.delete('state');
+    url.searchParams.delete('error');
+    url.searchParams.delete('error_code');
+    url.searchParams.delete('error_description');
     url.searchParams.delete('hallaqi_refresh');
     window.history.replaceState(
       window.history.state,
@@ -162,4 +185,9 @@ export function stripAuthHashFromUrl(): boolean {
   } catch {
     return false;
   }
+}
+
+/** @deprecated Use stripOAuthCallbackFromUrl */
+export function stripAuthHashFromUrl(): boolean {
+  return stripOAuthCallbackFromUrl();
 }

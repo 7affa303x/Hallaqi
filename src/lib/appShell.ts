@@ -1,5 +1,7 @@
 /** Keep installed clients on the latest deploy — pairs with auth-shell.js + build meta tag. */
 
+import { isOAuthCallbackUrl } from '@/lib/authRedirect';
+
 declare const __HALLAQI_BUILD_ID__: string;
 
 const BUILD_KEY = 'hallaqi-app-build-v1';
@@ -47,6 +49,9 @@ async function clearServiceWorkerAndCaches(): Promise<boolean> {
  */
 export async function ensureFreshAppShell(): Promise<boolean> {
   if (typeof window === 'undefined') return false;
+
+  // Never reload during OAuth callback — would interrupt ?code= / hash token exchange.
+  if (isOAuthCallbackUrl()) return false;
 
   const buildId = currentBuildId();
   let previous: string | null = null;
