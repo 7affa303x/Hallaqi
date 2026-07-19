@@ -142,8 +142,10 @@ export function transformToBarber(professional: RawProfessional): Barber {
     }
   }
 
-  const city = profile?.city?.trim() || '';
-  const address = professional.business_address?.trim() || '';
+  const cityRaw = profile?.city?.trim() || '';
+  const addressRaw = professional.business_address?.trim() || '';
+  const city = isMissingLocation(cityRaw) ? '' : cityRaw;
+  const address = isMissingLocation(addressRaw) ? '' : addressRaw;
 
   return {
     id: professional.id,
@@ -189,11 +191,36 @@ export function isPlausibleService(service: Pick<Service, 'name' | 'price' | 'du
 }
 
 /** Prefer listing barbers that look real enough for a soft launch. */
+export function isMissingLocation(value: string | undefined | null): boolean {
+  const v = (value || '').trim().toLowerCase();
+  if (!v) return true;
+  return (
+    v === 'n/a'
+    || v === 'na'
+    || v === 'null'
+    || v === 'undefined'
+    || v === 'unknown'
+    || v === 'unknown location'
+    || v === 'unknown wilaya'
+    || v.includes('غير محدد')
+    || v.includes('غير معر')
+  );
+}
+
+export function formatBarberLocation(barber: Pick<Barber, 'location' | 'wilaya'>): string {
+  const loc = isMissingLocation(barber.location) ? '' : barber.location.trim();
+  const wilaya = isMissingLocation(barber.wilaya) ? '' : barber.wilaya.trim();
+  if (loc && wilaya && loc !== wilaya) return `${loc}، ${wilaya}`;
+  return loc || wilaya || 'الموقع غير مكتمل';
+}
+
 export function isDisplayableBarber(barber: Barber): boolean {
   if (!barber.isActive) return false;
   if (!barber.services.length) return false;
   if (!barber.name || barber.name === 'حلاق') return false;
-  if (barber.wilaya === 'ولاية غير محددة' && barber.location === 'عنوان غير محدد') return false;
+  // Hide junk / incomplete profiles that erode trust (Unknown / N/A / empty city).
+  if (isMissingLocation(barber.wilaya) && isMissingLocation(barber.location)) return false;
+  if (!barber.services.some(isPlausibleService)) return false;
   return true;
 }
 

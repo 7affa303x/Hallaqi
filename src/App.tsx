@@ -55,18 +55,32 @@ const MarketplaceAnalyticsPage = lazy(() => import('@/pages/analytics/Marketplac
 const AiListingToolsPage = lazy(() => import('@/pages/marketplace/AiListingToolsPage'));
 
 function TabContent({ tab }: { tab: string }) {
-  let content;
-  switch (tab) {
-    case 'booking': content = <BookingTab />; break;
-    case 'appointments': content = <AppointmentsTab />; break;
-    case 'camera': content = <CameraTab />; break;
-    case 'ai-hub': content = <AIAdvisorPage />; break;
-    case 'forum': content = <ForumTab />; break;
-    case 'marketplace': content = <MarketplaceTab />; break;
-    case 'profile': content = <ProfileTab />; break;
-    default: content = <BookingTab />;
-  }
-  return <Suspense fallback={<LoadingFallback />}>{content}</Suspense>;
+  // Keep primary tabs mounted so auth/UI state does not remount and flash Login CTAs.
+  return (
+    <>
+      <div className={tab === 'booking' ? 'block' : 'hidden'} aria-hidden={tab !== 'booking'}>
+        <BookingTab />
+      </div>
+      <div className={tab === 'appointments' ? 'block' : 'hidden'} aria-hidden={tab !== 'appointments'}>
+        <Suspense fallback={<LoadingFallback />}><AppointmentsTab /></Suspense>
+      </div>
+      <div className={tab === 'camera' ? 'block' : 'hidden'} aria-hidden={tab !== 'camera'}>
+        <Suspense fallback={<LoadingFallback />}><CameraTab /></Suspense>
+      </div>
+      <div className={tab === 'ai-hub' ? 'block' : 'hidden'} aria-hidden={tab !== 'ai-hub'}>
+        <Suspense fallback={<LoadingFallback />}><AIAdvisorPage /></Suspense>
+      </div>
+      <div className={tab === 'forum' ? 'block' : 'hidden'} aria-hidden={tab !== 'forum'}>
+        <Suspense fallback={<LoadingFallback />}><ForumTab /></Suspense>
+      </div>
+      <div className={tab === 'marketplace' ? 'block' : 'hidden'} aria-hidden={tab !== 'marketplace'}>
+        <Suspense fallback={<LoadingFallback />}><MarketplaceTab /></Suspense>
+      </div>
+      <div className={tab === 'profile' ? 'block' : 'hidden'} aria-hidden={tab !== 'profile'}>
+        <Suspense fallback={<LoadingFallback />}><ProfileTab /></Suspense>
+      </div>
+    </>
+  );
 }
 
 function ScreenRouter() {

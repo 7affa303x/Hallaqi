@@ -49,5 +49,9 @@ describe('isDisplayableBarber', () => {
       wilaya: 'ولاية غير محددة',
       location: 'عنوان غير محدد',
     }))).toBe(false);
+    expect(isDisplayableBarber(base({
+      wilaya: 'N/A',
+      location: 'Unknown Location',
+    }))).toBe(false);
   });
 });

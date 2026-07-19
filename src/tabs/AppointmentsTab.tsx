@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuthGate } from '@/hooks/useAuthGate';
 import { useApp } from '@/contexts/useApp';
 import { SkeletonBookingCard } from '@/components/Skeleton';
 import EmptyState from '@/components/EmptyState';
@@ -46,7 +46,7 @@ function openDirections(location: string) {
 
 export default function AppointmentsTab() {
   const { bookings, themeConfig, settings, cancelBooking, navigate, setActiveTab, isLoading, refreshData } = useApp();
-  const { isAuthenticated, isLoading: authLoading, appUser } = useAuth();
+  const { isAuthenticated, isLoading: authLoading, needsLogin, appUser } = useAuthGate();
   const { money } = useI18n();
   const [activeFilter, setActiveFilter] = useState('upcoming');
   const [reviewBooking, setReviewBooking] = useState<Booking | null>(null);
@@ -111,7 +111,7 @@ export default function AppointmentsTab() {
   const showSkeletons = isLoading.bookings && bookings.length === 0;
 
   // If not authenticated, show login prompt
-  if (!isAuthenticated) {
+  if (needsLogin) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center px-6" style={{ backgroundColor: themeConfig.colors.background }}>
         <div className="text-center max-w-xs">

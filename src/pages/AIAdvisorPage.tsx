@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowRight, Image, LogIn, MapPin, Send, Sparkles, WandSparkles } from 'lucide-react';
 import { useApp } from '@/contexts/useApp';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuthGate } from '@/hooks/useAuthGate';
 import PausedFeatureBanner from '@/components/PausedFeatureBanner';
 import { FEATURE_FLAGS, PAUSED_LABEL } from '@/lib/featureFlags';
 import { buildClientSiteContext } from '@/lib/ai/siteContext';
@@ -23,7 +23,7 @@ const fallbackCapabilities: AICapabilities = {
 
 export default function AIAdvisorPage() {
   const { themeConfig, goBack, navigate, barbers, bookings, currentUser } = useApp();
-  const { isAuthenticated } = useAuth();
+  const { isLoggedIn, needsLogin, ready: authReady } = useAuthGate();
   const [capabilities, setCapabilities] = useState(fallbackCapabilities);
   const [mode, setMode] = useState<'advice' | 'image'>('advice');
   const [question, setQuestion] = useState('');
@@ -68,7 +68,7 @@ export default function AIAdvisorPage() {
 
   const submit = async () => {
     if (question.trim().length < 5) return;
-    if (!isAuthenticated) {
+    if (!isLoggedIn) {
       setError('يجب تسجيل الدخول لاستخدام المساعد الذكي');
       navigate('login', { redirectScreen: 'ai-advisor' });
       return;
@@ -104,7 +104,7 @@ export default function AIAdvisorPage() {
   const providerReady = mode === 'advice'
     ? capabilities.generativeAdvice
     : capabilities.hairstyleImageGeneration && !imagePaused;
-  const canSubmit = providerReady && isAuthenticated && !(mode === 'image' && imagePaused);
+  const canSubmit = providerReady && isLoggedIn && !(mode === 'image' && imagePaused);
 
   return (
     <div className="min-h-screen pb-8" style={{ backgroundColor: themeConfig.colors.background }}>
@@ -119,7 +119,9 @@ export default function AIAdvisorPage() {
       </header>
 
       <main className="p-4 space-y-4">
-        {!isAuthenticated && (
+        {!authReady ? (
+          <div className="h-20 rounded-2xl animate-pulse" style={{ backgroundColor: themeConfig.colors.surface }} />
+        ) : needsLogin ? (
           <div className="rounded-2xl border p-4" style={{ backgroundColor: `${themeConfig.colors.info}12`, borderColor: themeConfig.colors.border }}>
             <p className="text-xs font-bold" style={{ color: themeConfig.colors.text }}>سجّل الدخول لاستخدام المساعد</p>
             <p className="text-[11px] mt-1 leading-5" style={{ color: themeConfig.colors.textMuted }}>
@@ -134,9 +136,7 @@ export default function AIAdvisorPage() {
               <LogIn size={14} /> تسجيل الدخول
             </button>
           </div>
-        )}
-
-        {isAuthenticated && (
+        ) : (
           <div className="rounded-xl px-3 py-2 flex items-center gap-2 text-[11px]" style={{ backgroundColor: themeConfig.colors.primary + '10', color: themeConfig.colors.textMuted }}>
             <MapPin size={13} style={{ color: themeConfig.colors.primary }} />
             <span>{contextLabel}{(siteContext.topBarbers?.length ?? 0) > 0 ? ` · ${siteContext.topBarbers!.length} حلاق مقترح` : ''}</span>
@@ -196,7 +196,7 @@ export default function AIAdvisorPage() {
             <Send size={15} />
             {loading
               ? 'جاري المعالجة...'
-              : !isAuthenticated
+              : !isLoggedIn
                 ? 'سجّل الدخول للمتابعة'
                 : mode === 'image' && imagePaused
                   ? PAUSED_LABEL

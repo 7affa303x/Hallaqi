@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { useAuthGate } from '@/hooks/useAuthGate';
 import { useApp } from '@/contexts/useApp';
 import { settingsSections } from '@/data/mockData';
 import type { ThemeName, AnimationStyle } from '@/types';
@@ -82,7 +83,7 @@ type ProfileSubPage = 'main' | 'theme' | 'animation' | 'language' | 'country' | 
 
 export default function ProfileTab() {
   const { themeConfig, settings, navigate, setActiveTab, unreadCount, bookings, barbers, screenParams } = useApp();
-  const { isAuthenticated, appUser, user, logout, isLoading: authLoading } = useAuth();
+  const { appUser, user, logout, isLoading: authLoading, needsLogin } = useAuthGate();
   const [subPage, setSubPage] = useState<ProfileSubPage>(() => {
     if (screenParams?.openLegal === 'terms') return 'terms';
     if (screenParams?.openLegal === 'privacy') return 'privacy-policy';
@@ -127,7 +128,7 @@ export default function ProfileTab() {
     );
   }
 
-  if (!isAuthenticated) {
+  if (needsLogin) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center px-6" style={{ backgroundColor: themeConfig.colors.background }}>
         <div className="text-center max-w-xs">

@@ -134,9 +134,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (mounted) setState(s => ({ ...s, isLoading: false, isAuthenticated: false }));
       });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (!mounted) return;
-      void Promise.resolve().then(() => applySession(session));
+      // getSession already applied the initial session — avoid a second paint that can flash Login UI.
+      if (event === 'INITIAL_SESSION') return;
+      if (event === 'SIGNED_OUT' || !session) {
+        void applySession(null);
+        return;
+      }
+      void applySession(session);
     });
 
     return () => { mounted = false; subscription.unsubscribe(); };

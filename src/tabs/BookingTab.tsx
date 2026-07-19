@@ -1,5 +1,4 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
-import { useAuth } from '@/hooks/useAuth';
 import { useApp } from '@/contexts/useApp';
 import { barberTags, serviceCategories } from '@/data/mockData';
 import { SkeletonBarberCard } from '@/components/Skeleton';
@@ -9,7 +8,8 @@ import { motion } from 'framer-motion';
 import type { BarberTag, ServiceCategory } from '@/types';
 import { rankBarberRecommendations } from '@/lib/recommendations';
 import { useI18n } from '@/hooks/useI18n';
-import { isBarberOpenNow, isDisplayableBarber } from '@/lib/utils';
+import { isBarberOpenNow, isDisplayableBarber, formatBarberLocation } from '@/lib/utils';
+import { useAuthGate } from '@/hooks/useAuthGate';
 import { trackProductEvent } from '@/lib/product-analytics';
 import type { TranslationKey } from '@/lib/i18n';
 import { translate } from '@/lib/i18n';
@@ -67,7 +67,7 @@ function openInMaps(location: string, isMobile: boolean, countryCode = 'DZ') {
 
 export default function BookingTab() {
   const { barbers, bookings, currentUser, themeConfig, settings, updateSettings, toggleFollow, navigate, isLoading, setActiveTab } = useApp();
-  const { isAuthenticated } = useAuth();
+  const { isLoggedIn } = useAuthGate();
   const { t, money } = useI18n();
   const lang = settings.language;
   const tx = (key: TranslationKey) => translate(lang, key);
@@ -262,6 +262,14 @@ export default function BookingTab() {
         filtered.sort((a, b) => (b.tags.includes('new') ? 1 : 0) - (a.tags.includes('new') ? 1 : 0));
         break;
     }
+    // Deduplicate by id (DB join glitches can surface the same pro twice).
+    const seen = new Set<string>();
+    filtered = filtered.filter(b => {
+      if (seen.has(b.id)) return false;
+      seen.add(b.id);
+      return true;
+    });
+
     return filtered;
   }, [
     barbers, distances, onlyFavorites, searchQuery, selectedTags, selectedCategory, selectedWilaya,
@@ -475,7 +483,7 @@ export default function BookingTab() {
         <button
           type="button"
           onClick={() => {
-            if (!isAuthenticated) {
+            if (!isLoggedIn) {
               navigate('login', { redirectTab: 'appointments' });
               return;
             }
@@ -503,7 +511,7 @@ export default function BookingTab() {
           <button
             type="button"
             onClick={() => {
-              if (!isAuthenticated) {
+              if (!isLoggedIn) {
                 navigate('login', { redirectScreen: 'home', redirectTab: 'booking' });
                 return;
               }
@@ -699,7 +707,7 @@ export default function BookingTab() {
         </p>
       </div>
 
-      {isAuthenticated && !searchQuery && selectedTags.length === 0 && recommendations.length > 0 && (
+      {isLoggedIn && !searchQuery && selectedTags.length === 0 && recommendations.length > 0 && (
         <section className="px-4 mt-3" aria-labelledby="recommended-title">
           <div className="flex items-center gap-2 mb-2">
             <Sparkles size={16} style={{ color: themeConfig.colors.accent }} />
@@ -786,7 +794,7 @@ export default function BookingTab() {
                   <button
                     type="button"
                     onClick={() => {
-                      if (!isAuthenticated) {
+                      if (!isLoggedIn) {
                         navigate('login', { redirectScreen: 'home', redirectTab: 'booking' });
                         return;
                       }
@@ -805,7 +813,7 @@ export default function BookingTab() {
                 <div className="flex items-center gap-3 mt-2">
                   <div className="flex items-center gap-1 min-w-0">
                     <MapPin size={12} style={{ color: themeConfig.colors.textMuted }} />
-                    <span className="text-[11px] truncate" style={{ color: themeConfig.colors.textMuted }}>{barber.location}, {barber.wilaya}</span>
+                    <span className="text-[11px] truncate" style={{ color: themeConfig.colors.textMuted }}>{formatBarberLocation(barber)}</span>
                   </div>
                   <button
                     type="button"
@@ -851,7 +859,7 @@ export default function BookingTab() {
                   <button
                     type="button"
                     onClick={() => {
-                      if (!isAuthenticated) {
+                      if (!isLoggedIn) {
                         navigate('login', { redirectScreen: 'booking-flow', barberId: barber.id });
                         return;
                       }

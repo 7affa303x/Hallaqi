@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuthGate } from '@/hooks/useAuthGate';
 import { useApp } from '@/contexts/useApp';
 import { SkeletonForumPost } from '@/components/Skeleton';
 import EmptyState from '@/components/EmptyState';
@@ -24,7 +24,7 @@ type ActiveCompetition = Awaited<ReturnType<typeof getActiveCompetitions>>[numbe
 
 export default function ForumTab() {
   const { forumPosts, themeConfig, settings, navigate, isLoading } = useApp();
-  const { isAuthenticated, appUser } = useAuth();
+  const { isAuthenticated, needsLogin, appUser } = useAuthGate();
   const [selectedCategory, setSelectedCategory] = useState<ForumCategory | 'all'>('all');
   const [showSort, setShowSort] = useState(false);
   const [sortMode, setSortMode] = useState<'newest' | 'trending' | 'liked' | 'commented'>('newest');
@@ -148,8 +148,8 @@ export default function ForumTab() {
         )}
       </div>
 
-      {/* Auth notice for posting */}
-      {!isAuthenticated && (
+      {/* Auth notice for posting — only after session restore finishes */}
+      {needsLogin && (
         <div className="px-4 mt-2">
           <button
             onClick={() => navigate('login')}
@@ -246,7 +246,7 @@ interface PostCardProps {
 
 function ForumPostCard({ post, isPinned = false, navigate, themeConfig }: PostCardProps) {
   const { toggleLike } = useApp();
-  const { isAuthenticated } = useAuth();
+  const { isLoggedIn } = useAuthGate();
   const [isExpanded, setIsExpanded] = useState(false);
   const [isBookmarked, setIsBookmarked] = useState(() => isForumBookmarked(post.id));
   const RoleIcon = roleIcons[post.authorRole] || Users;
@@ -257,7 +257,7 @@ function ForumPostCard({ post, isPinned = false, navigate, themeConfig }: PostCa
   const nav = navigate;
 
   const handleLike = () => {
-    if (!isAuthenticated) {
+    if (!isLoggedIn) {
       nav('login', { redirectScreen: 'post-detail', postId: post.id });
       return;
     }
@@ -279,7 +279,7 @@ function ForumPostCard({ post, isPinned = false, navigate, themeConfig }: PostCa
   };
 
   const handleComment = () => {
-    if (!isAuthenticated) {
+    if (!isLoggedIn) {
       nav('login', { redirectScreen: 'post-detail', postId: post.id });
       return;
     }
