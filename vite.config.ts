@@ -21,7 +21,7 @@ export default defineConfig({
         enabled: false,
       },
       manifest: false,
-      includeAssets: ["logo-icon.png", "logo-symbol.png", "logo-wordmark.png", "push-handler.js", "offline.html", "robots.txt"],
+      includeAssets: ["logo-icon.png", "logo-symbol.png", "logo-wordmark.png", "push-handler.js", "offline.html", "robots.txt", "auth-shell.js"],
       workbox: {
         cleanupOutdatedCaches: true,
         clientsClaim: true,
