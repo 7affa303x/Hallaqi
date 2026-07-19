@@ -138,3 +138,28 @@ export function consumeAuthUrlError(): string | null {
     return null;
   }
 }
+
+/**
+ * After Supabase has consumed `#access_token=...` / recovery hashes into a session,
+ * strip them from the address bar so tokens are not left visible or shareable.
+ */
+export function stripAuthHashFromUrl(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    const hash = window.location.hash || '';
+    if (!hash || (!hash.includes('access_token=') && !hash.includes('type=recovery'))) {
+      return false;
+    }
+    const url = new URL(window.location.href);
+    url.hash = '';
+    url.searchParams.delete('hallaqi_refresh');
+    window.history.replaceState(
+      window.history.state,
+      '',
+      `${url.pathname}${url.search}`,
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}

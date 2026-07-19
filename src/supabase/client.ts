@@ -37,6 +37,7 @@ export const supabase = isSupabaseConfigured()
         autoRefreshToken: true,
         persistSession: true,
         detectSessionInUrl: true,
+        flowType: 'pkce',
       },
     })
   : createClient<Database>('https://placeholder.supabase.co', 'placeholder', {

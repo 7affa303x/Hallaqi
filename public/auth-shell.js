@@ -1,8 +1,9 @@
 /**
  * Early shell guards — runs before React (CSP-safe external script).
  * 1) Apex redirect
- * 2) OAuth return → purge SW/cache once
- * 3) Every visit → fetch fresh index.html build id; auto-upgrade if deploy changed
+ * 2) OAuth ?code= (PKCE) → purge SW/cache once then reload
+ * 3) OAuth #access_token= → NEVER block React (Supabase must read the hash)
+ * 4) Every visit → fetch fresh build id; auto-upgrade if deploy changed
  */
 (function () {
   var BUILD_KEY = 'hallaqi-app-build-v1';
@@ -56,7 +57,6 @@
     var attempted = '';
     try { attempted = sessionStorage.getItem(UPGRADE_KEY) || ''; } catch (e) { /* ignore */ }
 
-    // Already tried this build once — accept to avoid infinite reload loops.
     if (attempted === serverBuild) {
       setStoredBuild(serverBuild);
       return Promise.resolve(false);
@@ -97,13 +97,16 @@
       return;
     }
 
-    window.__HALLAQI_AUTH_SHELL_PENDING = true;
-
     var q = location.search || '';
     var h = location.hash || '';
-    var auth = /[?&]code=/.test(q) || /[?&]error=/.test(q) || /access_token=/.test(h) || /type=recovery/.test(h);
+    // PKCE / query errors — safe to purge SW then reload (code survives in query).
+    var hasAuthCode = /[?&]code=/.test(q) || /[?&]error=/.test(q);
+    // Implicit / recovery tokens live in the hash — React+Supabase MUST read them.
+    // Never set PENDING or reload before boot for these, or the page stays blank.
+    var hasHashToken = /access_token=/.test(h) || /type=recovery/.test(h);
 
-    if (auth) {
+    if (hasAuthCode) {
+      window.__HALLAQI_AUTH_SHELL_PENDING = true;
       var codeMatch = q.match(/[?&]code=([^&]+)/);
       var refreshKey = 'hallaqi-auth-shell-refreshed:' + (codeMatch ? codeMatch[1].slice(0, 24) : 'err');
       if (sessionStorage.getItem(refreshKey) === '1') {
@@ -111,14 +114,27 @@
         return;
       }
       sessionStorage.setItem(refreshKey, '1');
-      clearShellCaches().then(function () {
+      var done = false;
+      var finishReload = function () {
+        if (done) return;
+        done = true;
         reloadWithRefresh('oauth');
-      }, function () {
-        reloadWithRefresh('oauth');
-      });
+      };
+      clearShellCaches().then(finishReload, finishReload);
+      // Never leave a white screen if cache APIs hang.
+      setTimeout(finishReload, 2500);
       return;
     }
 
+    if (hasHashToken) {
+      // Let the app boot immediately so detectSessionInUrl can consume #access_token.
+      window.__HALLAQI_AUTH_SHELL_PENDING = false;
+      // Best-effort SW cleanup in the background — no reload (would risk losing hash timing).
+      try { clearShellCaches(); } catch (e) { /* ignore */ }
+      return;
+    }
+
+    window.__HALLAQI_AUTH_SHELL_PENDING = true;
     runVersionCheck()
       .then(function (reloading) { finishShellGate(reloading); })
       .catch(function () { finishShellGate(false); });
