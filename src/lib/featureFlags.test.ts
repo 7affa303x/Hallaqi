@@ -16,6 +16,7 @@ describe('featureFlags', () => {
     expect(FEATURE_FLAGS.ccpPaymentsEnabled).toBe(false);
     expect(FEATURE_FLAGS.paidSubscriptionsEnabled).toBe(false);
     expect(FEATURE_FLAGS.aiImageGenerationEnabled).toBe(false);
+    expect(FEATURE_FLAGS.guestBookingEnabled).toBe(false);
     expect(isCashOnlyPayments()).toBe(true);
   });
 

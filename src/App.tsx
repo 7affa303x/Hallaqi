@@ -13,6 +13,7 @@ import BrandLogo from '@/components/BrandLogo';
 import InstallPrompt from '@/components/InstallPrompt';
 import SoftOnboarding from '@/components/SoftOnboarding';
 import CookieConsent from '@/components/CookieConsent';
+import { FEATURE_FLAGS } from '@/lib/featureFlags';
 import { readAnalyticsConsent } from '@/lib/analyticsConsent';
 import { reportClientError } from '@/lib/error-reporting';
 import { translate } from '@/lib/i18n';
@@ -205,6 +206,14 @@ function AppContent() {
   const [analyticsOn, setAnalyticsOn] = useState(() => readAnalyticsConsent() === 'accepted');
 
   useEffect(() => {
+    // Prefetch appointments chunk after home settles (#165)
+    const t = window.setTimeout(() => {
+      void import('@/tabs/AppointmentsTab');
+    }, 2500);
+    return () => window.clearTimeout(t);
+  }, []);
+
+  useEffect(() => {
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
     window.addEventListener('online', handleOnline);
@@ -272,6 +281,19 @@ function AppContent() {
         {translate(settings.language, 'skipToContent')}
       </a>
       <NetworkStatusBar />
+      {FEATURE_FLAGS.maintenanceModeEnabled && (
+        <div
+          role="status"
+          className="fixed top-0 left-0 right-0 z-[95] px-3 py-2 text-center text-[11px] font-bold text-white"
+          style={{ backgroundColor: themeConfig.colors.warning }}
+        >
+          {settings.language === 'en'
+            ? 'Scheduled maintenance — some features may be slow.'
+            : settings.language === 'fr'
+              ? 'Maintenance planifiée — certaines fonctions peuvent être lentes.'
+              : 'صيانة مجدولة — قد تبطئ بعض الميزات مؤقتاً.'}
+        </div>
+      )}
       {dataError && (
         <div
           role="alert"

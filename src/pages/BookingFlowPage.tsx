@@ -24,13 +24,19 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { bookingStep3Schema } from '@/lib/validation';
 import type { BookingStep3FormData } from '@/lib/validation';
 import { preferredBookingHour, rankAvailableSlots } from '@/lib/scheduling';
-import { FEATURE_FLAGS, PAUSED_LABEL } from '@/lib/featureFlags';
+import { FEATURE_FLAGS, PAUSED_LABEL, COMING_SOON_LABEL, isCashOnlyPayments } from '@/lib/featureFlags';
 import { cancelPolicyDetails, cancelPolicySummary } from '@/lib/cancelPolicy';
 import { trackProductEvent } from '@/lib/product-analytics';
 import { reportClientError } from '@/lib/error-reporting';
 import { useI18n } from '@/hooks/useI18n';
 
 const BOOKING_DRAFT_KEY = 'hallaqi-booking-draft-v1';
+
+const NOTE_QUICK_CHIPS = [
+  'قصة قصيرة من الجوانب',
+  'بدون منتجات كيميائية',
+  'أول زيارة لي',
+] as const;
 
 const ALL_TIME_SLOTS = [
   '08:00', '08:30', '09:00', '09:30', '10:00', '10:30',
@@ -146,6 +152,7 @@ export default function BookingFlowPage() {
   const {
     register: registerStep3,
     handleSubmit: handleStep3Submit,
+    setValue: setStep3Value,
     formState: { errors: step3Errors },
     watch: watchStep3,
   } = useForm<BookingStep3FormData>({
@@ -160,6 +167,7 @@ export default function BookingFlowPage() {
 
   const watchedPaymentMethod = watchStep3('paymentMethod');
   const watchedIsMobileService = watchStep3('isMobileService');
+  const watchedNote = watchStep3('note');
 
   const barber = barbers.find(b => b.id === screenParams?.barberId);
   const dates = generateDates();
@@ -763,6 +771,24 @@ export default function BookingFlowPage() {
         </div>
       </div>
 
+      {!FEATURE_FLAGS.guestBookingEnabled && (
+        <div
+          role="status"
+          className="mx-4 mt-3 rounded-xl border px-3 py-2 flex items-center justify-between gap-2"
+          style={{ backgroundColor: `${themeConfig.colors.info}10`, borderColor: themeConfig.colors.border }}
+        >
+          <p className="text-[11px] font-bold" style={{ color: themeConfig.colors.text }}>
+            حجز الزائر بدون حساب
+          </p>
+          <span
+            className="text-[9px] font-black px-2 py-0.5 rounded-full shrink-0"
+            style={{ backgroundColor: `${themeConfig.colors.info}22`, color: themeConfig.colors.info }}
+          >
+            {COMING_SOON_LABEL}
+          </span>
+        </div>
+      )}
+
       {/* === STEP 1: SERVICES === */}
       {step === 1 && (
         <div className="px-4 mt-4">
@@ -930,33 +956,51 @@ export default function BookingFlowPage() {
             </div>
           )}
 
-          {/* Payment method */}
+          {/* Payment method — DZ launch: cash-first; Stripe/CCP hidden unless explicitly enabled (#137/#144) */}
           <div>
             <p className="text-xs font-bold mb-2" style={{ color: themeConfig.colors.text }}>طريقة الدفع</p>
-            <div className="grid grid-cols-4 gap-2">
-              {([
-                { key: 'cash' as const, label: 'نقداً', icon: Banknote, disabled: false, badge: null as string | null },
-                { key: 'card' as const, label: 'بطاقة', icon: CreditCard, disabled: !cardEnabled, badge: cardEnabled ? null : PAUSED_LABEL },
-                { key: 'ccp' as const, label: 'CCP', icon: CreditCard, disabled: !ccpEnabled, badge: ccpEnabled ? null : PAUSED_LABEL },
-                { key: 'baridi-mob' as const, label: 'بريدي موب', icon: Wallet, disabled: !ccpEnabled, badge: ccpEnabled ? null : PAUSED_LABEL },
-              ]).map(pm => (
-                <button key={pm.key} type="button" disabled={pm.disabled} onClick={() => {
-                  registerStep3('paymentMethod').onChange({ target: { value: pm.key } });
-                  trackProductEvent('Payment Method Selected', { method: pm.key, barberId: barber.id });
-                }}
-                  className="relative flex flex-col items-center gap-1 p-3 rounded-xl border transition-all disabled:opacity-45"
-                  title={pm.disabled ? 'هذه الطريقة متوقفة حالياً' : undefined}
-                  style={{ backgroundColor: watchedPaymentMethod === pm.key ? themeConfig.colors.primary + '08' : themeConfig.colors.surface, borderColor: watchedPaymentMethod === pm.key ? themeConfig.colors.primary : themeConfig.colors.border }}>
-                  {pm.badge && (
-                    <span className="absolute -top-1.5 left-1 text-[8px] font-black px-1 rounded bg-amber-100 text-amber-700">{pm.badge}</span>
-                  )}
-                  <pm.icon size={20} style={{ color: watchedPaymentMethod === pm.key ? themeConfig.colors.primary : themeConfig.colors.textMuted }} />
-                  <span className="text-[10px] font-bold" style={{ color: watchedPaymentMethod === pm.key ? themeConfig.colors.primary : themeConfig.colors.textMuted }}>{pm.label}</span>
-                </button>
-              ))}
-            </div>
+            {isCashOnlyPayments() || settings.countryCode === 'DZ' ? (
+              <div
+                className="flex items-center gap-3 p-3 rounded-xl border"
+                style={{ backgroundColor: themeConfig.colors.primary + '08', borderColor: themeConfig.colors.primary }}
+              >
+                <Banknote size={22} style={{ color: themeConfig.colors.primary }} />
+                <div className="flex-1 text-right">
+                  <p className="text-xs font-bold" style={{ color: themeConfig.colors.text }}>نقداً عند الزيارة</p>
+                  <p className="text-[10px] mt-0.5" style={{ color: themeConfig.colors.textMuted }}>
+                    الدفع عند الزيارة فقط · التسوية بالدينار الجزائري (DZD)
+                  </p>
+                </div>
+                <span className="text-[9px] font-black px-2 py-1 rounded-lg" style={{ backgroundColor: themeConfig.colors.success + '22', color: themeConfig.colors.success }}>
+                  الدفع عند الزيارة فقط
+                </span>
+              </div>
+            ) : (
+              <div className="grid grid-cols-4 gap-2">
+                {([
+                  { key: 'cash' as const, label: 'نقداً', icon: Banknote, disabled: false, badge: 'عند الزيارة' as string | null },
+                  { key: 'card' as const, label: 'بطاقة', icon: CreditCard, disabled: !cardEnabled, badge: cardEnabled ? null : PAUSED_LABEL },
+                  { key: 'ccp' as const, label: 'CCP', icon: CreditCard, disabled: !ccpEnabled, badge: ccpEnabled ? null : PAUSED_LABEL },
+                  { key: 'baridi-mob' as const, label: 'بريدي موب', icon: Wallet, disabled: !ccpEnabled, badge: ccpEnabled ? null : PAUSED_LABEL },
+                ]).map(pm => (
+                  <button key={pm.key} type="button" disabled={pm.disabled} onClick={() => {
+                    registerStep3('paymentMethod').onChange({ target: { value: pm.key } });
+                    trackProductEvent('Payment Method Selected', { method: pm.key, barberId: barber.id });
+                  }}
+                    className="relative flex flex-col items-center gap-1 p-3 rounded-xl border transition-all disabled:opacity-45"
+                    title={pm.disabled ? 'هذه الطريقة متوقفة حالياً' : undefined}
+                    style={{ backgroundColor: watchedPaymentMethod === pm.key ? themeConfig.colors.primary + '08' : themeConfig.colors.surface, borderColor: watchedPaymentMethod === pm.key ? themeConfig.colors.primary : themeConfig.colors.border }}>
+                    {pm.badge && (
+                      <span className="absolute -top-1.5 left-1 text-[8px] font-black px-1 rounded bg-amber-100 text-amber-700">{pm.badge}</span>
+                    )}
+                    <pm.icon size={20} style={{ color: watchedPaymentMethod === pm.key ? themeConfig.colors.primary : themeConfig.colors.textMuted }} />
+                    <span className="text-[10px] font-bold" style={{ color: watchedPaymentMethod === pm.key ? themeConfig.colors.primary : themeConfig.colors.textMuted }}>{pm.label}</span>
+                  </button>
+                ))}
+              </div>
+            )}
             <p className="text-[10px] mt-2 leading-5" style={{ color: themeConfig.colors.textMuted }}>
-              عند الإطلاق: الدفع النقدي عند الزيارة متاح. المبلغ المعروض بعملة العرض للتقريب؛ التسوية عند الزيارة بالدينار الجزائري (DZD). البطاقة وCCP وبريدي موب <span className="font-bold" style={{ color: themeConfig.colors.warning }}>{PAUSED_LABEL}</span> حتى تفعيل التحصيل.
+              المبلغ المعروض بعملة العرض للتقريب؛ التسوية عند الزيارة بالدينار الجزائري (DZD). البطاقة وStripe وCCP غير معروضة كخيار رئيسي في الجزائر حالياً.
             </p>
           </div>
 
@@ -990,6 +1034,26 @@ export default function BookingFlowPage() {
           {/* Note */}
           <div>
             <p className="text-xs font-bold mb-2" style={{ color: themeConfig.colors.text }}>ملاحظات (اختياري)</p>
+            <div className="flex flex-wrap gap-2 mb-2">
+              {NOTE_QUICK_CHIPS.map(chip => {
+                const active = watchedNote === chip;
+                return (
+                  <button
+                    key={chip}
+                    type="button"
+                    onClick={() => setStep3Value('note', chip, { shouldDirty: true, shouldValidate: true })}
+                    className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg border transition-all"
+                    style={{
+                      backgroundColor: active ? themeConfig.colors.primary + '14' : themeConfig.colors.surface,
+                      borderColor: active ? themeConfig.colors.primary : themeConfig.colors.border,
+                      color: active ? themeConfig.colors.primary : themeConfig.colors.textMuted,
+                    }}
+                  >
+                    {chip}
+                  </button>
+                );
+              })}
+            </div>
             <textarea {...registerStep3('note')} placeholder="أي ملاحظات خاصة..." rows={2} className="w-full p-3 rounded-xl border text-xs resize-none" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border, color: themeConfig.colors.text }} />
           </div>
 

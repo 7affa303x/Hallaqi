@@ -4,6 +4,19 @@ import { translate } from '@/lib/i18n';
 import { X, CalendarDays, ShoppingBag, Sparkles } from 'lucide-react';
 
 const STORAGE_KEY = 'hallaqi-onboarding-v1-done';
+const DEVICE_LANG_KEY = 'hallaqi-device-lang-applied-v1';
+
+function detectDeviceLanguage(): 'ar' | 'fr' | 'en' {
+  try {
+    const raw = (navigator.language || (navigator as Navigator & { userLanguage?: string }).userLanguage || 'ar').toLowerCase();
+    if (raw.startsWith('fr')) return 'fr';
+    if (raw.startsWith('en')) return 'en';
+    if (raw.startsWith('ar')) return 'ar';
+  } catch {
+    /* ignore */
+  }
+  return 'ar';
+}
 
 /**
  * First-visit soft onboarding — one composition, three short steps.
@@ -20,12 +33,20 @@ export default function SoftOnboarding() {
 
   useEffect(() => {
     try {
+      // #103 — respect device language once on first open (before user picks)
+      if (localStorage.getItem(DEVICE_LANG_KEY) !== '1') {
+        const hasExplicit = Boolean(localStorage.getItem('hallaqi-locale-prefs-v1'));
+        if (!hasExplicit) {
+          updateSettings({ language: detectDeviceLanguage() });
+        }
+        localStorage.setItem(DEVICE_LANG_KEY, '1');
+      }
       if (localStorage.getItem(STORAGE_KEY) === '1') return;
       setOpen(true);
     } catch {
       // ignore
     }
-  }, []);
+  }, [updateSettings]);
 
   const finish = () => {
     try { localStorage.setItem(STORAGE_KEY, '1'); } catch { /* ignore */ }

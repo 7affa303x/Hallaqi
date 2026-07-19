@@ -10,6 +10,8 @@
     "lint": "eslint .",
     "test": "vitest",
     "test:run": "vitest run",
+    "audit": "npm audit --omit=dev",
+    "audit:ci": "npm audit --audit-level=high --omit=dev",
     "check": "npm run typecheck && npm run lint && npm run test:run && npm run build",
     "preview": "vite preview"
   },

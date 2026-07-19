@@ -5,6 +5,8 @@ import { useAuth } from '@/hooks/useAuth';
 import PausedFeatureBanner from '@/components/PausedFeatureBanner';
 import { FEATURE_FLAGS, PAUSED_LABEL } from '@/lib/featureFlags';
 import { buildClientSiteContext } from '@/lib/ai/siteContext';
+import { looksLikeMedicalQuestion, medicalRefusalMessage } from '@/lib/ai/medicalGuard';
+import { translateApiError } from '@/lib/apiErrors';
 import {
   getAICapabilities,
   requestGroomingAdvice,
@@ -22,7 +24,7 @@ const fallbackCapabilities: AICapabilities = {
 };
 
 export default function AIAdvisorPage() {
-  const { themeConfig, goBack, navigate, barbers, bookings, currentUser } = useApp();
+  const { themeConfig, goBack, navigate, barbers, bookings, currentUser, settings } = useApp();
   const { isAuthenticated } = useAuth();
   const [capabilities, setCapabilities] = useState(fallbackCapabilities);
   const [mode, setMode] = useState<'advice' | 'image'>('advice');
@@ -31,6 +33,8 @@ export default function AIAdvisorPage() {
   const [styleImage, setStyleImage] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  /** Short session memory — last 3 questions (#123) */
+  const [recentQuestions, setRecentQuestions] = useState<string[]>([]);
 
   useEffect(() => {
     void getAICapabilities().then(setCapabilities).catch(() => {
@@ -77,6 +81,14 @@ export default function AIAdvisorPage() {
       setError(`توليد صور التسريحات ${PAUSED_LABEL} — حصة Gemini غير متاحة حالياً`);
       return;
     }
+    const q = question.trim();
+    if (mode === 'advice' && looksLikeMedicalQuestion(q)) {
+      setAdvice(null);
+      setStyleImage('');
+      setError(medicalRefusalMessage(settings.language));
+      setRecentQuestions(prev => [q, ...prev.filter(x => x !== q)].slice(0, 3));
+      return;
+    }
     setLoading(true);
     setError('');
     setAdvice(null);
@@ -84,15 +96,16 @@ export default function AIAdvisorPage() {
     try {
       if (mode === 'advice') {
         setAdvice(await requestGroomingAdvice({
-          question: question.trim(),
+          question: q,
           siteContext,
         }));
+        setRecentQuestions(prev => [q, ...prev.filter(x => x !== q)].slice(0, 3));
       } else {
-        setStyleImage(await requestStyleImage(question.trim()));
+        setStyleImage(await requestStyleImage(q));
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'الخدمة غير متاحة';
-      if (message.includes('تسجيل الدخول')) {
+      const message = translateApiError(err, settings.language);
+      if (message.includes('تسجيل الدخول') || message.includes('Sign in') || message.includes('Connectez')) {
         navigate('login', { redirectScreen: 'ai-advisor' });
       }
       setError(message);
@@ -157,6 +170,22 @@ export default function AIAdvisorPage() {
               colors={themeConfig.colors}
             />
           ) : null
+        )}
+
+        {recentQuestions.length > 0 && mode === 'advice' && (
+          <div className="flex flex-wrap gap-2">
+            {recentQuestions.map(rq => (
+              <button
+                key={rq}
+                type="button"
+                onClick={() => setQuestion(rq)}
+                className="text-[10px] px-2.5 py-1.5 rounded-lg border max-w-full truncate"
+                style={{ borderColor: themeConfig.colors.border, color: themeConfig.colors.textMuted, backgroundColor: themeConfig.colors.surface }}
+              >
+                {rq}
+              </button>
+            ))}
+          </div>
         )}
 
         <div className="rounded-2xl border p-4" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>

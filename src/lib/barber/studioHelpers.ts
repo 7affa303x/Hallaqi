@@ -75,6 +75,8 @@ export interface DayStats {
   pendingCount: number;
   confirmedCount: number;
   completedCount: number;
+  cancelledToday: number;
+  noShowToday: number;
   revenueToday: number;
   nextBooking: StudioBooking | null;
   nowBooking: StudioBooking | null;
@@ -90,6 +92,8 @@ export function computeDayStats(rows: StudioBooking[], now = new Date()): DaySta
   const pendingCount = rows.filter(r => r.status === 'pending').length;
   const confirmedToday = today.filter(r => r.status === 'confirmed' || r.status === 'in_progress');
   const completedToday = today.filter(r => r.status === 'completed');
+  const cancelledToday = rows.filter(r => isSameDay(r.booking_start_time, now) && r.status === 'cancelled').length;
+  const noShowToday = rows.filter(r => isSameDay(r.booking_start_time, now) && r.status === 'no_show').length;
   const revenueToday = completedToday.reduce((sum, r) => sum + (r.total_price || 0), 0);
 
   const nowBooking = confirmedToday.find(r => {
@@ -133,6 +137,8 @@ export function computeDayStats(rows: StudioBooking[], now = new Date()): DaySta
     pendingCount,
     confirmedCount: confirmedToday.length,
     completedCount: completedToday.length,
+    cancelledToday,
+    noShowToday,
     revenueToday,
     nextBooking,
     nowBooking,

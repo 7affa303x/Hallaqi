@@ -15,10 +15,12 @@ import { getRecentBarberIds } from '@/lib/deviceStorage';
 import { trackProductEvent } from '@/lib/product-analytics';
 import type { TranslationKey } from '@/lib/i18n';
 import { translate } from '@/lib/i18n';
+import { absoluteUrl } from '@/lib/siteUrl';
 import {
   Search, SlidersHorizontal, MapPin, Star, Clock, Car, Heart,
   Scissors, BadgeCheck, Zap, TrendingUp, ChevronLeft, X,
-  Filter, Navigation, Globe, Sparkles, ShoppingBag, CalendarDays, GitCompare
+  Filter, Navigation, Globe, Sparkles, ShoppingBag, CalendarDays, GitCompare,
+  LayoutGrid, List, Share2,
 } from 'lucide-react';
 
 const tagIcons: Record<string, typeof Zap> = {
@@ -65,6 +67,9 @@ export default function BookingTab() {
   const [sortBy, setSortBy] = useState<'smart' | 'rating' | 'distance' | 'price' | 'newest'>('smart');
   const [openNowOnly, setOpenNowOnly] = useState(false);
   const [mobileOnly, setMobileOnly] = useState(false);
+  const [maxBudget, setMaxBudget] = useState<number | null>(null);
+  const [maxDuration, setMaxDuration] = useState<number | null>(null);
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
   const [compareIds, setCompareIds] = useState<string[]>([]);
   const [recentIds, setRecentIds] = useState<string[]>(() => getRecentBarberIds());
   const [userCoordinates, setUserCoordinates] = useState<{ lat: number; lng: number } | null>(null);
@@ -88,6 +93,56 @@ export default function BookingTab() {
   useEffect(() => {
     setRecentIds(getRecentBarberIds());
   }, [barbers]);
+
+  // Restore discovery filters from shareable URL params
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const wilaya = params.get('wilaya');
+    const q = params.get('q');
+    const sort = params.get('sort');
+    const openNow = params.get('openNow');
+    const mobile = params.get('mobile');
+    const budget = params.get('budget');
+    const duration = params.get('duration');
+
+    if (wilaya) {
+      setSelectedWilaya(wilaya);
+      try { localStorage.setItem('hallaqi-discovery-wilaya', wilaya); } catch { /* ignore */ }
+    }
+    if (q) setSearchQuery(q);
+    if (sort === 'smart' || sort === 'rating' || sort === 'distance' || sort === 'price' || sort === 'newest') {
+      setSortBy(sort);
+    }
+    if (openNow === '1' || openNow === 'true') setOpenNowOnly(true);
+    if (mobile === '1' || mobile === 'true') setMobileOnly(true);
+    if (budget != null && budget !== '') {
+      const n = Number(budget);
+      if (Number.isFinite(n) && n >= 0) setMaxBudget(n);
+    }
+    if (duration != null && duration !== '') {
+      const n = Number(duration);
+      if (Number.isFinite(n) && n >= 0) setMaxDuration(n);
+    }
+  }, []);
+
+  useEffect(() => {
+    trackProductEvent('Discovery Filter Applied', {
+      wilaya: selectedWilaya || null,
+      q: searchQuery || null,
+      sort: sortBy,
+      openNow: openNowOnly,
+      mobile: mobileOnly,
+      budget: maxBudget,
+      duration: maxDuration,
+      onlyFavorites,
+      category: selectedCategory,
+      tags: selectedTags.join(',') || null,
+      viewMode,
+    });
+  }, [
+    selectedWilaya, searchQuery, sortBy, openNowOnly, mobileOnly,
+    maxBudget, maxDuration, onlyFavorites, selectedCategory, selectedTags, viewMode,
+  ]);
 
   const popularServiceNames = useMemo(() => {
     const counts = new Map<string, number>();
@@ -117,6 +172,37 @@ export default function BookingTab() {
       if (prev.length >= 3) return prev;
       return [...prev, barberId];
     });
+  };
+
+  const shareSearch = async () => {
+    const params = new URLSearchParams();
+    params.set('tab', 'booking');
+    if (selectedWilaya) params.set('wilaya', selectedWilaya);
+    if (searchQuery.trim()) params.set('q', searchQuery.trim());
+    if (sortBy !== 'smart') params.set('sort', sortBy);
+    if (openNowOnly) params.set('openNow', '1');
+    if (mobileOnly) params.set('mobile', '1');
+    if (maxBudget != null) params.set('budget', String(maxBudget));
+    if (maxDuration != null) params.set('duration', String(maxDuration));
+    const url = absoluteUrl(`/?${params.toString()}`);
+    trackProductEvent('Discovery Share', {
+      wilaya: selectedWilaya || null,
+      q: searchQuery || null,
+      sort: sortBy,
+      openNow: openNowOnly,
+      mobile: mobileOnly,
+      budget: maxBudget,
+      duration: maxDuration,
+    });
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: 'Hallaqi', text: tx('shareSearch'), url });
+      } else {
+        await navigator.clipboard.writeText(url);
+      }
+    } catch {
+      try { await navigator.clipboard.writeText(url); } catch { /* ignore */ }
+    }
   };
 
   const recentBarbers = useMemo(
@@ -181,9 +267,18 @@ export default function BookingTab() {
     if (mobileOnly) {
       filtered = filtered.filter(barber => barber.isMobile);
     }
+    if (maxBudget != null) {
+      filtered = filtered.filter(barber => barber.services.some(s => s.price <= maxBudget));
+    }
+    if (maxDuration != null) {
+      filtered = filtered.filter(barber => barber.services.some(s => s.duration <= maxDuration));
+    }
     switch (sortBy) {
       case 'smart':
         filtered.sort((a, b) => {
+          const followA = a.isFollowing ? 1 : 0;
+          const followB = b.isFollowing ? 1 : 0;
+          if (followA !== followB) return followB - followA;
           const distA = distances.get(a.id);
           const distB = distances.get(b.id);
           const knownA = distA != null;
@@ -208,7 +303,7 @@ export default function BookingTab() {
       case 'newest': filtered.sort((a, b) => (b.tags.includes('new') ? 1 : 0) - (a.tags.includes('new') ? 1 : 0)); break;
     }
     return filtered;
-  }, [barbers, distances, mobileOnly, onlyFavorites, openNowOnly, searchQuery, selectedTags, selectedCategory, selectedWilaya, sortBy]);
+  }, [barbers, distances, maxBudget, maxDuration, mobileOnly, onlyFavorites, openNowOnly, searchQuery, selectedTags, selectedCategory, selectedWilaya, sortBy]);
 
   const recommendations = useMemo(() => {
     return rankBarberRecommendations(barbers.filter(isDisplayableBarber), {
@@ -468,6 +563,50 @@ export default function BookingTab() {
                 ))}
               </div>
             </div>
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              <label className="block">
+                <span className="text-xs font-medium mb-1.5 block" style={{ color: themeConfig.colors.textMuted }}>{tx('budgetFilter')}</span>
+                <input
+                  type="number"
+                  min={0}
+                  inputMode="numeric"
+                  value={maxBudget ?? ''}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    if (raw === '') { setMaxBudget(null); return; }
+                    const n = Number(raw);
+                    setMaxBudget(Number.isFinite(n) && n >= 0 ? n : null);
+                  }}
+                  className="w-full h-9 px-2.5 rounded-lg text-xs outline-none border"
+                  style={{
+                    backgroundColor: themeConfig.colors.background,
+                    color: themeConfig.colors.text,
+                    borderColor: maxBudget != null ? themeConfig.colors.primary : themeConfig.colors.border,
+                  }}
+                />
+              </label>
+              <label className="block">
+                <span className="text-xs font-medium mb-1.5 block" style={{ color: themeConfig.colors.textMuted }}>{tx('maxDurationFilter')}</span>
+                <input
+                  type="number"
+                  min={0}
+                  inputMode="numeric"
+                  value={maxDuration ?? ''}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    if (raw === '') { setMaxDuration(null); return; }
+                    const n = Number(raw);
+                    setMaxDuration(Number.isFinite(n) && n >= 0 ? n : null);
+                  }}
+                  className="w-full h-9 px-2.5 rounded-lg text-xs outline-none border"
+                  style={{
+                    backgroundColor: themeConfig.colors.background,
+                    color: themeConfig.colors.text,
+                    borderColor: maxDuration != null ? themeConfig.colors.primary : themeConfig.colors.border,
+                  }}
+                />
+              </label>
+            </div>
           </div>
         )}
         {locationMessage && <p role="status" className="text-[10px] mt-2 text-center" style={{ color: themeConfig.colors.textMuted }}>{locationMessage}</p>}
@@ -543,11 +682,63 @@ export default function BookingTab() {
       )}
 
       {/* === BARBERS LIST === */}
-      <div className="px-4 space-y-3 mt-2">
+      <div className={`px-4 mt-2 ${viewMode === 'grid' ? 'grid grid-cols-2 gap-3' : 'space-y-3'}`}>
         {!showSkeletons && filteredBarbers.length > 0 && (
-          <p className="text-xs font-medium pt-1" style={{ color: themeConfig.colors.textMuted }}>
-            {tx('barbersCount').replace('{n}', String(filteredBarbers.length))}
-          </p>
+          <div className={`flex items-center justify-between gap-2 pt-1 ${viewMode === 'grid' ? 'col-span-2' : ''}`}>
+            <p className="text-xs font-medium" style={{ color: themeConfig.colors.textMuted }}>
+              {tx('barbersCount').replace('{n}', String(filteredBarbers.length))}
+            </p>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => void shareSearch()}
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium border"
+                style={{
+                  backgroundColor: themeConfig.colors.surface,
+                  borderColor: themeConfig.colors.border,
+                  color: themeConfig.colors.textMuted,
+                }}
+                title={tx('shareSearch')}
+                aria-label={tx('shareSearch')}
+              >
+                <Share2 size={13} />
+                <span className="hidden sm:inline">{tx('shareSearch')}</span>
+              </button>
+              <div
+                className="flex rounded-lg border overflow-hidden"
+                style={{ borderColor: themeConfig.colors.border }}
+                role="group"
+                aria-label="view mode"
+              >
+                <button
+                  type="button"
+                  onClick={() => setViewMode('list')}
+                  className="px-2.5 py-1.5"
+                  style={{
+                    backgroundColor: viewMode === 'list' ? themeConfig.colors.primary : themeConfig.colors.surface,
+                    color: viewMode === 'list' ? '#fff' : themeConfig.colors.textMuted,
+                  }}
+                  title={tx('listView')}
+                  aria-pressed={viewMode === 'list'}
+                >
+                  <List size={14} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('grid')}
+                  className="px-2.5 py-1.5"
+                  style={{
+                    backgroundColor: viewMode === 'grid' ? themeConfig.colors.primary : themeConfig.colors.surface,
+                    color: viewMode === 'grid' ? '#fff' : themeConfig.colors.textMuted,
+                  }}
+                  title={tx('gridView')}
+                  aria-pressed={viewMode === 'grid'}
+                >
+                  <LayoutGrid size={14} />
+                </button>
+              </div>
+            </div>
+          </div>
         )}
         {showSkeletons ? (
           <>
@@ -568,6 +759,80 @@ export default function BookingTab() {
               : minPrice === maxPrice
                 ? money(minPrice)
                 : `${money(minPrice)} – ${money(maxPrice!)}`;
+            const avatarClass = barber.isFollowing
+              ? 'w-12 h-12 rounded-xl object-cover ring-2'
+              : 'w-12 h-12 rounded-xl object-cover border-2';
+            const avatarStyle = barber.isFollowing
+              ? ({ ['--tw-ring-color']: themeConfig.colors.primary } as { [key: string]: string })
+              : { borderColor: themeConfig.colors.primary + '40' };
+            const gridAvatarClass = barber.isFollowing
+              ? 'w-14 h-14 rounded-xl object-cover ring-2'
+              : 'w-14 h-14 rounded-xl object-cover border-2';
+
+            if (viewMode === 'grid') {
+              return (
+                <motion.div
+                  key={barber.id}
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.03, duration: 0.3 }}
+                  className="rounded-2xl border p-2.5 relative"
+                  style={{
+                    backgroundColor: themeConfig.colors.surface,
+                    borderColor: inCompare ? themeConfig.colors.primary : themeConfig.colors.border,
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => toggleCompare(barber.id)}
+                    className="absolute top-2 left-2 w-7 h-7 rounded-lg flex items-center justify-center z-10"
+                    style={{ backgroundColor: inCompare ? themeConfig.colors.primary : themeConfig.colors.background, color: inCompare ? '#fff' : themeConfig.colors.textMuted }}
+                    aria-pressed={inCompare}
+                    title={tx('compare')}
+                  >
+                    <GitCompare size={12} />
+                  </button>
+                  <div className="flex flex-col items-center text-center gap-1.5 pt-1">
+                    <img
+                      src={barber.avatar}
+                      alt={barber.name}
+                      loading="lazy"
+                      decoding="async"
+                      className={gridAvatarClass}
+                      style={avatarStyle}
+                    />
+                    <h3 className="font-bold text-xs leading-tight line-clamp-2" style={{ color: themeConfig.colors.text }}>{barber.name}</h3>
+                    <div className="flex items-center gap-1">
+                      <Star size={11} className="text-yellow-500 fill-yellow-500" />
+                      <span className="text-[11px] font-medium" style={{ color: themeConfig.colors.text }}>{barber.rating}</span>
+                    </div>
+                    <span className="text-[11px] font-bold" style={{ color: themeConfig.colors.primary }}>{priceLabel}</span>
+                    <span
+                      className="px-2 py-0.5 rounded-full text-[9px] font-bold text-white"
+                      style={{ backgroundColor: openNow ? themeConfig.colors.success : '#6B7280' }}
+                    >
+                      {openNow ? tx('openNow') : tx('closedNow')}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!isAuthenticated) {
+                          navigate('login', { redirectScreen: 'booking-flow', barberId: barber.id });
+                          return;
+                        }
+                        trackProductEvent('Booking Started', { source: 'discovery-grid', barberId: barber.id });
+                        navigate('booking-flow', { barberId: barber.id });
+                      }}
+                      className="w-full h-8 mt-1 rounded-xl text-[11px] font-bold text-white"
+                      style={{ backgroundColor: themeConfig.colors.primary }}
+                    >
+                      {tx('bookNow')}
+                    </button>
+                  </div>
+                </motion.div>
+              );
+            }
+
             return (
             <motion.div
               key={barber.id}
@@ -630,8 +895,8 @@ export default function BookingTab() {
                   <div className="flex items-center gap-2">
                     <img
                       src={barber.avatar} alt={barber.name} loading="lazy" decoding="async"
-                      className="w-12 h-12 rounded-xl object-cover border-2"
-                      style={{ borderColor: themeConfig.colors.primary + '40' }}
+                      className={avatarClass}
+                      style={avatarStyle}
                     />
                     <div>
                       <h3 className="font-bold text-sm" style={{ color: themeConfig.colors.text }}>{barber.name}</h3>
@@ -749,8 +1014,20 @@ export default function BookingTab() {
       {!showSkeletons && filteredBarbers.length === 0 && (
         <EmptyState
           icon={Search}
-          title={tx('noResults')}
-          description={settings.language === 'en' ? 'Try changing search or filters' : settings.language === 'fr' ? 'Modifiez la recherche ou les filtres' : 'جرب تغيير كلمات البحث أو الفلاتر'}
+          title={
+            selectedWilaya
+              ? tx('emptyWilayaTitle').replace('{wilaya}', selectedWilaya)
+              : tx('noResults')
+          }
+          description={
+            selectedWilaya
+              ? tx('emptyWilayaBody').replace('{wilaya}', selectedWilaya)
+              : settings.language === 'en'
+                ? 'Try changing search or filters'
+                : settings.language === 'fr'
+                  ? 'Modifiez la recherche ou les filtres'
+                  : 'جرب تغيير كلمات البحث أو الفلاتر'
+          }
           actionLabel={tx('resetFilters')}
           onAction={() => {
             setSearchQuery('');
@@ -760,8 +1037,11 @@ export default function BookingTab() {
             setOnlyFavorites(false);
             setOpenNowOnly(false);
             setMobileOnly(false);
+            setMaxBudget(null);
+            setMaxDuration(null);
             setCompareIds([]);
             setSortBy('smart');
+            setViewMode('list');
           }}
           themeConfig={themeConfig}
         />
@@ -771,7 +1051,10 @@ export default function BookingTab() {
         <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-[80] w-[calc(100%-2rem)] max-w-md">
           <button
             type="button"
-            onClick={() => navigate('compare-barbers', { barberIds: compareIds.join(',') })}
+            onClick={() => {
+              trackProductEvent('Discovery Compare Opened', { count: compareIds.length });
+              navigate('compare-barbers', { barberIds: compareIds.join(',') });
+            }}
             className="w-full h-12 rounded-2xl text-sm font-bold text-white shadow-lg flex items-center justify-center gap-2"
             style={{ backgroundColor: themeConfig.colors.primary }}
           >

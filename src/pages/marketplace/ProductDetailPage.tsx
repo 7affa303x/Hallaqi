@@ -51,6 +51,9 @@ export default function ProductDetailPage() {
       setVisitError('رابط المتجر غير آمن أو غير متوفر (يُسمح بـ https فقط).');
       return;
     }
+    const leaveMsg =
+      'أنت على وشك مغادرة حلاقي وفتح موقع المتجر الخارجي. المتابعة؟\n\nYou are about to leave Hallaqi and open the seller’s website. Continue?\n\nVous allez quitter Hallaqi et ouvrir le site du vendeur. Continuer ?';
+    if (!window.confirm(leaveMsg)) return;
     trackMarketplaceEvent('click', { productId: product.id, sellerId: product.sellerId });
     trackMarketplaceEvent('visit_store', { productId: product.id, sellerId: product.sellerId });
     if (product.isFeatured) trackMarketplaceEvent('featured_click', { productId: product.id, sellerId: product.sellerId });

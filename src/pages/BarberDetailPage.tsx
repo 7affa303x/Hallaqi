@@ -368,6 +368,9 @@ export default function BarberDetailPage() {
           <MessageSquare size={18} />
         </button>
       </div>
+      <p className="px-4 mt-2 text-[10px] font-bold" style={{ color: themeConfig.colors.success }}>
+        الدفع عند الزيارة فقط · نقداً (DZD)
+      </p>
 
       {/* === QR MODAL === */}
       {showQR && (

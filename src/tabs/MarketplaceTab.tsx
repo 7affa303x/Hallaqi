@@ -18,6 +18,7 @@ import {
 import { formatDzd, discountPercent, flattenCategories } from '@/lib/marketplace/filters';
 import { trackMarketplaceEvent } from '@/lib/marketplace/analytics';
 import { mapBarberExtrasToMarketplace } from '@/lib/marketplace/barberExtras';
+import { isDisplayableProduct } from '@/lib/marketplace/displayable';
 import { readMarketplaceSectionConfig } from '@/lib/marketplace/sectionConfig';
 import type {
   MarketplaceCategory,
@@ -80,7 +81,7 @@ export default function MarketplaceTab() {
         ]);
         if (cancelled) return;
         setCategories(cats);
-        setProducts(prods);
+        setProducts(prods.filter(isDisplayableProduct));
         setSellers(sells);
         setPotd(day);
         setPlacements(places.filter(p => p.isActive));

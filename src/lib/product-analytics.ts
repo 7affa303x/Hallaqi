@@ -9,7 +9,10 @@ export type ProductEvent =
   | 'Booking Submitted'
   | 'Forum Post Created'
   | 'Push Enabled'
-  | 'Loyalty Voucher Selected';
+  | 'Loyalty Voucher Selected'
+  | 'Discovery Filter Applied'
+  | 'Discovery Share'
+  | 'Discovery Compare Opened';
 
 export function trackProductEvent(
   name: ProductEvent,

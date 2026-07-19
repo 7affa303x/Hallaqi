@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Check, CheckCircle2, Clock, MessageSquare, PlayCircle, Plus, Sparkles,
+  Check, CheckCircle2, Clock, MessageSquare, PlayCircle, Plus, Printer, Sparkles,
   User as UserIcon, Wallet, X, XCircle, AlertCircle, CalendarDays,
 } from 'lucide-react';
 import { useApp } from '@/contexts/useApp';
@@ -19,7 +19,12 @@ import {
   getOrCreateConversation,
   sendMessage,
 } from '@/supabase/database';
-import { BARBER_MESSAGE_TEMPLATES, fillTemplate } from '@/lib/barber/messageTemplates';
+import {
+  BARBER_MESSAGE_TEMPLATES,
+  fillTemplate,
+  templateBody,
+  templateLabel,
+} from '@/lib/barber/messageTemplates';
 import {
   computeDayStats,
   displayClientName,
@@ -51,7 +56,7 @@ const statusConfig: Record<BookingStatus, { label: string; color: string; bg: st
 };
 
 export default function BarberStudioHub({ proId }: { proId: string }) {
-  const { themeConfig, navigate } = useApp();
+  const { themeConfig, navigate, settings } = useApp();
   const [rows, setRows] = useState<StudioBooking[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -190,13 +195,40 @@ export default function BarberStudioHub({ proId }: { proId: string }) {
 
   return (
     <div className="pb-28 relative">
-      <div className="sticky top-0 z-30 px-4 pt-3 pb-3 backdrop-blur-lg" style={{ backgroundColor: `${themeConfig.colors.background}ee` }}>
+      <style>{`
+        @media print {
+          body * { visibility: hidden !important; }
+          #studio-day-print, #studio-day-print * { visibility: visible !important; }
+          #studio-day-print {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            display: block !important;
+          }
+          .studio-print-chrome { display: none !important; }
+        }
+      `}</style>
+      <div className="sticky top-0 z-30 px-4 pt-3 pb-3 backdrop-blur-lg studio-print-chrome print:hidden" style={{ backgroundColor: `${themeConfig.colors.background}ee` }}>
         <div className="flex items-center gap-2 mb-3">
           <BrandLogo className="w-9 h-9 shadow-sm" priority />
           <div className="flex-1">
             <h1 className="text-lg font-bold leading-tight" style={{ color: themeConfig.colors.text }}>استوديو العمل</h1>
             <p className="text-[10px]" style={{ color: themeConfig.colors.textMuted }}>{formatDayLabel()} · إدارة سلسة ليومك</p>
           </div>
+          <button
+            type="button"
+            onClick={() => window.print()}
+            className="h-10 px-3 rounded-xl text-[10px] font-bold border flex items-center gap-1"
+            style={{
+              backgroundColor: themeConfig.colors.surface,
+              borderColor: themeConfig.colors.border,
+              color: themeConfig.colors.text,
+            }}
+            aria-label="طباعة اليوم"
+          >
+            <Printer size={14} />
+            طباعة اليوم
+          </button>
           <button
             type="button"
             onClick={() => void toggleAccepting()}
@@ -229,7 +261,7 @@ export default function BarberStudioHub({ proId }: { proId: string }) {
             border: `1px solid ${themeConfig.colors.border}`,
           }}
         >
-          <div className="grid grid-cols-3 gap-2 mb-3">
+          <div className="grid grid-cols-5 gap-2 mb-3">
             <div>
               <p className="text-[10px]" style={{ color: themeConfig.colors.textMuted }}>اليوم</p>
               <p className="text-lg font-bold" style={{ color: themeConfig.colors.text }}>{stats.todayCount}</p>
@@ -241,6 +273,14 @@ export default function BarberStudioHub({ proId }: { proId: string }) {
             <div>
               <p className="text-[10px]" style={{ color: themeConfig.colors.textMuted }}>إيراد اليوم</p>
               <p className="text-lg font-bold" style={{ color: themeConfig.colors.primary }}>{stats.revenueToday}<span className="text-[10px] font-medium"> دج</span></p>
+            </div>
+            <div>
+              <p className="text-[10px]" style={{ color: themeConfig.colors.textMuted }}>ملغي</p>
+              <p className="text-lg font-bold" style={{ color: themeConfig.colors.error }}>{stats.cancelledToday}</p>
+            </div>
+            <div>
+              <p className="text-[10px]" style={{ color: themeConfig.colors.textMuted }}>لم يحضر</p>
+              <p className="text-lg font-bold" style={{ color: '#78716C' }}>{stats.noShowToday}</p>
             </div>
           </div>
 
@@ -307,7 +347,7 @@ export default function BarberStudioHub({ proId }: { proId: string }) {
         </div>
       </div>
 
-      <div className="px-4 space-y-3 mt-2">
+      <div id="studio-day-print" className="px-4 space-y-3 mt-2 print:block">
         {loading ? (
           <><SkeletonBookingCard /><SkeletonBookingCard /></>
         ) : shown.map((b, index) => {
@@ -435,7 +475,7 @@ export default function BarberStudioHub({ proId }: { proId: string }) {
       <button
         type="button"
         onClick={() => setQuickOpen(true)}
-        className="fixed bottom-24 left-1/2 -translate-x-1/2 z-40 w-14 h-14 rounded-full text-white shadow-lg flex items-center justify-center"
+        className="fixed bottom-24 left-1/2 -translate-x-1/2 z-40 w-14 h-14 rounded-full text-white shadow-lg flex items-center justify-center studio-print-chrome print:hidden"
         style={{ backgroundColor: themeConfig.colors.primary }}
         aria-label="إدخال سريع"
       >
@@ -448,7 +488,7 @@ export default function BarberStudioHub({ proId }: { proId: string }) {
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
-            className="fixed bottom-40 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full text-xs font-bold text-white shadow-lg"
+            className="fixed bottom-40 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full text-xs font-bold text-white shadow-lg studio-print-chrome print:hidden"
             style={{ backgroundColor: themeConfig.colors.text }}
           >
             {toast}
@@ -488,7 +528,10 @@ export default function BarberStudioHub({ proId }: { proId: string }) {
                     key={tpl.id}
                     type="button"
                     onClick={() => {
-                      const body = fillTemplate(tpl.body, displayClientName(templateFor));
+                      const body = fillTemplate(
+                        templateBody(tpl, settings.language),
+                        displayClientName(templateFor),
+                      );
                       const target = templateFor;
                       setTemplateFor(null);
                       void openChat(target, body);
@@ -496,8 +539,12 @@ export default function BarberStudioHub({ proId }: { proId: string }) {
                     className="text-right rounded-xl p-3"
                     style={{ backgroundColor: themeConfig.colors.background }}
                   >
-                    <span className="block text-xs font-bold" style={{ color: themeConfig.colors.text }}>{tpl.label}</span>
-                    <span className="block text-[11px] mt-0.5" style={{ color: themeConfig.colors.textMuted }}>{tpl.body}</span>
+                    <span className="block text-xs font-bold" style={{ color: themeConfig.colors.text }}>
+                      {templateLabel(tpl, settings.language)}
+                    </span>
+                    <span className="block text-[11px] mt-0.5" style={{ color: themeConfig.colors.textMuted }}>
+                      {templateBody(tpl, settings.language)}
+                    </span>
                   </button>
                 ))}
                 <button

@@ -225,8 +225,10 @@ export default function ForumTab() {
       {!showSkeletons && filteredPosts.length === 0 && (
         <EmptyState
           icon={MessageCircle}
-          title="لا توجد منشورات في هذا القسم"
-          description="كن أول من ينشر منشوراً هنا"
+          title={selectedCategory === 'all' ? 'لا منشورات بعد' : 'لا توجد منشورات في هذا الفلتر'}
+          description={selectedCategory === 'all'
+            ? 'كن أول من يفتح نقاشاً مفيداً في المجتمع'
+            : 'جرّب قسماً آخر أو أنشئ منشوراً جديداً في هذا القسم'}
           actionLabel="أنشئ منشوراً"
           onAction={() => navigate('create-post')}
           themeConfig={themeConfig}

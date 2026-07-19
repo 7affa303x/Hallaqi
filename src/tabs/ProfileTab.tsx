@@ -21,6 +21,7 @@ import EditBarberProfile from '@/components/EditBarberProfile';
 import ServicesManagement from '@/components/ServicesManagement';
 import PausedFeatureBanner from '@/components/PausedFeatureBanner';
 import SavedItemsPage from '@/components/SavedItemsPage';
+import ChangelogPage from '@/pages/ChangelogPage';
 import { FEATURE_FLAGS, isWebPushConfigured, isWhatsAppSupportConfigured, PAUSED_LABEL, COMING_SOON_LABEL } from '@/lib/featureFlags';
 import { CANCEL_POLICY } from '@/lib/cancelPolicy';
 import {
@@ -75,9 +76,9 @@ const iconMap: Record<string, LucideIcon> = {
   Crown: CrownIcon,
 };
 
-type ProfileSubPage = 'main' | 'theme' | 'animation' | 'language' | 'country' | 'currency' | 'notifications' |
+type ProfileSubPage = 'main' | 'theme' | 'animation' | 'language' | 'country' | 'currency' | 'region' | 'notifications' |
   'privacy' | 'account' | 'subscription' | 'payment' | 'id-verification' |
-  'linked-accounts' | 'help' | 'about' | 'badges' | 'stats' | 'edit-profile' | 'services' | 'loyalty' |
+  'linked-accounts' | 'help' | 'about' | 'changelog' | 'badges' | 'stats' | 'edit-profile' | 'services' | 'loyalty' |
   'accessibility' | 'privacy-policy' | 'terms' | 'licenses' | 'security' | 'saves';
 
 export default function ProfileTab() {
@@ -172,6 +173,8 @@ export default function ProfileTab() {
   if (subPage === 'language') return <LanguageSelector onBack={() => setSubPage('main')} />;
   if (subPage === 'country') return <CountrySelector onBack={() => setSubPage('main')} />;
   if (subPage === 'currency') return <CurrencySelector onBack={() => setSubPage('main')} />;
+  if (subPage === 'region') return <RegionSettingsPage onBack={() => setSubPage('main')} />;
+  if (subPage === 'changelog') return <ChangelogPage onBack={() => setSubPage('main')} />;
   if (subPage === 'notifications') return <NotificationsSettings onBack={() => setSubPage('main')} />;
   if (subPage === 'privacy') return <PrivacySettings onBack={() => setSubPage('main')} />;
   if (subPage === 'subscription') return <SubscriptionPage onBack={() => setSubPage('main')} />;
@@ -517,14 +520,16 @@ export default function ProfileTab() {
                   if (item.id === 'reportBug') { window.location.href = 'mailto:support@hallaqi.app?subject=Hallaqi%20Bug%20Report'; return; }
                   if (item.id === 'featureRequest') { window.location.href = 'mailto:support@hallaqi.app?subject=Hallaqi%20Feature%20Request'; return; }
                   const pageMap: Record<string, ProfileSubPage> = {
-                    theme: 'theme', animation: 'animation', language: 'language', country: 'country', currency: 'currency', fontSize: 'accessibility',
+                    theme: 'theme', animation: 'animation', language: 'region', country: 'region', currency: 'region', fontSize: 'accessibility',
+                    regionSettings: 'region', aboutApp: 'about',
                     pushNotifications: 'notifications', emailNotifications: 'notifications', smsNotifications: 'notifications',
                     bookingReminders: 'notifications', promotions: 'notifications', forumReplies: 'notifications',
                     competitionUpdates: 'notifications', newFollowers: 'notifications',
                     profileVisible: 'privacy', showLocation: 'privacy', showBookings: 'privacy', allowMessages: 'privacy', blockList: 'privacy',
                     editProfile: 'edit-profile', twoFactor: 'security', subscription: 'subscription', paymentMethods: 'payment', baridiMob: 'payment',
-                    idVerification: 'id-verification', linkedAccounts: 'linked-accounts', helpCenter: 'help', aboutApp: 'about',
+                    idVerification: 'id-verification', linkedAccounts: 'linked-accounts', helpCenter: 'help',
                     services: 'services', privacyPolicy: 'privacy-policy', termsOfService: 'terms', licenses: 'licenses',
+                    changelog: 'changelog',
                   };
                   const page = pageMap[item.id]; if (page) setSubPage(page);
                 };
@@ -759,7 +764,9 @@ function LegalPage({ onBack, kind }: { onBack: () => void; kind: 'privacy' | 'te
             <p className="text-xs leading-6 mt-2" style={{ color: themeConfig.colors.textMuted }}>{text}</p>
           </section>
         ))}
-        <p className="text-[10px] text-center" style={{ color: themeConfig.colors.textMuted }}>آخر تحديث: يوليو 2026</p>
+        <p className="text-[10px] text-center" style={{ color: themeConfig.colors.textMuted }}>
+          آخر تحديث: 18 تموز/يوليو 2026 · مطابق لتوجيهات الإطلاق الناعم
+        </p>
       </div>
     </div>
   );
@@ -992,6 +999,91 @@ function LanguageSelector({ onBack }: { onBack: () => void }) {
           </button>
         ))}
       </div>
+    </div>
+  );
+}
+
+function RegionSettingsPage({ onBack }: { onBack: () => void }) {
+  const { themeConfig, settings, updateSettings } = useApp();
+  const languages = [
+    { key: 'ar' as const, label: 'العربية' },
+    { key: 'fr' as const, label: 'Français' },
+    { key: 'en' as const, label: 'English' },
+  ];
+  return (
+    <div className="pb-20">
+      <div className="sticky top-0 z-30 flex items-center gap-3 px-4 py-3 border-b" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
+        <button type="button" onClick={onBack} aria-label={translate(settings.language, 'back')} className="w-9 h-9 rounded-xl flex items-center justify-center">
+          <ArrowLeft size={20} style={{ color: themeConfig.colors.text }} />
+        </button>
+        <h2 className="text-base font-bold" style={{ color: themeConfig.colors.text }}>{translate(settings.language, 'regionSettings')}</h2>
+      </div>
+      <div className="p-4 space-y-4">
+        <section className="rounded-2xl border p-4" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
+          <p className="text-xs font-bold mb-2" style={{ color: themeConfig.colors.text }}>{translate(settings.language, 'language')}</p>
+          <div className="flex gap-2">
+            {languages.map(lang => (
+              <button
+                key={lang.key}
+                type="button"
+                onClick={() => updateSettings({ language: lang.key })}
+                className="flex-1 h-10 rounded-xl text-xs font-bold"
+                style={{
+                  backgroundColor: settings.language === lang.key ? themeConfig.colors.primary : themeConfig.colors.background,
+                  color: settings.language === lang.key ? '#fff' : themeConfig.colors.text,
+                }}
+              >
+                {lang.label}
+              </button>
+            ))}
+          </div>
+        </section>
+        <RegionLocalePickers />
+      </div>
+    </div>
+  );
+}
+
+function RegionLocalePickers() {
+  const { themeConfig, settings } = useApp();
+  const [mode, setMode] = useState<'menu' | 'country' | 'currency'>('menu');
+  if (mode === 'country') return <CountrySelector onBack={() => setMode('menu')} />;
+  if (mode === 'currency') return <CurrencySelector onBack={() => setMode('menu')} />;
+  const country = findCountry(settings.countryCode);
+  const currency = findCurrency(settings.currencyCode);
+  return (
+    <div className="space-y-2">
+      <button
+        type="button"
+        onClick={() => setMode('country')}
+        className="w-full flex items-center justify-between p-3 rounded-2xl border text-right"
+        style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}
+      >
+        <span>
+          <span className="block text-xs font-bold" style={{ color: themeConfig.colors.text }}>{translate(settings.language, 'country')}</span>
+          <span className="block text-[10px]" style={{ color: themeConfig.colors.textMuted }}>
+            {country ? countryLabel(country, settings.language) : settings.countryCode}
+          </span>
+        </span>
+        <ChevronLeft size={16} style={{ color: themeConfig.colors.textMuted }} />
+      </button>
+      <button
+        type="button"
+        onClick={() => setMode('currency')}
+        className="w-full flex items-center justify-between p-3 rounded-2xl border text-right"
+        style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}
+      >
+        <span>
+          <span className="block text-xs font-bold" style={{ color: themeConfig.colors.text }}>{translate(settings.language, 'currency')}</span>
+          <span className="block text-[10px]" style={{ color: themeConfig.colors.textMuted }}>
+            {currencySymbol(currency, settings.language)} · {currencyLabel(currency, settings.language)}
+          </span>
+        </span>
+        <ChevronLeft size={16} style={{ color: themeConfig.colors.textMuted }} />
+      </button>
+      <p className="text-[10px] px-1" style={{ color: themeConfig.colors.warning }}>
+        {translate(settings.language, 'displayCurrencyNote')}
+      </p>
     </div>
   );
 }

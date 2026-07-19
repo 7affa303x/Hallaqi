@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useApp } from '@/contexts/useApp';
 import { SkeletonBookingCard } from '@/components/Skeleton';
@@ -17,7 +17,7 @@ import { CANCEL_POLICY } from '@/lib/cancelPolicy';
 import {
   CalendarDays, Clock, MapPin, Car, CreditCard,
   CheckCircle2, XCircle, AlertCircle, MessageSquare,
-  Star, Navigation, LogIn, ArrowRight
+  Star, Navigation, LogIn, ArrowRight, Share2
 } from 'lucide-react';
 
 const statusConfig: Record<BookingStatus, { label: string; color: string; bg: string; icon: typeof CheckCircle2 }> = {
@@ -44,6 +44,30 @@ function openDirections(location: string) {
   window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(location)}`, '_blank');
 }
 
+function bookingStartMs(booking: Booking): number {
+  const iso = `${booking.date}T${booking.time.length === 5 ? `${booking.time}:00` : booking.time}`;
+  const t = new Date(iso).getTime();
+  return Number.isFinite(t) ? t : NaN;
+}
+
+function formatRemaining(ms: number): string {
+  const totalMinutes = Math.max(0, Math.floor(ms / 60000));
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (hours > 0) return `${hours} س و ${minutes} د متبقية`;
+  return `${minutes} د متبقية`;
+}
+
+function shareBookingWhatsApp(booking: Booking) {
+  const text = [
+    'تفاصيل حجزي على حلاقي:',
+    `الحلاق: ${booking.barberName}`,
+    `التاريخ: ${booking.date}`,
+    `الوقت: ${booking.time}`,
+  ].join('\n');
+  window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
+}
+
 export default function AppointmentsTab() {
   const { bookings, themeConfig, settings, cancelBooking, navigate, setActiveTab, isLoading, refreshData } = useApp();
   const { isAuthenticated, appUser } = useAuth();
@@ -54,6 +78,21 @@ export default function AppointmentsTab() {
   const [reviewComment, setReviewComment] = useState('');
   const [reviewError, setReviewError] = useState('');
   const [isReviewing, setIsReviewing] = useState(false);
+  const [nowMs, setNowMs] = useState(() => Date.now());
+
+  useEffect(() => {
+    const id = window.setInterval(() => setNowMs(Date.now()), 30000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  const nearestUpcomingId = useMemo(() => {
+    const upcoming = bookings
+      .filter(b => ['pending', 'confirmed'].includes(b.status))
+      .map(b => ({ id: b.id, start: bookingStartMs(b) }))
+      .filter(b => Number.isFinite(b.start) && b.start > nowMs)
+      .sort((a, b) => a.start - b.start);
+    return upcoming[0]?.id ?? null;
+  }, [bookings, nowMs]);
 
   const isProfessional = appUser?.user_role === 'barber' || appUser?.user_role === 'specialist';
   if (isAuthenticated && isProfessional && appUser) {
@@ -187,6 +226,9 @@ export default function AppointmentsTab() {
           filteredBookings.map((booking, index) => {
             const status = statusConfig[booking.status];
             const StatusIcon = status.icon;
+            const isNearest = booking.id === nearestUpcomingId;
+            const remainingMs = isNearest ? bookingStartMs(booking) - nowMs : 0;
+            const countdownLabel = isNearest && remainingMs > 0 ? formatRemaining(remainingMs) : null;
 
             return (
               <motion.div
@@ -203,7 +245,14 @@ export default function AppointmentsTab() {
                     <StatusIcon size={14} style={{ color: status.color }} />
                     <span className="text-xs font-bold" style={{ color: status.color }}>{status.label}</span>
                   </div>
-                  <span className="text-[10px]" style={{ color: status.color + '99' }}>#{booking.id.toUpperCase()}</span>
+                  <div className="flex items-center gap-2">
+                    {countdownLabel && (
+                      <span className="text-[10px] font-bold" style={{ color: status.color }}>
+                        {countdownLabel}
+                      </span>
+                    )}
+                    <span className="text-[10px]" style={{ color: status.color + '99' }}>#{booking.id.toUpperCase()}</span>
+                  </div>
                 </div>
 
                 {/* Content */}
@@ -270,6 +319,11 @@ export default function AppointmentsTab() {
                   <div className="flex gap-2 pt-3 border-t" style={{ borderColor: themeConfig.colors.border }}>
                     {['pending', 'confirmed'].includes(booking.status) && (
                       <>
+                        <button onClick={() => shareBookingWhatsApp(booking)}
+                          className="flex-1 flex items-center justify-center gap-1.5 h-9 rounded-xl text-xs font-bold transition-all"
+                          style={{ backgroundColor: '#25D36618', color: '#128C7E' }}>
+                          <Share2 size={14} /> واتساب
+                        </button>
                         <button onClick={() => openChatWith(booking.barberId, booking.barberName, booking.barberAvatar)}
                           className="flex-1 flex items-center justify-center gap-1.5 h-9 rounded-xl text-xs font-bold transition-all"
                           style={{ backgroundColor: themeConfig.colors.primary + '10', color: themeConfig.colors.primary }}>

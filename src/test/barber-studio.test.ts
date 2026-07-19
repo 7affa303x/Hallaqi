@@ -61,10 +61,30 @@ describe('barber studio helpers', () => {
         status: 'confirmed',
         profiles: { full_name: 'ب', avatar_url: null },
       },
+      {
+        id: 'c',
+        client_id: '3',
+        booking_start_time: '2026-07-17T09:00:00',
+        booking_end_time: '2026-07-17T09:30:00',
+        total_price: 0,
+        notes: null,
+        status: 'cancelled',
+      },
+      {
+        id: 'd',
+        client_id: '4',
+        booking_start_time: '2026-07-17T11:00:00',
+        booking_end_time: '2026-07-17T11:30:00',
+        total_price: 0,
+        notes: null,
+        status: 'no_show',
+      },
     ];
     const stats = computeDayStats(rows, now);
-    expect(stats.todayCount).toBe(2);
+    expect(stats.todayCount).toBe(3);
     expect(stats.completedCount).toBe(1);
+    expect(stats.cancelledToday).toBe(1);
+    expect(stats.noShowToday).toBe(1);
     expect(stats.revenueToday).toBe(400);
     expect(stats.nextBooking?.id).toBe('b');
     expect(stats.gaps[0]?.minutes).toBeGreaterThanOrEqual(25);

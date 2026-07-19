@@ -71,6 +71,20 @@ export const FEATURE_FLAGS = {
    * In-app map clusters for discovery — قريباً (external Maps link remains).
    */
   mapClustersEnabled: false,
+  /**
+   * Guest (no-account) booking checkout — قريباً.
+   */
+  guestBookingEnabled: false,
+  /**
+   * Maintenance mode banner — enable with VITE_MAINTENANCE_MODE=true.
+   */
+  get maintenanceModeEnabled() {
+    try {
+      return String(import.meta.env.VITE_MAINTENANCE_MODE || '').toLowerCase() === 'true';
+    } catch {
+      return false;
+    }
+  },
 } as const;
 
 /** User-facing label for deferred launch features. */

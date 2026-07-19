@@ -455,6 +455,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
     root.dir = settings.language === 'ar' ? 'rtl' : 'ltr';
   }, [settings.accessibility, settings.language]);
 
+  // #166 — sync OS prefers-reduced-motion into accessibility (once, if user hasn't toggled)
+  useEffect(() => {
+    try {
+      if (localStorage.getItem('hallaqi-reduce-motion-synced-v1') === '1') return;
+      const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+      if (mq.matches) {
+        setSettings(prev => ({
+          ...prev,
+          accessibility: { ...prev.accessibility, reduceMotion: true },
+        }));
+      }
+      localStorage.setItem('hallaqi-reduce-motion-synced-v1', '1');
+    } catch { /* ignore */ }
+  }, []);
+
   const updateSettings = useCallback((newSettings: Partial<AppSettings>) => {
     if (newSettings.theme) useStore.getState().setTheme(newSettings.theme);
     if (newSettings.animationStyle) useStore.getState().setAnimationStyle(newSettings.animationStyle);

@@ -4,6 +4,7 @@ import { useApp } from '@/contexts/useApp';
 import type { ScreenParams, TabName } from '@/types';
 import { useStore } from '@/store/useStore';
 import { getErrMsg } from '@/lib/error';
+import { translateApiError } from '@/lib/apiErrors';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   LogIn, Mail, Lock, Eye, EyeOff, ArrowRight,
@@ -23,10 +24,11 @@ interface LoginScreenProps {
 }
 
 export default function LoginScreen({ redirectScreen, redirectParams }: LoginScreenProps) {
-  const { themeConfig, navigate, setActiveTab } = useApp();
+  const { themeConfig, navigate, setActiveTab, settings } = useApp();
   const { googleSignIn, login, error: authError } = useAuth();
   const setAuthenticated = useStore(s => s.setAuthenticated);
   const isOnline = useStore(s => s.isOnline);
+  const reduceMotion = settings.accessibility.reduceMotion;
 
   const {
     register,
@@ -73,12 +75,12 @@ export default function LoginScreen({ redirectScreen, redirectParams }: LoginScr
         // We'll show this via the formErrors mechanism by setting a custom error
         // But react-hook-form doesn't let us set errors directly without setError
         // So we'll use localError for server-side auth errors
-        setLocalError('لا يوجد حساب بهذا البريد');
+        setLocalError(settings.language === 'fr' ? 'Aucun compte avec cet e-mail' : settings.language === 'en' ? 'No account with this email' : 'لا يوجد حساب بهذا البريد');
       } else if (msg.includes('wrong-password') || msg.includes('غير صحيحة')) {
         resetField('password', { defaultValue: data.password, keepTouched: true });
-        setLocalError('كلمة المرور غير صحيحة');
+        setLocalError(settings.language === 'fr' ? 'Mot de passe incorrect' : settings.language === 'en' ? 'Incorrect password' : 'كلمة المرور غير صحيحة');
       } else {
-        setLocalError(msg);
+        setLocalError(translateApiError(err, settings.language));
       }
     }
   };
@@ -107,10 +109,10 @@ export default function LoginScreen({ redirectScreen, redirectParams }: LoginScr
 
   return (
     <motion.div
-      initial={{ opacity: 0 }}
+      initial={reduceMotion ? false : { opacity: 0 }}
       animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.3 }}
+      exit={reduceMotion ? undefined : { opacity: 0 }}
+      transition={{ duration: reduceMotion ? 0 : 0.3 }}
       className="min-h-screen flex flex-col"
       style={{ backgroundColor: themeConfig.colors.background }}
     >

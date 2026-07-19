@@ -423,9 +423,7 @@ export const settingsSections = [
     items: [
       { id: 'theme', label: 'السمة', icon: 'Palette', description: 'اختر سمة التطبيق المفضلة', type: 'select' },
       { id: 'animation', label: 'نمط الحركة', icon: 'Sparkles', description: 'اختر نمط الانتقالات والحركات', type: 'select' },
-      { id: 'language', label: 'اللغة', icon: 'Globe', description: 'العربية / الفرنسية / الإنجليزية', type: 'select' },
-      { id: 'country', label: 'البلد', icon: 'MapPin', description: 'اختر بلدك من قائمة دول العالم', type: 'select' },
-      { id: 'currency', label: 'العملة', icon: 'CreditCard', description: 'عملات الوطن العربي + دولار + يورو', type: 'select' },
+      { id: 'regionSettings', label: 'اللغة والمنطقة', icon: 'Globe', description: 'لغة · بلد · عملة في شاشة واحدة', type: 'link' },
       { id: 'fontSize', label: 'حجم الخط', icon: 'Type', description: 'صغير / متوسط / كبير', type: 'select' },
     ],
   },
@@ -479,6 +477,7 @@ export const settingsSections = [
     title: 'حول',
     items: [
       { id: 'aboutApp', label: 'عن التطبيق', icon: 'Info', description: 'Hallaqi v12 — العناية الشخصية الموثوقة', type: 'link' },
+      { id: 'changelog', label: 'سجل التغييرات', icon: 'FileText', description: 'ما الجديد في حلاقي', type: 'link' },
       { id: 'privacyPolicy', label: 'سياسة الخصوصية', icon: 'FileText', description: 'قراءة سياسة الخصوصية', type: 'link' },
       { id: 'termsOfService', label: 'شروط الاستخدام', icon: 'FileText', description: 'قراءة الشروط والأحكام', type: 'link' },
       { id: 'licenses', label: 'التراخيص', icon: 'FileCode', description: 'تراخيص مفتوحة المصدر', type: 'link' },
