@@ -6,7 +6,7 @@
 #   VERCEL_TOKEN            — from https://vercel.com/account/tokens
 #   GEMINI_API_KEY          — Google AI Studio auth key
 # Optional:
-#   SUPABASE_PROJECT_REF    — default: npkmqlupkvijhumkldpm
+#   SUPABASE_PROJECT_REF    — default: cdwzbtjwqybnahhbhldy
 #   VERCEL_PROJECT          — default: hallaqi (or your linked project name)
 
 set -euo pipefail
@@ -14,7 +14,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-PROJECT_REF="${SUPABASE_PROJECT_REF:-npkmqlupkvijhumkldpm}"
+PROJECT_REF="${SUPABASE_PROJECT_REF:-cdwzbtjwqybnahhbhldy}"
 VERCEL_PROJECT="${VERCEL_PROJECT:-hallaqi}"
 
 require() {

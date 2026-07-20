@@ -48,7 +48,7 @@ curl -sS -X POST "https://api.vercel.com/v9/projects/$PROJECT_ID/env?teamId=$TEA
   -H "Content-Type: application/json" \
   -d '{
     "key": "VITE_SUPABASE_URL",
-    "value": "https://npkmqlupkvijhumkldpm.supabase.co",
+    "value": "https://cdwzbtjwqybnahhbhldy.supabase.co",
     "type": "plain",
     "target": ["production", "preview", "development"]
   }'

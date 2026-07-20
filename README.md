@@ -64,7 +64,7 @@ cp .env.example .env
 1. Create project at [supabase.com](https://supabase.com)
 2. Link the official project and apply committed migrations:
    ```bash
-   npx supabase link --project-ref npkmqlupkvijhumkldpm
+   npx supabase link --project-ref cdwzbtjwqybnahhbhldy
    npx supabase db push
    ```
 3. Deploy Edge Functions:
