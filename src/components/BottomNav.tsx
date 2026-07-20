@@ -36,6 +36,16 @@ export default function BottomNav() {
     setActiveTab(tab.key);
   };
 
+  const handleSpecialTabClick = () => {
+    // Normal tap: show radial menu
+    setRadialOpen(true);
+  };
+
+  const handleSpecialTabLongPress = () => {
+    // Long press: navigate to AI page
+    setActiveTab('ai-hub');
+  };
+
   return (
     <>
       <nav
@@ -60,15 +70,18 @@ export default function BottomNav() {
                 <button
                   key={tab.key}
                   type="button"
-                  aria-label={`${label} — اضغط للذكاء الاصطناعي، اضغط مطولاً للإجراءات السريعة`}
+                  aria-label={`${label} — اضغط لعرض القائمة السريعة، اضغط مطولاً للذهاب إلى الذكاء الاصطناعي`}
                   className="relative flex flex-col items-center justify-center w-16 h-14 -mt-5"
                   onPointerDown={longPress.onPointerDown}
                   onPointerUp={longPress.onPointerUp}
                   onPointerLeave={longPress.onPointerLeave}
                   onPointerCancel={longPress.onPointerCancel}
                   onClick={() => {
-                    if (longPress.didLongPress()) return;
-                    handleTabClick(tab);
+                    if (longPress.didLongPress()) {
+                      handleSpecialTabLongPress();
+                    } else {
+                      handleSpecialTabClick();
+                    }
                   }}
                 >
                   <motion.div
