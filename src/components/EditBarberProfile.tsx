@@ -43,13 +43,14 @@ export default function EditBarberProfile({ onBack, userRole, initialSection }: 
   const isBarber = userRole === 'barber' || userRole === 'specialist';
   const isSeller = userRole === 'store' || userRole === 'company' || userRole === 'doctor';
 
-  const sections: { key: EditSection; label: string; icon: typeof User; show: boolean }[] = [
-    { key: 'photos', label: 'الصور', icon: Images, show: true },
-    { key: 'personal', label: 'شخصي', icon: User, show: true },
-    { key: 'business', label: 'العمل', icon: Briefcase, show: isBarber || isSeller },
-    { key: 'portfolio', label: 'معرض', icon: ImageIcon, show: isBarber },
-    { key: 'calendar', label: 'الجدول', icon: Calendar, show: isBarber },
-  ].filter(s => s.show);
+  const sections = ([
+    { key: 'photos' as const, label: 'الصور', icon: Images, show: true },
+    { key: 'personal' as const, label: 'شخصي', icon: User, show: true },
+    { key: 'business' as const, label: 'العمل', icon: Briefcase, show: isBarber || isSeller },
+    { key: 'portfolio' as const, label: 'معرض', icon: ImageIcon, show: isBarber },
+    { key: 'calendar' as const, label: 'الجدول', icon: Calendar, show: isBarber },
+  ] satisfies { key: EditSection; label: string; icon: typeof User; show: boolean }[])
+    .filter(s => s.show);
 
   const [activeSection, setActiveSection] = useState<EditSection>(
     initialSection && sections.some(s => s.key === initialSection) ? initialSection : 'photos'
