@@ -27,9 +27,9 @@ describe('AI API contracts', () => {
     }));
   });
 
-  it('reports groq provider when a server key is present', async () => {
+  it('reports groq provider when a valid gsk_ server key is present', async () => {
     process.env.AI_GENERATION_ENABLED = 'true';
-    process.env.GROQ_API_KEY = 'test-key';
+    process.env.GROQ_API_KEY = 'gsk_test_valid_key';
     const body = await capabilitiesGet().json();
     expect(body).toEqual(expect.objectContaining({
       generativeAdvice: true,
@@ -38,6 +38,15 @@ describe('AI API contracts', () => {
       hairstyleImageGeneration: false,
       externalBlocker: null,
     }));
+  });
+
+  it('rejects mislabeled xAI keys in GROQ_API_KEY', async () => {
+    process.env.AI_GENERATION_ENABLED = 'true';
+    process.env.GROQ_API_KEY = 'xai-relH76IlK7gLcRVw';
+    const body = await capabilitiesGet().json();
+    expect(body.generativeAdvice).toBe(false);
+    expect(body.provider).toBeNull();
+    expect(body.externalBlocker).toContain('xAI Grok');
   });
 
   it('reports gemini provider when a server key is present', async () => {

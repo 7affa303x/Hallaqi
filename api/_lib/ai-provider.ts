@@ -8,9 +8,13 @@ const DEFAULT_GROQ_MODEL = 'llama-3.3-70b-versatile';
 const DEFAULT_GEMINI_TEXT_MODEL = 'gemini-2.0-flash';
 const DEFAULT_GEMINI_IMAGE_MODEL = 'gemini-2.0-flash-preview-image-generation';
 
-/** Resolve Groq API key (server-only, free tier friendly). */
+/** Resolve Groq API key (server-only, free tier friendly). Rejects mislabeled xAI keys. */
 export function getGroqApiKey(): string | undefined {
-  return process.env.GROQ_API_KEY?.trim() || undefined;
+  const key = process.env.GROQ_API_KEY?.trim();
+  if (!key) return undefined;
+  if (key.startsWith('xai-')) return undefined;
+  if (!key.startsWith('gsk_')) return undefined;
+  return key;
 }
 
 /** Resolve Gemini API key from common env names (server-only). */
@@ -24,6 +28,24 @@ export function getGeminiApiKey(): string | undefined {
 export function getActiveTextProviderName(): AiTextProviderName | null {
   if (getGroqApiKey()) return 'groq';
   if (getGeminiApiKey()) return 'gemini';
+  return null;
+}
+
+/** Human-readable reason when generative AI is unavailable. */
+export function getAiExternalBlocker(): string | null {
+  if (!isAiGenerationEnabled()) {
+    return 'AI_GENERATION_ENABLED is off on the server.';
+  }
+  const rawGroq = process.env.GROQ_API_KEY?.trim();
+  if (rawGroq?.startsWith('xai-')) {
+    return 'GROQ_API_KEY holds an xAI Grok key — use a Groq key (gsk_…) from console.groq.com, or set GEMINI_API_KEY.';
+  }
+  if (rawGroq && !rawGroq.startsWith('gsk_')) {
+    return 'GROQ_API_KEY is not a valid Groq key (expected gsk_… from console.groq.com).';
+  }
+  if (!getGroqApiKey() && !getGeminiApiKey()) {
+    return 'Set GROQ_API_KEY (free, gsk_…) or GEMINI_API_KEY on the server to enable generative AI.';
+  }
   return null;
 }
 
