@@ -24,6 +24,8 @@ export interface AuthContextValue extends AuthState {
   logout: () => Promise<void>;
   forgotPassword: (email: string) => Promise<void>;
   clearError: () => void;
+  /** Re-fetch profile for the signed-in user (e.g. after role switch). */
+  refreshAppUser: () => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextValue | null>(null);

@@ -56,9 +56,10 @@ export const FEATURE_FLAGS = {
    */
   algeriaOnlyDiscovery: true,
   /**
-   * Soft launch: register as client or barber only (no store/company/doctor).
+   * Soft launch: register as client / barber / store (doctor hidden until verification).
+   * When true, only client+barber; when false, use softLaunchRegistrationRoles.
    */
-  clientBarberRegistrationOnly: true,
+  clientBarberRegistrationOnly: false,
   /**
    * Soft launch: hide subscription / paid placement / Baridi entry points.
    */
@@ -81,9 +82,9 @@ export const FEATURE_FLAGS = {
    */
   competitionsEnabled: false,
   /**
-   * Account type switcher on profile — hidden until role migration is approved.
+   * Account type switcher on profile — client / barber / store without conditions.
    */
-  accountTypeSwitchEnabled: false,
+  accountTypeSwitchEnabled: true,
   /**
    * Advanced appearance (animation style, country, currency) — soft-hide at launch.
    */
@@ -132,6 +133,10 @@ export const PAUSED_LABEL = 'متوقف';
 export function isCashOnlyPayments(): boolean {
   return !FEATURE_FLAGS.cardPaymentsEnabled && !FEATURE_FLAGS.ccpPaymentsEnabled;
 }
+
+/** Soft-launch registration / switch roles — doctor excluded until verification. */
+export const SOFT_LAUNCH_ACCOUNT_ROLES = ['client', 'barber', 'store'] as const;
+export type SoftLaunchAccountRole = (typeof SOFT_LAUNCH_ACCOUNT_ROLES)[number];
 
 export function isWebPushConfigured(): boolean {
   const key = import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined;

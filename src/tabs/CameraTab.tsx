@@ -249,8 +249,8 @@ export default function CameraTab({ isActive = true, initialMode = 'scanner', co
   };
 
   const shellClass = compact
-    ? 'h-[calc(100dvh-3.75rem)] max-h-[calc(100dvh-3.75rem)] flex flex-col overflow-hidden'
-    : 'h-[100dvh] flex flex-col overflow-hidden';
+    ? 'h-full max-h-full flex flex-col overflow-hidden overscroll-none'
+    : 'h-[100dvh] max-h-[100dvh] flex flex-col overflow-hidden overscroll-none';
 
   return (
     <div className={shellClass} style={{ backgroundColor: '#000' }}>
@@ -380,17 +380,17 @@ export default function CameraTab({ isActive = true, initialMode = 'scanner', co
         )}
 
         {!cameraActive && (mode === 'scanner' || mode === 'camera') && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center" style={{ backgroundColor: themeConfig.colors.background }}>
-            <img src="/logo-icon.png" alt="Hallaqi" className="w-20 h-20 mb-4 rounded-2xl" />
+          <div className="absolute inset-0 flex flex-col items-center justify-center px-4" style={{ backgroundColor: themeConfig.colors.background }}>
+            <img src="/logo-icon.png" alt="Hallaqi" className="w-14 h-14 mb-2 rounded-2xl" />
             <p className="text-sm font-bold" style={{ color: themeConfig.colors.text }}>
-              {mode === 'scanner' ? 'ماسح QR Code' : 'الكاميرا'}
+              {mode === 'scanner' ? 'ماسح QR' : 'الكاميرا'}
             </p>
-            <p className="text-xs mt-2 text-center px-6" style={{ color: themeConfig.colors.textMuted }}>
-              {cameraError || 'اضغط للتشغيل — الكاميرا تتوقف تلقائياً عند المغادرة'}
+            <p className="text-[11px] mt-1 text-center max-w-xs" style={{ color: themeConfig.colors.textMuted }}>
+              {cameraError || 'اضغط للتشغيل — تتوقف تلقائياً عند المغادرة'}
             </p>
             <button
               onClick={requestStart}
-              className="mt-4 px-6 py-2.5 rounded-xl text-sm font-bold text-white"
+              className="mt-3 px-5 py-2 rounded-xl text-xs font-bold text-white"
               style={{ backgroundColor: themeConfig.colors.primary }}
             >
               تشغيل الكاميرا
@@ -399,8 +399,8 @@ export default function CameraTab({ isActive = true, initialMode = 'scanner', co
         )}
       </div>
 
-      <div className="flex-shrink-0 pb-4 pt-3 px-4" style={{ backgroundColor: 'rgba(0,0,0,0.9)', backdropFilter: 'blur(20px)' }}>
-        <div className="flex items-center justify-center gap-1 mb-3">
+      <div className="flex-shrink-0 pb-3 pt-2 px-3" style={{ backgroundColor: 'rgba(0,0,0,0.92)', backdropFilter: 'blur(20px)' }}>
+        <div className="flex items-center justify-center gap-1 mb-2">
           {[
             { key: 'scanner' as CameraMode, icon: Scan, label: 'مسح' },
             { key: 'camera' as CameraMode, icon: Camera, label: 'كاميرا' },
@@ -410,13 +410,13 @@ export default function CameraTab({ isActive = true, initialMode = 'scanner', co
               key={m.key}
               whileTap={{ scale: 0.92 }}
               onClick={() => switchMode(m.key)}
-              className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all"
+              className="flex flex-col items-center gap-0.5 px-3 py-1 rounded-xl transition-all"
               style={{
                 backgroundColor: mode === m.key ? 'rgba(255,255,255,0.15)' : 'transparent',
               }}
             >
-              <m.icon size={18} style={{ color: mode === m.key ? '#F59E0B' : 'rgba(255,255,255,0.5)' }} />
-              <span className="text-[10px] font-medium" style={{ color: mode === m.key ? '#F59E0B' : 'rgba(255,255,255,0.5)' }}>
+              <m.icon size={16} style={{ color: mode === m.key ? '#F59E0B' : 'rgba(255,255,255,0.5)' }} />
+              <span className="text-[9px] font-medium" style={{ color: mode === m.key ? '#F59E0B' : 'rgba(255,255,255,0.5)' }}>
                 {m.label}
               </span>
             </motion.button>
@@ -424,14 +424,14 @@ export default function CameraTab({ isActive = true, initialMode = 'scanner', co
         </div>
 
         {mode !== 'generator' && (
-          <div className="flex items-center justify-center gap-8">
+          <div className="flex items-center justify-center gap-6">
             <motion.button
               whileTap={{ scale: 0.85 }}
               onClick={() => void toggleFlash()}
-              className="w-11 h-11 rounded-full flex items-center justify-center"
+              className="w-10 h-10 rounded-full flex items-center justify-center"
               style={{ backgroundColor: flashOn ? 'rgba(245,158,11,0.3)' : 'rgba(255,255,255,0.1)' }}
             >
-              <Flashlight size={20} style={{ color: flashOn ? '#F59E0B' : '#fff' }} />
+              <Flashlight size={18} style={{ color: flashOn ? '#F59E0B' : '#fff' }} />
             </motion.button>
 
             <motion.button
@@ -439,18 +439,18 @@ export default function CameraTab({ isActive = true, initialMode = 'scanner', co
               onClick={mode === 'camera'
                 ? capturePhoto
                 : () => { setUserRequested(true); void startScanner(); }}
-              className="rounded-full flex items-center justify-center p-1"
+              className="rounded-full flex items-center justify-center p-0.5"
               style={{
-                border: mode === 'scanner' ? '3px solid #F59E0B' : '3px solid #fff',
+                border: mode === 'scanner' ? '2px solid #F59E0B' : '2px solid #fff',
               }}
             >
-              <div className="w-12 h-12 rounded-full flex items-center justify-center"
+              <div className="w-11 h-11 rounded-full flex items-center justify-center"
                 style={{ backgroundColor: mode === 'scanner' ? '#F59E0B' : '#fff' }}
               >
                 {mode === 'scanner' ? (
-                  <Scan size={22} className="text-black" />
+                  <Scan size={20} className="text-black" />
                 ) : (
-                  <Aperture size={22} className="text-black" />
+                  <Aperture size={20} className="text-black" />
                 )}
               </div>
             </motion.button>
@@ -458,10 +458,10 @@ export default function CameraTab({ isActive = true, initialMode = 'scanner', co
             <motion.button
               whileTap={{ scale: 0.85 }}
               onClick={() => setFrontCamera(prev => !prev)}
-              className="w-11 h-11 rounded-full flex items-center justify-center"
+              className="w-10 h-10 rounded-full flex items-center justify-center"
               style={{ backgroundColor: 'rgba(255,255,255,0.1)' }}
             >
-              <FlipHorizontal size={20} className="text-white" />
+              <FlipHorizontal size={18} className="text-white" />
             </motion.button>
           </div>
         )}

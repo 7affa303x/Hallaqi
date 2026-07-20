@@ -654,7 +654,11 @@ export default function BookingFlowPage() {
           </button>
           <button
             type="button"
-            onClick={() => { setConfirmed(false); setActiveTab('appointments'); }}
+            onClick={() => {
+              try { sessionStorage.setItem('hallaqi-force-client-appointments', '1'); } catch { /* ignore */ }
+              setConfirmed(false);
+              setActiveTab('appointments');
+            }}
             className="flex-1 h-12 rounded-xl text-sm font-bold text-white"
             style={{ backgroundColor: themeConfig.colors.primary }}
           >

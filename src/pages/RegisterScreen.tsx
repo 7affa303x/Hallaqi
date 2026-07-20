@@ -7,13 +7,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   UserPlus, Mail, Lock, Eye, EyeOff, ArrowRight, User,
   Chrome, AlertCircle, WifiOff, ShieldCheck, Check, Scissors,
-  Store, Building2, Stethoscope, Phone,
+  Store, Phone,
 } from 'lucide-react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { registerSchema, normalizeAlgerianPhone } from '@/lib/validation';
 import type { RegisterFormData } from '@/lib/validation';
-import { FEATURE_FLAGS } from '@/lib/featureFlags';
 
 function getPasswordStrength(pw: string): { score: number; label: string; color: string } {
   if (!pw) return { score: 0, label: '', color: '' };
@@ -430,19 +429,11 @@ export default function RegisterScreen() {
                 نوع الحساب
               </legend>
               <div className="grid grid-cols-2 gap-2">
-                {(FEATURE_FLAGS.clientBarberRegistrationOnly
-                  ? ([
-                    { value: 'client', label: 'عميل', icon: User },
-                    { value: 'barber', label: 'حلاق', icon: Scissors },
-                  ] as const)
-                  : ([
-                    { value: 'client', label: 'عميل', icon: User },
-                    { value: 'barber', label: 'حلاق', icon: Scissors },
-                    { value: 'store', label: 'متجر', icon: Store },
-                    { value: 'company', label: 'شركة', icon: Building2 },
-                    { value: 'doctor', label: 'طبيب', icon: Stethoscope },
-                  ] as const)
-                ).map(option => {
+                {([
+                  { value: 'client', label: 'زبون', icon: User },
+                  { value: 'barber', label: 'حلاق', icon: Scissors },
+                  { value: 'store', label: 'متجر', icon: Store },
+                ] as const).map(option => {
                   const Icon = option.icon;
                   const selected = field.value === option.value;
                   return (
@@ -464,9 +455,7 @@ export default function RegisterScreen() {
                 })}
               </div>
               <p className="text-[10px] mt-2" style={{ color: themeConfig.colors.textMuted }}>
-                {FEATURE_FLAGS.clientBarberRegistrationOnly
-                  ? 'الإطلاق الناعم: عميل أو حلاق. المتاجر والأطباء لاحقاً.'
-                  : 'الأدوار منفصلة بالكامل — المتاجر والشركات والأطباء يحتاجون موافقة الأدمن.'}
+                زبون · حلاق · متجر. تسجيل الطبيب مخفي حتى التوثيق.
               </p>
             </fieldset>
           )}

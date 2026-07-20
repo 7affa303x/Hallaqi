@@ -1687,6 +1687,10 @@ export type Database = {
     }
     Functions: {
       complete_barber_onboarding: { Args: never; Returns: undefined }
+      switch_own_account_type: {
+        Args: { new_role: string }
+        Returns: Database["public"]["Tables"]["profiles"]["Row"]
+      }
       consume_ai_quota: { Args: { ai_feature: string }; Returns: boolean }
       create_booking_with_services: {
         Args: {

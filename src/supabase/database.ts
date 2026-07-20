@@ -1135,6 +1135,13 @@ export async function adminListProfiles(limit = 100): Promise<AdminUserRow[]> {
   return (data || []) as AdminUserRow[];
 }
 
+export async function switchOwnAccountType(role: 'client' | 'barber' | 'store') {
+  guard();
+  const { data, error } = await supabase.rpc('switch_own_account_type', { new_role: role });
+  if (error) throw new Error(error.message);
+  return data;
+}
+
 export async function adminUpdateUserRole(userId: string, role: string) {
   guard();
   const { error } = await supabase

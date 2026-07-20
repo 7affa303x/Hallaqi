@@ -9,7 +9,8 @@ export const DEFAULT_MARKETPLACE_SECTIONS: MarketplaceSectionConfig = {
   /** Soft-launch: hide barber extras in marketplace — booking services stay in profile. */
   showBarberExtras: false,
   showCompanies: true,
-  showDoctors: true,
+  /** Soft-launch: doctors need verification — hidden from marketplace. */
+  showDoctors: false,
   categoryOrder: [],
 };
 

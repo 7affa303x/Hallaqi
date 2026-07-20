@@ -370,6 +370,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setState(s => ({ ...s, error: null }));
   }, []);
 
+  const refreshAppUser = useCallback(async () => {
+    const userId = state.user?.id;
+    if (!userId) return;
+    if (isDeveloperMode) return;
+    const profile = await fetchProfileWithTimeout(userId);
+    if (profile) {
+      setState(s => ({ ...s, appUser: profile, error: null }));
+    }
+  }, [state.user?.id]);
+
   const value = useMemo<AuthContextValue>(() => ({
     ...state,
     login,
@@ -378,7 +388,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     logout,
     forgotPassword,
     clearError,
-  }), [state, login, register, googleSignIn, logout, forgotPassword, clearError]);
+    refreshAppUser,
+  }), [state, login, register, googleSignIn, logout, forgotPassword, clearError, refreshAppUser]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

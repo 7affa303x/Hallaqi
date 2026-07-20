@@ -253,30 +253,28 @@ export default function ProfileTab() {
             >
               <Settings size={16} className="text-white" />
             </button>
-            <button
-              type="button"
-              onClick={() => { setEditSection('photos'); setSubPage('edit-profile'); }}
-              aria-label="تعديل البروفايل"
-              className="w-9 h-9 rounded-xl flex items-center justify-center bg-white/10"
-            >
-              <Pencil size={16} className="text-white" />
-            </button>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => { setEditSection('photos'); setSubPage('edit-profile'); }}
+          className="w-full flex items-center gap-3 text-right rounded-2xl p-1 -mx-1 active:bg-white/10 transition-colors"
+          aria-label="تعديل البروفايل"
+        >
           <div className="relative">
             <img src={userAvatar} alt={userName} className="w-16 h-16 rounded-2xl object-cover border-2 border-white/30" />
             {isIdVerified && <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-green-500 flex items-center justify-center border-2 border-white"><BadgeCheck size={12} className="text-white" /></div>}
           </div>
-          <div className="flex-1">
+          <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <h2 className="text-base font-bold text-white">{userName}</h2>
-              {isVerified && <BadgeCheck size={16} className="text-sky-300 fill-sky-300" />}
+              <h2 className="text-base font-bold text-white truncate">{userName}</h2>
+              {isVerified && <BadgeCheck size={16} className="text-sky-300 fill-sky-300 flex-shrink-0" />}
+              <Pencil size={14} className="text-white/70 flex-shrink-0" />
             </div>
-            <p className="text-xs text-white/70 mt-0.5">{userEmail}</p>
-            {userPhone && <p className="text-xs text-white/70">{userPhone}</p>}
-            <div className="flex items-center gap-2 mt-1.5">
+            <p className="text-xs text-white/70 mt-0.5 truncate">{userEmail}</p>
+            {userPhone && <p className="text-xs text-white/70 truncate">{userPhone}</p>}
+            <div className="flex items-center gap-2 mt-1.5 flex-wrap">
               {FEATURE_FLAGS.gamificationSurfacesEnabled && (
                 <>
                   <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-white font-medium">{stats.rank}</span>
@@ -287,9 +285,13 @@ export default function ProfileTab() {
               {(userRole === 'barber' || userRole === 'specialist') && (
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-white font-medium">حلاق</span>
               )}
+              {userRole === 'store' && (
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-white font-medium">متجر</span>
+              )}
+              <span className="text-[10px] text-white/60">اضغط للتعديل</span>
             </div>
           </div>
-        </div>
+        </button>
 
         {FEATURE_FLAGS.gamificationSurfacesEnabled && (
         <div className="flex gap-3 mt-4">
@@ -492,8 +494,8 @@ export default function ProfileTab() {
           >
             <UserPlus size={16} style={{ color: themeConfig.colors.primary }} />
             <span className="flex-1">
-              <span className="block text-xs font-bold" style={{ color: themeConfig.colors.text }}>تبديل نوع الحساب</span>
-              <span className="block text-[10px]" style={{ color: themeConfig.colors.textMuted }}>عميل · حلاق · متجر — {COMING_SOON_LABEL} للتفعيل الكامل</span>
+              <span className="block text-xs font-bold" style={{ color: themeConfig.colors.text }}>تغيير نوع الحساب</span>
+              <span className="block text-[10px]" style={{ color: themeConfig.colors.textMuted }}>زبون · حلاق · متجر — بدون شروط</span>
             </span>
             <ChevronLeft size={16} style={{ color: themeConfig.colors.textMuted }} />
           </button>
@@ -624,11 +626,33 @@ type LoyaltyData = Awaited<ReturnType<typeof getLoyaltyDashboard>>;
 
 function AccountTypeSwitcher({ onBack, currentRole }: { onBack: () => void; currentRole: string }) {
   const { themeConfig } = useApp();
+  const { refreshAppUser } = useAuth();
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
   const options = [
-    { id: 'client', label: 'عميل', desc: 'حجز مواعيد وتصفح السوق' },
-    { id: 'barber', label: 'حلاق / مختص', desc: 'استوديو عمل وحجوزات' },
-    { id: 'store', label: 'متجر', desc: 'بيع منتجات العناية' },
-  ] as const;
+    { id: 'client' as const, label: 'زبون', desc: 'حجز مواعيد وتصفح السوق' },
+    { id: 'barber' as const, label: 'حلاق', desc: 'استوديو عمل وحجوزات العملاء' },
+    { id: 'store' as const, label: 'متجر', desc: 'بيع منتجات العناية' },
+  ];
+
+  const switchRole = async (role: 'client' | 'barber' | 'store') => {
+    if (role === currentRole || busy) return;
+    setBusy(role);
+    setError('');
+    setMessage('');
+    try {
+      const { switchOwnAccountType } = await import('@/supabase/database');
+      await switchOwnAccountType(role);
+      await refreshAppUser();
+      setMessage('تم تغيير نوع الحساب');
+      window.setTimeout(() => onBack(), 700);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'تعذر تغيير نوع الحساب');
+    } finally {
+      setBusy(null);
+    }
+  };
 
   return (
     <div className="pb-20">
@@ -637,28 +661,34 @@ function AccountTypeSwitcher({ onBack, currentRole }: { onBack: () => void; curr
         <h2 className="text-base font-bold" style={{ color: themeConfig.colors.text }}>نوع الحساب</h2>
       </div>
       <div className="p-4 space-y-3">
-        <PausedFeatureBanner
-          title={`تبديل نوع الحساب ${COMING_SOON_LABEL}`}
-          description="الواجهة جاهزة — التفعيل الكامل يحتاج موافقة الإدارة وترحيل الأدوار."
-          kind="soon"
-          colors={themeConfig.colors}
-        />
-        {options.map(option => (
-          <div
-            key={option.id}
-            className="p-4 rounded-2xl border"
-            style={{
-              backgroundColor: themeConfig.colors.surface,
-              borderColor: currentRole === option.id ? themeConfig.colors.primary : themeConfig.colors.border,
-            }}
-          >
-            <p className="text-sm font-bold" style={{ color: themeConfig.colors.text }}>
-              {option.label}
-              {currentRole === option.id ? ' · الحالي' : ''}
-            </p>
-            <p className="text-[11px] mt-1" style={{ color: themeConfig.colors.textMuted }}>{option.desc}</p>
-          </div>
-        ))}
+        <p className="text-[11px] leading-5" style={{ color: themeConfig.colors.textMuted }}>
+          يمكنك التبديل بين زبون وحلاق ومتجر مباشرة. تسجيل الطبيب مخفي حالياً حتى التوثيق.
+        </p>
+        {error && <p role="alert" className="text-xs p-3 rounded-xl" style={{ backgroundColor: `${themeConfig.colors.error}12`, color: themeConfig.colors.error }}>{error}</p>}
+        {message && <p role="status" className="text-xs p-3 rounded-xl" style={{ backgroundColor: `${themeConfig.colors.success}12`, color: themeConfig.colors.success }}>{message}</p>}
+        {options.map(option => {
+          const active = currentRole === option.id;
+          return (
+            <button
+              key={option.id}
+              type="button"
+              disabled={Boolean(busy)}
+              onClick={() => void switchRole(option.id)}
+              className="w-full p-4 rounded-2xl border text-right disabled:opacity-60"
+              style={{
+                backgroundColor: active ? `${themeConfig.colors.primary}10` : themeConfig.colors.surface,
+                borderColor: active ? themeConfig.colors.primary : themeConfig.colors.border,
+              }}
+            >
+              <p className="text-sm font-bold" style={{ color: themeConfig.colors.text }}>
+                {option.label}
+                {active ? ' · الحالي' : ''}
+                {busy === option.id ? '…' : ''}
+              </p>
+              <p className="text-[11px] mt-1" style={{ color: themeConfig.colors.textMuted }}>{option.desc}</p>
+            </button>
+          );
+        })}
       </div>
     </div>
   );

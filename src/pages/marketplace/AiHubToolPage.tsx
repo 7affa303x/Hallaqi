@@ -7,7 +7,7 @@ const CameraTab = lazy(() => import('@/tabs/CameraTab'));
 
 /**
  * Hosts QR / Camera / Gallery tools opened from the central AI radial menu.
- * Gallery preview persists in sessionStorage so it survives navigation.
+ * Camera/QR must fit the viewport with no page scroll.
  */
 export default function AiHubToolPage() {
   const { themeConfig, screenParams, goBack, setActiveTab } = useApp();
@@ -26,6 +26,13 @@ export default function AiHubToolPage() {
     }
   }, []);
 
+  useEffect(() => {
+    if (tool !== 'qr' && tool !== 'camera') return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
+  }, [tool]);
+
   const title = useMemo(() => {
     if (tool === 'camera') return 'الكاميرا';
     if (tool === 'gallery') return 'المعرض';
@@ -34,28 +41,33 @@ export default function AiHubToolPage() {
 
   if (tool === 'qr' || tool === 'camera') {
     return (
-      <div className="h-[100dvh] overflow-hidden" style={{ backgroundColor: themeConfig.colors.background }}>
-        <div className="flex items-center gap-3 px-4 pt-4 pb-2">
-          <button type="button" onClick={goBack} className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: themeConfig.colors.surface }} aria-label="رجوع">
-            <ArrowLeft size={18} />
+      <div
+        className="fixed inset-0 z-40 flex flex-col overflow-hidden overscroll-none"
+        style={{ backgroundColor: themeConfig.colors.background, height: '100dvh', maxHeight: '100dvh' }}
+      >
+        <div className="flex items-center gap-3 px-3 py-2 flex-shrink-0">
+          <button type="button" onClick={goBack} className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: themeConfig.colors.surface }} aria-label="رجوع">
+            <ArrowLeft size={16} />
           </button>
-          <h1 className="text-base font-black truncate" style={{ color: themeConfig.colors.text }}>{title}</h1>
+          <h1 className="text-sm font-black truncate" style={{ color: themeConfig.colors.text }}>{title}</h1>
           <button
             type="button"
-            className="mr-auto text-xs font-bold px-3 py-1.5 rounded-full flex-shrink-0"
+            className="mr-auto text-[11px] font-bold px-2.5 py-1 rounded-full flex-shrink-0"
             style={{ backgroundColor: `${themeConfig.colors.primary}15`, color: themeConfig.colors.primary }}
             onClick={() => setActiveTab('ai-hub')}
           >
-            فتح المساعد AI
+            المساعد AI
           </button>
         </div>
-        <Suspense fallback={<p className="text-center py-10" style={{ color: themeConfig.colors.textMuted }}>جاري التحميل...</p>}>
-          <CameraTab
-            isActive
-            initialMode={tool === 'camera' ? 'camera' : 'scanner'}
-            compact
-          />
-        </Suspense>
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <Suspense fallback={<p className="text-center py-10" style={{ color: themeConfig.colors.textMuted }}>جاري التحميل...</p>}>
+            <CameraTab
+              isActive
+              initialMode={tool === 'camera' ? 'camera' : 'scanner'}
+              compact
+            />
+          </Suspense>
+        </div>
       </div>
     );
   }

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuthGate } from '@/hooks/useAuthGate';
 import { useApp } from '@/contexts/useApp';
 import { SkeletonBookingCard } from '@/components/Skeleton';
@@ -54,8 +54,16 @@ export default function AppointmentsTab() {
   const [reviewComment, setReviewComment] = useState('');
   const [reviewError, setReviewError] = useState('');
   const [isReviewing, setIsReviewing] = useState(false);
+  const [forceClientAppointments, setForceClientAppointments] = useState(() => {
+    try { return sessionStorage.getItem('hallaqi-force-client-appointments') === '1'; } catch { return false; }
+  });
 
   const isProfessional = appUser?.user_role === 'barber' || appUser?.user_role === 'specialist';
+
+  useEffect(() => {
+    if (!forceClientAppointments) return;
+    try { sessionStorage.removeItem('hallaqi-force-client-appointments'); } catch { /* ignore */ }
+  }, [forceClientAppointments]);
 
   if (authLoading) {
     return (
@@ -65,7 +73,7 @@ export default function AppointmentsTab() {
     );
   }
 
-  if (isAuthenticated && isProfessional && appUser) {
+  if (isAuthenticated && isProfessional && appUser && !forceClientAppointments) {
     return <BarberStudioHub proId={appUser.id} />;
   }
 
@@ -159,7 +167,22 @@ export default function AppointmentsTab() {
             <h1 className="text-lg font-bold leading-tight" style={{ color: themeConfig.colors.text }}>{translate(settings.language, 'myAppointments')}</h1>
             <p className="text-[10px]" style={{ color: themeConfig.colors.textMuted }}>{translate(settings.language, 'appointmentsDescription')}</p>
           </div>
+          {isProfessional && forceClientAppointments && (
+            <button
+              type="button"
+              onClick={() => setForceClientAppointments(false)}
+              className="text-[10px] font-bold px-2.5 py-1.5 rounded-xl border"
+              style={{ borderColor: themeConfig.colors.border, color: themeConfig.colors.primary, backgroundColor: themeConfig.colors.surface }}
+            >
+              استوديو الحلاق
+            </button>
+          )}
         </div>
+        {isProfessional && forceClientAppointments && (
+          <p className="text-[10px] mb-2 px-1" style={{ color: themeConfig.colors.textMuted }}>
+            تعرض مواعيدك كزبون (طلباتك أنت) — وليس حجوزات زبائن صالونك.
+          </p>
+        )}
         <div className="flex gap-2">
           {tabs.map(tab => (
             <button key={tab.key} onClick={() => setActiveFilter(tab.key)}

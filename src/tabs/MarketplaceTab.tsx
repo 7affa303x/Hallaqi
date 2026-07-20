@@ -117,9 +117,17 @@ export default function MarketplaceTab() {
   const stores = sellers.filter(s => s.sellerType === 'store');
   const companies = sellers.filter(s => s.sellerType === 'company');
   const flatCats = useMemo(() => flattenCategories(categories), [categories]);
+  const doctorSellerIds = useMemo(
+    () => new Set(sellers.filter(s => s.sellerType === 'doctor').map(s => s.id)),
+    [sellers],
+  );
+  const visibleProducts = useMemo(
+    () => products.filter(p => p.sellerType !== 'doctor' && !doctorSellerIds.has(p.sellerId)),
+    [products, doctorSellerIds],
+  );
 
-  const featured = products.filter(p => p.isFeatured).slice(0, 6);
-  const premium = products.filter(p => p.isPremiumVisibility).slice(0, 6);
+  const featured = visibleProducts.filter(p => p.isFeatured).slice(0, 6);
+  const premium = visibleProducts.filter(p => p.isPremiumVisibility).slice(0, 6);
 
   const toggleCatExpand = (id: string) => {
     setExpandedCats(prev => {
@@ -187,8 +195,8 @@ export default function MarketplaceTab() {
         </div>
       </header>
 
-      {/* Product of the Day — advertising placement */}
-      {sections.showProductOfTheDay && potd && !filters.productOfTheDayOnly && (
+      {/* Product of the Day — free soft-launch spotlight (not a paid ad) */}
+      {sections.showProductOfTheDay && potd && potd.sellerType !== 'doctor' && !doctorSellerIds.has(potd.sellerId) && !filters.productOfTheDayOnly && (
         <section className="px-4 mt-4">
           <button
             type="button"
@@ -339,13 +347,12 @@ export default function MarketplaceTab() {
         </div>
       </section>
 
-      {/* Quick filter chips — stores / companies / doctors (paid featured/premium hidden at soft launch) */}
+      {/* Quick filter chips — stores / companies (doctors hidden until verification) */}
       <section className="px-4 mt-3 flex gap-2 overflow-x-auto no-scrollbar">
         {[
           { key: 'potd', label: 'منتج اليوم', on: !!filters.productOfTheDayOnly, toggle: () => setFilters(f => ({ ...f, productOfTheDayOnly: !f.productOfTheDayOnly, sellerType: null })) },
           { key: 'store', label: 'متاجر', on: filters.sellerType === 'store', toggle: () => setFilters(f => ({ ...f, sellerType: f.sellerType === 'store' ? null : 'store', productOfTheDayOnly: false })) },
           { key: 'company', label: 'شركات', on: filters.sellerType === 'company', toggle: () => setFilters(f => ({ ...f, sellerType: f.sellerType === 'company' ? null : 'company', productOfTheDayOnly: false })) },
-          { key: 'doctor', label: 'أطباء', on: filters.sellerType === 'doctor', toggle: () => setFilters(f => ({ ...f, sellerType: f.sellerType === 'doctor' ? null : 'doctor', productOfTheDayOnly: false })) },
         ].map(chip => (
           <button
             key={chip.key}
@@ -364,12 +371,20 @@ export default function MarketplaceTab() {
       </section>
 
       {showFilters && (
-        <section className="mx-4 mt-3 p-3 rounded-2xl border space-y-3"
-          style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
-          <div className="flex items-center justify-between">
+        <div
+          className="fixed inset-0 z-50 flex flex-col"
+          style={{ backgroundColor: themeConfig.colors.background }}
+          role="dialog"
+          aria-modal="true"
+          aria-label="فلاتر السوق"
+        >
+          <div className="flex items-center justify-between gap-3 px-4 pt-4 pb-3 border-b" style={{ borderColor: themeConfig.colors.border, backgroundColor: themeConfig.colors.surface }}>
             <h4 className="text-sm font-black" style={{ color: themeConfig.colors.text }}>فلاتر متقدمة</h4>
-            <button type="button" onClick={() => setShowFilters(false)} aria-label="إغلاق"><X size={16} /></button>
+            <button type="button" onClick={() => setShowFilters(false)} aria-label="إغلاق" className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: themeConfig.colors.background }}>
+              <X size={18} style={{ color: themeConfig.colors.text }} />
+            </button>
           </div>
+          <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
           <div className="grid grid-cols-2 gap-2 text-xs">
             <label className="space-y-1">
               <span style={{ color: themeConfig.colors.textMuted }}>الولاية</span>
@@ -473,15 +488,26 @@ export default function MarketplaceTab() {
               </select>
             </label>
           </div>
-          <button
-            type="button"
-            className="w-full py-2 rounded-xl text-sm font-bold text-white"
-            style={{ backgroundColor: themeConfig.colors.primary }}
-            onClick={() => setFilters({ query: filters.query, sortBy: 'popularity' })}
-          >
-            إعادة ضبط الفلاتر
-          </button>
-        </section>
+          </div>
+          <div className="p-4 border-t flex gap-2" style={{ borderColor: themeConfig.colors.border, backgroundColor: themeConfig.colors.surface }}>
+            <button
+              type="button"
+              className="flex-1 py-3 rounded-xl text-sm font-bold border"
+              style={{ borderColor: themeConfig.colors.border, color: themeConfig.colors.text }}
+              onClick={() => setFilters({ query: filters.query, sortBy: 'popularity' })}
+            >
+              إعادة ضبط
+            </button>
+            <button
+              type="button"
+              className="flex-1 py-3 rounded-xl text-sm font-bold text-white"
+              style={{ backgroundColor: themeConfig.colors.primary }}
+              onClick={() => setShowFilters(false)}
+            >
+              عرض النتائج
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Featured strip — hidden at soft launch (paid placement) */}
@@ -515,15 +541,15 @@ export default function MarketplaceTab() {
       {/* Sellers by type */}
       <section className="mt-4 px-4">
         <h3 className="text-sm font-black mb-2" style={{ color: themeConfig.colors.text }}>
-          {filters.sellerType === 'doctor' ? 'أطباء' : filters.sellerType === 'company' ? 'شركات' : filters.sellerType === 'store' ? 'متاجر' : 'متاجر وشركات وأطباء'}
+          {filters.sellerType === 'company' ? 'شركات' : filters.sellerType === 'store' ? 'متاجر' : 'متاجر وشركات'}
         </h3>
         <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1">
           {sellers
             .filter(s => {
+              if (s.sellerType === 'doctor') return false;
               if (filters.sellerType) return s.sellerType === filters.sellerType;
               if (s.sellerType === 'company' && !sections.showCompanies) return false;
-              if (s.sellerType === 'doctor' && !sections.showDoctors) return false;
-              return s.sellerType === 'store' || s.sellerType === 'company' || s.sellerType === 'doctor';
+              return s.sellerType === 'store' || s.sellerType === 'company';
             })
             .slice(0, 8)
             .map(seller => (
@@ -555,7 +581,7 @@ export default function MarketplaceTab() {
       <section className="mt-5 px-4">
         <div className="flex items-center justify-between mb-2">
           <h3 className="text-sm font-black" style={{ color: themeConfig.colors.text }}>
-            النتائج ({products.length})
+            النتائج ({visibleProducts.length})
           </h3>
           <span className="text-[10px]" style={{ color: themeConfig.colors.textMuted }}>
             {flatCats.find(c => c.id === filters.categoryId)?.nameAr || 'كل الفئات'}
@@ -577,7 +603,7 @@ export default function MarketplaceTab() {
             onAction={() => setRetryTick(n => n + 1)}
             themeConfig={themeConfig}
           />
-        ) : products.length === 0 ? (
+        ) : visibleProducts.length === 0 ? (
           <EmptyState
             icon={Search}
             title={sellers.length === 0 ? 'السوق فارغ حالياً' : 'لا نتائج'}
@@ -586,7 +612,7 @@ export default function MarketplaceTab() {
           />
         ) : (
           <div className="grid grid-cols-2 gap-3">
-            {products.map(p => (
+            {visibleProducts.map(p => (
               <ProductCard key={p.id} product={p} onOpen={() => openProduct(p)} />
             ))}
           </div>

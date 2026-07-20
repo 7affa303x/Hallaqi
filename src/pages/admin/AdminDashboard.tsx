@@ -1041,6 +1041,6 @@ const DEFAULT_SECTIONS_SAFE: MarketplaceSectionConfig = {
   showBanners: false,
   showBarberExtras: false,
   showCompanies: true,
-  showDoctors: true,
+  showDoctors: false,
   categoryOrder: [],
 }
