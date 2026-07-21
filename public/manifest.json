@@ -32,13 +32,6 @@
   "categories": ["lifestyle", "utilities"],
   "screenshots": [
     {
-      "src": "/logo-wordmark.png",
-      "sizes": "1280x720",
-      "type": "image/png",
-      "form_factor": "wide",
-      "label": "حلاقي — منصة الحجز والعناية"
-    },
-    {
       "src": "/logo-icon-512.png",
       "sizes": "512x512",
       "type": "image/png",

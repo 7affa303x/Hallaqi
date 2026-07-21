@@ -453,8 +453,8 @@ export const settingsSections = [
   {
     title: 'الحساب',
     items: [
-      { id: 'editProfile', label: 'تعديل البروفايل', icon: 'User', description: 'تحديث المعلومات الشخصية', type: 'link' },
       { id: 'services', label: 'إدارة الخدمات', icon: 'Scissors', description: 'إضافة وتعديل الخدمات', type: 'link' },
+      { id: 'editProfile', label: 'تعديل البروفايل', icon: 'User', description: 'تحديث المعلومات الشخصية', type: 'link' },
       { id: 'idVerification', label: 'توثيق الهوية', icon: 'Shield', description: 'التحقق من هويتك بالبطاقة', type: 'link' },
       { id: 'changePassword', label: 'تغيير كلمة المرور', icon: 'Lock', description: 'تحديث كلمة المرور', type: 'link' },
       { id: 'linkedAccounts', label: 'الحسابات المرتبطة', icon: 'Link', description: 'ربط بحسابات التواصل', type: 'link' },

@@ -163,7 +163,6 @@ const LAUNCH_VISIBLE_SETTING_IDS = new Set([
   'language',
   'pushNotifications',
   'bookingReminders',
-  'editProfile',
   'changePassword',
   'helpCenter',
   'contactUs',
@@ -200,6 +199,9 @@ export function isSettingsItemVisible(
   if (!FEATURE_FLAGS.licensesPageEnabled && itemId === 'licenses') return false;
   if (FEATURE_FLAGS.hideMonetizationSurfaces && itemId === 'paymentMethods') return false;
   if (!FEATURE_FLAGS.paidSubscriptionsEnabled && itemId === 'subscription') return false;
+
+  // Profile edit: avatar/name tap only — hide duplicate settings row + old gear entry.
+  if (itemId === 'editProfile') return false;
 
   // Services management: barbers / specialists only
   if (itemId === 'services') {

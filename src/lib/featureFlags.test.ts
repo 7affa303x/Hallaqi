@@ -41,7 +41,7 @@ describe('featureFlags', () => {
 
   it('hides most settings at soft launch but keeps core items', () => {
     expect(isSettingsItemVisible('theme', 'client')).toBe(true);
-    expect(isSettingsItemVisible('editProfile', 'client')).toBe(true);
+    expect(isSettingsItemVisible('editProfile', 'client')).toBe(false);
     expect(isSettingsItemVisible('logout', 'client')).toBe(true);
     expect(isSettingsItemVisible('animation', 'client')).toBe(false);
     expect(isSettingsItemVisible('paymentMethods', 'client')).toBe(false);

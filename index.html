@@ -9,6 +9,24 @@
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <!-- Prefer mobile layout before React hydrates (survives browser Desktop Site). -->
+    <script>
+      (function () {
+        try {
+          var nav = navigator;
+          var ua = nav.userAgent || '';
+          var hint = nav.userAgentData && nav.userAgentData.mobile === true;
+          var mobileUa = /Android.+Mobile|iPhone|iPod|iPad|Android|webOS|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+          var touch = (nav.maxTouchPoints || 0) > 0;
+          var coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+          var noHover = window.matchMedia && window.matchMedia('(hover: none)').matches;
+          var shortSide = Math.min(screen.width || 0, screen.height || 0);
+          if (hint || mobileUa || (touch && (coarse || noHover) && shortSide > 0 && shortSide <= 920)) {
+            document.documentElement.classList.add('hallaqi-mobile-shell');
+          }
+        } catch (e) { /* ignore */ }
+      })();
+    </script>
     <meta name="description" content="حلاقي (Hallaqi) — منصة جزائرية لحجز الحلاقين والعناية الشخصية: احجز نقداً عند الزيارة، اكتشف السوق، وشارك في المنتدى." />
     <meta name="keywords" content="حلاق, حجز حلاق, جزائر, صالون, حلاقة, عناية شخصية, Hallaqi, barber Algeria, CCP, نقدي" />
     <meta name="author" content="Hallaqi" />
