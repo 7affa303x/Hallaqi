@@ -18,6 +18,7 @@ import { readAnalyticsConsent } from '@/lib/analyticsConsent';
 import { reportClientError } from '@/lib/error-reporting';
 import { translate } from '@/lib/i18n';
 import { consumeAuthUrlError } from '@/lib/authRedirect';
+import { applyMobileShellClass } from '@/lib/mobileShell';
 import BookingTab from '@/tabs/BookingTab';
 import ForumTab from '@/tabs/ForumTab';
 import './App.css';
@@ -245,6 +246,18 @@ function AppContent() {
   }, []);
 
   useEffect(() => {
+    applyMobileShellClass();
+    // Re-apply after login/OAuth when UA hints may settle, and on orientation change.
+    const reapply = () => applyMobileShellClass();
+    window.addEventListener('orientationchange', reapply);
+    window.addEventListener('pageshow', reapply);
+    return () => {
+      window.removeEventListener('orientationchange', reapply);
+      window.removeEventListener('pageshow', reapply);
+    };
+  }, [authLoading]);
+
+  useEffect(() => {
     // Re-show banner when a new error arrives after dismiss
     setDismissDataError(false);
   }, [dataError]);
@@ -346,8 +359,8 @@ function AppContent() {
           </button>
         </div>
       )}
-      {/* Full-bleed on phones; phone-column only from tablet/desktop up */}
-      <main id="main-content" className={`w-full max-w-none sm:max-w-lg sm:mx-auto min-h-screen min-h-[100dvh] ${showNav ? 'pb-[calc(4rem+env(safe-area-inset-bottom,0px))]' : ''}`}>
+      {/* Full-bleed on phones; phone-column only on large desktops (lg+). Mobile shell class overrides Desktop Site. */}
+      <main id="main-content" data-mobile-shell className={`w-full max-w-none lg:max-w-lg lg:mx-auto min-h-screen min-h-[100dvh] ${showNav ? 'pb-[calc(4rem+env(safe-area-inset-bottom,0px))]' : ''}`}>
         {/* Developer Mode toggle — dev builds only; stripped from production. */}
         {import.meta.env.DEV && (
           <>

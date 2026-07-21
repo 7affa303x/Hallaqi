@@ -204,11 +204,21 @@ button, nav, .no-select {
 }
 
 /* ====== RESPONSIVE SHELL ====== */
-/* Phones: full bleed. sm+: centered phone column for desktop browsing. */
-@media (min-width: 640px) {
-  #main-content {
+/* Real desktops only: centered phone column. Phones stay full-bleed. */
+@media (min-width: 1024px) {
+  html:not(.hallaqi-mobile-shell) #main-content {
     box-shadow: 0 0 0 1px color-mix(in srgb, var(--border) 80%, transparent);
   }
+}
+
+/* Phones / Desktop-Site spoofing: always full-bleed mobile shell */
+html.hallaqi-mobile-shell #main-content,
+html.hallaqi-mobile-shell [data-mobile-shell] {
+  max-width: none !important;
+  width: 100% !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  box-shadow: none !important;
 }
 
 @media (max-width: 380px) {

@@ -215,10 +215,6 @@ export default function ProfileTab() {
     }
   };
 
-  const scrollToSettings = () => {
-    document.getElementById('profile-settings')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
-
   return (
     <div className="pb-20 overflow-x-hidden max-w-full">
       <div className="px-4 pt-4 pb-6" style={{ backgroundColor: themeConfig.colors.primary, borderRadius: '0 0 2rem 2rem' }}>
@@ -245,14 +241,6 @@ export default function ProfileTab() {
               )}
             </button>
             <button onClick={handleLogout} className="w-9 h-9 rounded-xl flex items-center justify-center bg-white/10" title="تسجيل الخروج"><LogOut size={16} className="text-white" /></button>
-            <button
-              type="button"
-              onClick={scrollToSettings}
-              aria-label="الإعدادات"
-              className="w-9 h-9 rounded-xl flex items-center justify-center bg-white/10"
-            >
-              <Settings size={16} className="text-white" />
-            </button>
           </div>
         </div>
 
@@ -324,6 +312,30 @@ export default function ProfileTab() {
           colors={themeConfig.colors}
           onContinue={openOnboardingStep}
         />
+      )}
+
+      {(userRole === 'barber' || userRole === 'specialist') && (
+        <div className="px-4 mt-4">
+          <button
+            type="button"
+            onClick={() => setSubPage('services')}
+            className="w-full flex items-center gap-3 p-4 rounded-2xl border text-right"
+            style={{ backgroundColor: themeConfig.colors.primary + '12', borderColor: themeConfig.colors.primary + '40' }}
+          >
+            <div className="w-11 h-11 rounded-xl flex items-center justify-center" style={{ backgroundColor: themeConfig.colors.primary + '18' }}>
+              <Scissors size={21} style={{ color: themeConfig.colors.primary }} />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-bold" style={{ color: themeConfig.colors.text }}>إدارة الخدمات والأسعار</p>
+              <p className="text-[11px]" style={{ color: themeConfig.colors.textMuted }}>
+                {ownProfessional?.services.length
+                  ? `${ownProfessional.services.length} خدمة — اضغط للتعديل`
+                  : 'أضف خدماتك وأسعارك للظهور في الحجز'}
+              </p>
+            </div>
+            <ChevronLeft size={17} style={{ color: themeConfig.colors.textMuted }} />
+          </button>
+        </div>
       )}
 
       {appUser?.user_role === 'admin' && (

@@ -56,7 +56,7 @@ export default function BottomNav() {
           borderColor: themeConfig.colors.border,
         }}
       >
-        <div className="flex items-center justify-around h-16 w-full max-w-none sm:max-w-lg sm:mx-auto relative">
+        <div data-mobile-shell className="flex items-center justify-around h-16 w-full max-w-none lg:max-w-lg lg:mx-auto relative">
           {tabs.map((tab) => {
             const isActive =
               activeTab === tab.key
