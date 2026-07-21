@@ -4,8 +4,7 @@ import GrowthPageShell from '@/components/growth/GrowthPageShell';
 import { useGrowth } from '@/hooks/useGrowth';
 import { useGrowthLayer } from '@/hooks/useGrowthLayer';
 import { useApp } from '@/contexts/useApp';
-import { ReferralService } from '@/lib/growth-layer';
-import { GrowthAnalyticsService } from '@/lib/growth-layer';
+import { ReferralService, GrowthAnalyticsService } from '@/lib/growth-layer';
 
 export default function ReferralsPage() {
   const { themeConfig } = useApp();

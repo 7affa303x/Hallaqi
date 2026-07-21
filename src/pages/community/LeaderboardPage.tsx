@@ -6,11 +6,11 @@ import {
   GROWTH_RANKING_METRICS,
   GROWTH_RANKING_METRIC_LABELS,
   GrowthLeaderboardService,
+  GrowthAnalyticsService,
   type GrowthRankingMetric,
 } from '@/lib/growth-layer';
 import type { LeaderboardSnapshot } from '@/lib/community/types';
 import { RANKING_SCOPE_LABELS, type RankingScope } from '@/lib/community/config';
-import { GrowthAnalyticsService } from '@/lib/growth-layer';
 
 export default function LeaderboardPage() {
   const { themeConfig } = useApp();

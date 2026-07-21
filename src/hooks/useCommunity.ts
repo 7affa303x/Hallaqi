@@ -21,7 +21,7 @@ export function useCommunity() {
   const [localRank, setLocalRank] = useState<LeaderboardSnapshot | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const refresh = useCallback(async () => {
+  const load = useCallback(async (cancelled?: () => boolean) => {
     if (!userId || !isSupabaseConfigured()) return;
     setLoading(true);
     try {
@@ -30,26 +30,32 @@ export function useCommunity() {
         TagService.pendingForUser(userId),
         getCommunityStats(userId),
       ]);
+      const scopes = RankingService.defaultScopesForProfile(appUser?.city, appUser?.country);
+      const primary = scopes[0];
+      const board = primary
+        ? await RankingService.getLeaderboard(primary.type, primary.value, 'xp', 'monthly', userId)
+        : null;
+      if (cancelled?.()) return;
       setTransformations(t);
       setPendingTags(tags);
       setStats(s);
-
-      const scopes = RankingService.defaultScopesForProfile(appUser?.city, appUser?.country);
-      const primary = scopes[0];
-      if (primary) {
-        const board = await RankingService.getLeaderboard(primary.type, primary.value, 'xp', 'monthly', userId);
-        setLocalRank(board);
-      }
+      setLocalRank(board);
     } catch {
       /* offline / migration pending */
     } finally {
-      setLoading(false);
+      if (!cancelled?.()) setLoading(false);
     }
   }, [userId, appUser?.city, appUser?.country]);
 
   useEffect(() => {
-    void refresh();
-  }, [refresh]);
+    let cancelled = false;
+    void load(() => cancelled);
+    return () => {
+      cancelled = true;
+    };
+  }, [load]);
+
+  const refresh = useCallback(() => load(), [load]);
 
   const pinned = userId ? TransformationService.pinnedForUser(transformations, userId) : [];
 

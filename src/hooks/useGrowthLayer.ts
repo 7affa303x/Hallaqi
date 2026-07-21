@@ -16,7 +16,7 @@ export function useGrowthLayer() {
   const [ambassador, setAmbassador] = useState<AmbassadorStatus>({ unlocked: false });
   const [loading, setLoading] = useState(false);
 
-  const refresh = useCallback(async () => {
+  const load = useCallback(async (cancelled?: () => boolean) => {
     if (!appUser?.id) return;
     setLoading(true);
     try {
@@ -25,19 +25,26 @@ export function useGrowthLayer() {
         CoinsService.balance(appUser.id),
         AmbassadorService.evaluate(appUser.id),
       ]);
+      if (cancelled?.()) return;
       setReferralStats(stats);
       setCoins(balance);
       setAmbassador(amb);
     } catch {
       /* offline */
     } finally {
-      setLoading(false);
+      if (!cancelled?.()) setLoading(false);
     }
   }, [appUser?.id]);
 
   useEffect(() => {
-    void refresh();
-  }, [refresh]);
+    let cancelled = false;
+    void load(() => cancelled);
+    return () => {
+      cancelled = true;
+    };
+  }, [load]);
+
+  const refresh = useCallback(() => load(), [load]);
 
   return { referralStats, coins, ambassador, loading, refresh };
 }
