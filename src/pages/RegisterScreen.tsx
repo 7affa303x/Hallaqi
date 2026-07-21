@@ -336,7 +336,7 @@ export default function RegisterScreen() {
             />
           </div>
           <p className="text-[10px] mt-1.5 px-0.5" style={{ color: themeConfig.colors.textMuted }}>
-            رقم جزائري (05/06/07) — للتواصل عند الحجز. التحقق بـ OTP لاحقاً.
+            مطلوب للتواصل عند الحجز — يمكن استخدام رقم ولي الأمر إن كان العمر أقل من 15.
           </p>
           <AnimatePresence>{renderFieldError('phone')}</AnimatePresence>
         </div>

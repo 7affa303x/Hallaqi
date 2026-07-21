@@ -150,13 +150,12 @@ export const RankingService = {
     return snapshot;
   },
 
-  /** Always show geo-scoped boards — never return only national without local scopes. */
-  defaultScopesForProfile(city?: string | null, country?: string | null) {
+  /** Local-first scopes: neighborhood → municipal → wilaya → national. */
+  defaultScopesForProfile(city?: string | null, country?: string | null, wilaya?: string | null) {
     const scopes: { type: RankingScope; value: string }[] = [];
-    if (city) {
-      scopes.push({ type: 'city', value: city });
-      scopes.push({ type: 'district', value: city });
-    }
+    if (city) scopes.push({ type: 'district', value: city });
+    if (city) scopes.push({ type: 'city', value: city });
+    if (wilaya && wilaya !== city) scopes.push({ type: 'state', value: wilaya });
     if (country) scopes.push({ type: 'country', value: country });
     if (scopes.length === 0) scopes.push({ type: 'country', value: 'Algeria' });
     return scopes;

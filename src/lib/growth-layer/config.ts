@@ -48,7 +48,7 @@ export const REWARD_CATEGORY_LABELS: Record<string, string> = {
   coupon: 'كوبونات',
   product: 'منتجات',
   credit: 'رصيد ترويج',
-  gift_card: 'بطاقات هدية',
+  gift_card: 'حلاقة مجانية',
 };
 
 // TODO(seasonal-events): campaign configs plug in here without rewriting services.

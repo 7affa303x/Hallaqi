@@ -85,7 +85,7 @@ export function useGrowth(): {
       bookings,
       forumPosts,
     });
-    return evaluateProgression(signals);
+    return evaluateProgression(signals, appUser?.user_role);
   }, [appUser, bookings, forumPosts, tick, ready]);
 
   const shareReferral = useCallback(() => {

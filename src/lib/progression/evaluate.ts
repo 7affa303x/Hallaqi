@@ -4,7 +4,7 @@
  */
 
 import { ACHIEVEMENT_CATALOG } from '@/lib/progression/config/achievements';
-import { BADGE_CATALOG } from '@/lib/progression/config/badges';
+import { badgeCatalogForRole } from '@/lib/progression/badgeAudience';
 import { getMissionCatalogSync } from '@/lib/progression/missionCatalog';
 import { getLevelProgress } from '@/lib/progression/config/levels';
 import { evaluateNewAchievements, toAchievementViews } from '@/lib/progression/engines/achievementEngine';
@@ -120,7 +120,8 @@ export function buildProgressionSignals(input: {
  * Evaluate full progression snapshot and persist side-effects (XP/badges/missions).
  * Safe to call from React render paths — mutations are idempotent via dedupe keys.
  */
-export function evaluateProgression(signals: ProgressionSignals): ProgressionSnapshot {
+export function evaluateProgression(signals: ProgressionSignals, userRole?: string | null): ProgressionSnapshot {
+  const roleCatalog = badgeCatalogForRole(userRole);
   ProgressionService.touchDailyActivity(signals.userId);
 
   // Milestone XP from profile/gallery (deduped, sync local + async remote)
@@ -153,7 +154,7 @@ export function evaluateProgression(signals: ProgressionSignals): ProgressionSna
   let local = ProgressionService.load(signals.userId);
 
   // Badges
-  const newBadges = evaluateNewBadges(signals, local.streak, local.badges, BADGE_CATALOG);
+  const newBadges = evaluateNewBadges(signals, local.streak, local.badges, roleCatalog);
   for (const b of newBadges) {
     void ProgressionService.unlockBadge(signals.userId, b.id);
   }
@@ -199,7 +200,7 @@ export function evaluateProgression(signals: ProgressionSignals): ProgressionSna
   local = ProgressionService.load(signals.userId);
   const refreshedMissions = buildMissionViews(signals, local.missions, missionCatalog);
   const level = getLevelProgress(local.progress.totalXp);
-  const badges = toBadgeViews(BADGE_CATALOG, local.badges);
+  const badges = toBadgeViews(roleCatalog, local.badges);
   const achievements = toAchievementViews(ACHIEVEMENT_CATALOG, local.achievements, signals, local.streak);
   const pinned = pinnedBadgeViews(badges);
 

@@ -30,7 +30,11 @@ export function useCommunity() {
         TagService.pendingForUser(userId),
         getCommunityStats(userId),
       ]);
-      const scopes = RankingService.defaultScopesForProfile(appUser?.city, appUser?.country);
+      const scopes = RankingService.defaultScopesForProfile(
+        appUser?.city,
+        appUser?.country,
+        (appUser as { wilaya?: string })?.wilaya,
+      );
       const primary = scopes[0];
       const board = primary
         ? await RankingService.getLeaderboard(primary.type, primary.value, 'xp', 'monthly', userId)

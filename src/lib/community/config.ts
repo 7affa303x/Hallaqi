@@ -42,9 +42,9 @@ export const RANKING_METRIC_LABELS: Record<RankingMetric, string> = {
 };
 
 export const RANKING_SCOPE_LABELS: Record<RankingScope, string> = {
-  country: 'الدولة',
+  country: 'الوطني',
   state: 'الولاية',
-  city: 'المدينة',
+  city: 'البلدية',
   district: 'الحي',
 };
 

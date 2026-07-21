@@ -21,7 +21,11 @@ export default function LeaderboardPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const scopes = GrowthLeaderboardService.defaultScopes(appUser?.city, appUser?.country);
+    const scopes = GrowthLeaderboardService.defaultScopes(
+      appUser?.city,
+      appUser?.country,
+      (appUser as { wilaya?: string })?.wilaya,
+    );
     if (scopes[0]) setScope(scopes[0]);
   }, [appUser?.city, appUser?.country]);
 
@@ -53,7 +57,11 @@ export default function LeaderboardPage() {
       </div>
 
       <div className="flex gap-1 mb-4 overflow-x-auto no-scrollbar">
-        {GrowthLeaderboardService.defaultScopes(appUser?.city, appUser?.country).map(s => (
+        {GrowthLeaderboardService.defaultScopes(
+          appUser?.city,
+          appUser?.country,
+          (appUser as { wilaya?: string })?.wilaya,
+        ).map(s => (
           <button
             key={`${s.type}-${s.value}`}
             type="button"

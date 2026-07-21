@@ -26,6 +26,8 @@ export interface CriteriaMap {
   phoneVerified?: boolean;
 }
 
+export type BadgeAudience = 'client' | 'barber' | 'store' | 'doctor';
+
 export interface BadgeDef {
   id: string;
   category: BadgeCategory;
@@ -35,6 +37,8 @@ export interface BadgeDef {
   color: string;
   criteria: CriteriaMap;
   xpBonus: number;
+  /** When set, badge is shown/earned only for these account roles. */
+  audience?: readonly BadgeAudience[];
 }
 
 export interface AchievementDef {

@@ -4,6 +4,7 @@ export const BADGE_CATALOG: readonly BadgeDef[] = [
   {
     id: 'first_booking',
     category: 'booking' as BadgeCategory,
+    audience: ['client'],
     nameAr: 'أول حجز',
     descriptionAr: 'أكملت أول موعد عبر حلاقي',
     emoji: '✂️',
@@ -14,6 +15,7 @@ export const BADGE_CATALOG: readonly BadgeDef[] = [
   {
     id: 'bookings_10',
     category: 'booking',
+    audience: ['client'],
     nameAr: '10 حجوزات',
     descriptionAr: 'أكملت 10 مواعيد',
     emoji: '🔟',
@@ -24,6 +26,7 @@ export const BADGE_CATALOG: readonly BadgeDef[] = [
   {
     id: 'bookings_50',
     category: 'booking',
+    audience: ['client'],
     nameAr: '50 حجزاً',
     descriptionAr: 'أكملت 50 موعداً',
     emoji: '💎',
@@ -34,6 +37,7 @@ export const BADGE_CATALOG: readonly BadgeDef[] = [
   {
     id: 'bookings_100',
     category: 'booking',
+    audience: ['client'],
     nameAr: '100 حجز',
     descriptionAr: 'أكملت 100 موعد',
     emoji: '👑',
@@ -44,6 +48,7 @@ export const BADGE_CATALOG: readonly BadgeDef[] = [
   {
     id: 'trusted',
     category: 'verification',
+    audience: ['barber'],
     nameAr: 'موثوق',
     descriptionAr: 'حساب موثوق على حلاقي',
     emoji: '🛡️',
@@ -54,6 +59,7 @@ export const BADGE_CATALOG: readonly BadgeDef[] = [
   {
     id: 'verified',
     category: 'verification',
+    audience: ['barber', 'client', 'store', 'doctor'],
     nameAr: 'موثّق',
     descriptionAr: 'تم التحقق من هويتك',
     emoji: '✅',
@@ -64,6 +70,7 @@ export const BADGE_CATALOG: readonly BadgeDef[] = [
   {
     id: 'content_creator',
     category: 'community',
+    audience: ['client'],
     nameAr: 'صانع محتوى',
     descriptionAr: 'نشرت عدة مواضيع في المنتدى',
     emoji: '✍️',
@@ -94,6 +101,7 @@ export const BADGE_CATALOG: readonly BadgeDef[] = [
   {
     id: 'gallery_master',
     category: 'gallery',
+    audience: ['barber'],
     nameAr: 'سيد المعرض',
     descriptionAr: 'أكملت معرض أعمالك',
     emoji: '🖼️',
@@ -134,12 +142,46 @@ export const BADGE_CATALOG: readonly BadgeDef[] = [
   {
     id: 'streak_365',
     category: 'streak',
+    audience: ['client'],
     nameAr: 'سلسلة سنة',
     descriptionAr: '365 يوماً متتالياً',
     emoji: '🏆',
     color: '#7F1D1D',
     criteria: { streakDays: 365 },
     xpBonus: 200,
+  },
+  {
+    id: 'barber_jobs_50',
+    category: 'booking',
+    audience: ['barber'],
+    nameAr: '50 عميلاً',
+    descriptionAr: 'أكملت 50 حجزاً كحلاق',
+    emoji: '💈',
+    color: '#0F766E',
+    criteria: { completedBookings: 50 },
+    xpBonus: 60,
+  },
+  {
+    id: 'store_trusted',
+    category: 'verification',
+    audience: ['store'],
+    nameAr: 'متجر موثوق',
+    descriptionAr: 'متجر معتمد على حلاقي',
+    emoji: '🏪',
+    color: '#2563EB',
+    criteria: { trusted: true },
+    xpBonus: 25,
+  },
+  {
+    id: 'doctor_care',
+    category: 'verification',
+    audience: ['doctor'],
+    nameAr: 'رعاية موثوقة',
+    descriptionAr: 'ملف طبي موثّق على حلاقي',
+    emoji: '🩺',
+    color: '#059669',
+    criteria: { verified: true },
+    xpBonus: 25,
   },
 ] as const;
 

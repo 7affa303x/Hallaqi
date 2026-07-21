@@ -93,7 +93,8 @@ export async function getRewardStoreItems(): Promise<RewardStoreItem[]> {
     .eq('is_active', true)
     .order('sort_order', { ascending: true });
   if (error) return [];
-  return ((data || []) as Record<string, unknown>[]).map(row => ({
+  const { applyRewardStoreOverrides } = await import('@/lib/growth-layer/rewardOverrides');
+  const rows = ((data || []) as Record<string, unknown>[]).map(row => ({
     id: String(row.id),
     title: String(row.title),
     description: (row.description as string) || null,
@@ -102,6 +103,7 @@ export async function getRewardStoreItems(): Promise<RewardStoreItem[]> {
     imageEmoji: String(row.image_emoji || '🎁'),
     comingSoon: Boolean(row.coming_soon ?? true),
   }));
+  return applyRewardStoreOverrides(rows);
 }
 
 export async function getMiniSiteBySlug(slug: string): Promise<MiniSite | null> {
