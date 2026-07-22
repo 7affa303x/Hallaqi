@@ -2,15 +2,16 @@ import { GROWTH_PROGRESS_MOCK } from '@/data/growthMock';
 import { useGrowth } from '@/hooks/useGrowth';
 import { useApp } from '@/contexts/useApp';
 
-/** Live progress card — Level/XP/Streak/Badges from local growth engine. */
+/** XP / Level / Streak card — values from Progression Engine only. */
 export default function ProgressCard() {
-  const { themeConfig } = useApp();
+  const { themeConfig, navigate } = useApp();
   const { snapshot } = useGrowth();
   const level = snapshot.level || GROWTH_PROGRESS_MOCK.level;
   const xp = snapshot.xp;
   const xpToNext = snapshot.xpToNext;
   const xpInto = snapshot.xpIntoLevel;
   const streakDays = snapshot.streakDays;
+  const bestStreak = snapshot.bestStreak;
   const badgeCount = snapshot.badgeCount;
   const pct = Math.min(100, Math.round((xpInto / Math.max(xpToNext, 1)) * 100));
   const accent = themeConfig.colors.primary;
@@ -36,22 +37,27 @@ export default function ProgressCard() {
           <h2 className="text-2xl font-black text-white">Level {level}</h2>
           <p className="text-sm font-semibold mt-1" style={{ color: accent }}>{xp} XP</p>
         </div>
-        <div
-          className="w-14 h-14 rounded-2xl flex items-center justify-center text-xl font-black text-white"
-          style={{ background: `linear-gradient(145deg, ${accent}, ${themeConfig.colors.accent})` }}
+        <button
+          type="button"
+          onClick={() => navigate('levels')}
+          className="text-center px-2 py-1 rounded-xl active:scale-95 transition-transform"
+          style={{ background: `${accent}22`, border: `1px solid ${accent}44` }}
+          aria-label="المستويات والجوائز"
         >
-          {level}
-        </div>
+          <p className="text-[11px] font-black text-white">المستويات</p>
+          <p className="text-[9px] text-white/60 mt-0.5">اضغط هنا</p>
+        </button>
       </div>
 
       <div className="relative grid grid-cols-2 gap-2 mb-4">
         <div className="rounded-2xl px-3 py-2.5 bg-white/5 border border-white/10">
           <p className="text-[10px] text-white/50 font-medium">Streak</p>
-          <p className="text-sm font-bold text-white mt-0.5">🔥 {streakDays} Day Streak</p>
+          <p className="text-sm font-bold text-white mt-0.5">🔥 {streakDays} يوم</p>
+          <p className="text-[9px] text-white/40 mt-0.5">أفضل: {bestStreak}</p>
         </div>
         <div className="rounded-2xl px-3 py-2.5 bg-white/5 border border-white/10">
           <p className="text-[10px] text-white/50 font-medium">Badges</p>
-          <p className="text-sm font-bold text-white mt-0.5">🏅 {badgeCount} Badges</p>
+          <p className="text-sm font-bold text-white mt-0.5">🏅 {badgeCount} شارة</p>
         </div>
       </div>
 

@@ -13,6 +13,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { registerSchema, normalizeAlgerianPhone } from '@/lib/validation';
 import type { RegisterFormData } from '@/lib/validation';
+import { ReferralService } from '@/lib/growth-layer';
 
 function getPasswordStrength(pw: string): { score: number; label: string; color: string } {
   if (!pw) return { score: 0, label: '', color: '' };
@@ -80,6 +81,14 @@ export default function RegisterScreen() {
         phone,
       );
       if (result.session) {
+        const pendingRef = ReferralService.consumePendingCode();
+        if (pendingRef && result.user?.id) {
+          try {
+            await ReferralService.attribute(pendingRef, result.user.id);
+          } catch {
+            /* non-blocking */
+          }
+        }
         const sellerRoles = ['store', 'company', 'doctor'];
         if (sellerRoles.includes(data.accountType)) {
           navigate('seller-dashboard', { role: data.accountType, pendingApproval: '1' });
@@ -204,7 +213,7 @@ export default function RegisterScreen() {
             className="w-14 h-14 rounded-2xl flex items-center justify-center"
             style={{ backgroundColor: themeConfig.colors.primary + '12' }}
           >
-            <img src="/logo-icon.png" alt="Hallaqi" className="w-10 h-10 rounded-xl" />
+            <img src="/logo-icon.svg" alt="Hallaqi" className="w-10 h-10 rounded-xl" />
           </div>
           <div>
             <h1 className="text-2xl font-black tracking-tight" style={{ color: themeConfig.colors.text }}>Hallaqi</h1>
@@ -327,7 +336,7 @@ export default function RegisterScreen() {
             />
           </div>
           <p className="text-[10px] mt-1.5 px-0.5" style={{ color: themeConfig.colors.textMuted }}>
-            رقم جزائري (05/06/07) — للتواصل عند الحجز. التحقق بـ OTP لاحقاً.
+            مطلوب للتواصل عند الحجز — يمكن استخدام رقم ولي الأمر إن كان العمر أقل من 15.
           </p>
           <AnimatePresence>{renderFieldError('phone')}</AnimatePresence>
         </div>

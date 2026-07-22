@@ -59,7 +59,7 @@ export default function ChatRoomPage() {
   if (!conversationId || !appUser) {
     return (
       <div className="h-screen flex flex-col items-center justify-center" style={{ backgroundColor: themeConfig.colors.background }}>
-        <img src="/logo-icon.png" alt="Hallaqi" className="w-16 h-16 mb-4 opacity-30" />
+        <img src="/logo-icon.svg" alt="Hallaqi" className="w-16 h-16 mb-4 opacity-30" />
         <p style={{ color: themeConfig.colors.textMuted }}>الدردشة غير متاحة</p>
         <button onClick={goBack} className="mt-4 px-4 py-2 rounded-xl text-xs font-bold text-white" style={{ backgroundColor: themeConfig.colors.primary }}>رجوع</button>
       </div>
@@ -86,7 +86,7 @@ export default function ChatRoomPage() {
     <motion.div
       initial={{ opacity: 0, x: 300 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 300 }}
       transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-      className="h-screen flex flex-col" style={{ backgroundColor: themeConfig.colors.background }}>
+      className="h-[100dvh] max-h-[100dvh] flex flex-col overflow-hidden" style={{ backgroundColor: themeConfig.colors.background }}>
 
       <div className="flex items-center gap-3 px-4 py-3 border-b backdrop-blur-lg flex-shrink-0"
         style={{ backgroundColor: `${themeConfig.colors.surface}ee`, borderColor: themeConfig.colors.border }}>
@@ -104,7 +104,7 @@ export default function ChatRoomPage() {
       </div>
       {callMessage && <button onClick={() => setCallMessage('')} className="mx-4 mt-2 p-2 rounded-xl text-[11px] text-center" style={{ backgroundColor: themeConfig.colors.warning + '12', color: themeConfig.colors.warning }}>{callMessage}</button>}
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+      <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3 overscroll-contain">
         {messages.length === 0 && (
           <p className="text-center text-xs mt-8" style={{ color: themeConfig.colors.textMuted }}>ابدأ المحادثة بإرسال رسالة</p>
         )}

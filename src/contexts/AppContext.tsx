@@ -25,7 +25,7 @@ import { mockCurrentUser, mockBarbers, mockBookings, mockForumPosts, mockNotific
 import { mapBookingRow, mapForumPost, mapNotificationRow } from '@/lib/mappers';
 import { requiresMfaChallenge } from '@/lib/mfa';
 import { sanitizeAuthRedirectIntent } from '@/lib/authRedirect';
-import { scrollToTop } from '@/lib/scroll';
+import { scrollToTop, saveProfileScrollPosition, markProfileScrollRestore, shouldRestoreProfileScroll, clearProfileScrollRestore, restoreProfileScrollPosition } from '@/lib/scroll';
 import type { Barber, Booking, Chat, ForumPost, AppNotification, TabName, ThemeName, AnimationStyle, AppSettings, ScreenName, ScreenParams, User } from '@/types';
 import type { Database } from '@/types/supabase';
 import type { Profile } from '@/types/supabase-aliases';
@@ -73,6 +73,8 @@ function screenUrl(screen: ScreenName, params?: ScreenParams): string {
   if (screen === 'company-detail' && params?.sellerId) return `/company/${encodeURIComponent(params.sellerId)}`;
   if (screen === 'doctor-detail' && params?.sellerId) return `/doctor/${encodeURIComponent(params.sellerId)}`;
   if (screen === 'product-detail' && params?.productId) return `/product/${encodeURIComponent(params.productId)}`;
+  if (screen === 'referral-landing' && params?.referralCode) return `/ref/${encodeURIComponent(params.referralCode)}`;
+  if (screen === 'mini-site' && params?.slug) return `/u/${encodeURIComponent(params.slug)}`;
   const query = new URLSearchParams({ screen });
   for (const [key, value] of Object.entries(params || {})) {
     if (value) query.set(key, value);
@@ -101,6 +103,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
   /* ---- Tab ---- */
   const [activeTab, setActiveTabState] = useState<TabName>('booking');
   const [prevTab, setPrevTab] = useState<TabName | null>(null);
+
+  const restoreProfileIfNeeded = useCallback(() => {
+    if (shouldRestoreProfileScroll()) {
+      clearProfileScrollRestore();
+      restoreProfileScrollPosition();
+    } else {
+      scrollToTop();
+    }
+  }, []);
 
   /** Reset to main tabs shell so bottom nav stays visible and stable. */
   const resetToTabs = useCallback((tab: TabName = 'booking') => {
@@ -143,6 +154,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } else if (pathname.startsWith('/product/')) {
       initialScreen = 'product-detail';
       initialParams = { productId: decodeURIComponent(pathname.slice('/product/'.length)) };
+    } else if (pathname.startsWith('/ref/')) {
+      initialScreen = 'referral-landing';
+      initialParams = { referralCode: decodeURIComponent(pathname.slice('/ref/'.length)) };
+    } else if (pathname.startsWith('/u/')) {
+      initialScreen = 'mini-site';
+      initialParams = { slug: decodeURIComponent(pathname.slice('/u/'.length)) };
     } else if (queryScreen === 'payment-success') {
       initialScreen = 'payment-success';
       initialParams = { bookingId: query.get('booking_id') || undefined };
@@ -171,7 +188,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const navigate = useCallback((nextScreen: ScreenName, params?: ScreenParams) => {
-    // Always reset stack when returning home — fixes auth/register nav glitches
+    if (nextScreen !== 'home' && screen === 'home' && activeTab === 'profile') {
+      saveProfileScrollPosition();
+      markProfileScrollRestore();
+    }
     if (nextScreen === 'home') {
       const tab = (params?.redirectTab as TabName) || 'booking';
       setActiveTabState(prev => {
@@ -179,14 +199,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
         return tab;
       });
       setScreen('home');
-      // Keep lightweight home params (e.g. openLegal) so Profile can deep-link
-      const homeParams = params?.openLegal
-        ? { openLegal: params.openLegal }
-        : undefined;
+      const homeParams = params?.openLegal ? { openLegal: params.openLegal } : undefined;
       setScreenParams(homeParams);
       setHistory([{ screen: 'home', params: homeParams }]);
       window.history.replaceState({ hallaqi: true, tab }, '', '/');
-      scrollToTop();
+      if (tab === 'profile') restoreProfileIfNeeded();
+      else scrollToTop();
       return;
     }
     setScreen(nextScreen);
@@ -194,28 +212,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setHistory(prev => [...prev, { screen: nextScreen, params }]);
     window.history.pushState({ hallaqi: true, screen: nextScreen }, '', screenUrl(nextScreen, params));
     scrollToTop();
-  }, []);
+  }, [screen, activeTab, restoreProfileIfNeeded]);
 
   const goBack = useCallback(() => {
     setHistory(prev => {
       if (prev.length <= 1) {
-        // Never no-op: fall back to home tabs (deep links / empty stack)
         setScreen('home');
         setScreenParams(undefined);
         window.history.replaceState({ hallaqi: true }, '', '/');
-        scrollToTop();
+        restoreProfileIfNeeded();
         return [{ screen: 'home' }];
       }
       const next = prev.slice(0, -1);
       const last = next[next.length - 1];
       setScreen(last.screen);
       setScreenParams(last.params);
-      // replaceState avoids back-button loops created by pushState-on-back
       window.history.replaceState({ hallaqi: true, screen: last.screen }, '', screenUrl(last.screen, last.params));
-      scrollToTop();
+      if (last.screen === 'home') restoreProfileIfNeeded();
+      else scrollToTop();
       return next;
     });
-  }, []);
+  }, [restoreProfileIfNeeded]);
 
   const setActiveTab = useCallback((tab: TabName) => {
     resetToTabs(tab);
@@ -228,20 +245,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (prev.length <= 1) {
           setScreen('home');
           setScreenParams(undefined);
-          scrollToTop();
+          restoreProfileIfNeeded();
           return [{ screen: 'home' }];
         }
         const next = prev.slice(0, -1);
         const last = next[next.length - 1];
         setScreen(last.screen);
         setScreenParams(last.params);
-        scrollToTop();
+        if (last.screen === 'home') restoreProfileIfNeeded();
+        else scrollToTop();
         return next;
       });
     };
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
-  }, []);
+  }, [restoreProfileIfNeeded]);
 
   useEffect(() => {
     if (!appUser) return;
@@ -414,6 +432,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
       } else if (pathname.startsWith('/product/')) {
         setScreen('product-detail');
         setScreenParams({ productId: decodeURIComponent(pathname.slice('/product/'.length)) });
+        return;
+      } else if (pathname.startsWith('/ref/')) {
+        setScreen('referral-landing');
+        setScreenParams({ referralCode: decodeURIComponent(pathname.slice('/ref/'.length)) });
+        return;
+      } else if (pathname.startsWith('/u/')) {
+        setScreen('mini-site');
+        setScreenParams({ slug: decodeURIComponent(pathname.slice('/u/'.length)) });
         return;
       } else if (query.get('screen') === 'payment-success') {
         setScreen('payment-success');

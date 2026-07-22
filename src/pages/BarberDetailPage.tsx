@@ -232,12 +232,12 @@ export default function BarberDetailPage() {
     }
   };
 
-  const bookNow = () => {
+  const bookNow = (serviceId?: string) => {
     if (!isAuthenticated) {
-      navigate('login', { redirectScreen: 'booking-flow', barberId: barber.id });
+      navigate('login', { redirectScreen: 'booking-flow', barberId: barber.id, serviceIds: serviceId });
       return;
     }
-    navigate('booking-flow', { barberId: barber.id });
+    navigate('booking-flow', { barberId: barber.id, serviceIds: serviceId });
   };
 
   const mapSrc = barber.coordinates
@@ -351,7 +351,7 @@ export default function BarberDetailPage() {
 
       {/* === QUICK ACTIONS === */}
       <div className="px-4 mt-4 flex gap-2">
-        <button onClick={bookNow}
+        <button onClick={() => bookNow()}
           className="flex-1 h-12 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2" style={{ backgroundColor: themeConfig.colors.primary }}>
           <Calendar size={18} /> احجز موعداً
         </button>
@@ -377,7 +377,7 @@ export default function BarberDetailPage() {
             </div>
             <div className="p-3 rounded-2xl inline-block" style={{ backgroundColor: themeConfig.colors.background }}>
               <QRCodeSVG value={`https://www.hallaqi.app/barber/${barber.id}`} size={180} bgColor="#FFFFFF" fgColor={themeConfig.colors.primary} level="H"
-                imageSettings={{ src: '/logo-symbol.png', height: 36, width: 36, excavate: true }} />
+                imageSettings={{ src: '/logo-symbol.svg', height: 36, width: 36, excavate: true }} />
             </div>
             <h3 className="text-base font-bold mt-3" style={{ color: themeConfig.colors.text }}>{barber.name}</h3>
             <p className="text-xs mt-1" style={{ color: themeConfig.colors.textMuted }}>امسح للوصول للبروفايل</p>
@@ -483,7 +483,13 @@ export default function BarberDetailPage() {
           <motion.div key="services" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
             className="px-4 mt-3 space-y-2">
             {barber.services.map(svc => (
-              <div key={svc.id} className="p-3 rounded-xl border flex items-center justify-between" style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}>
+              <button
+                key={svc.id}
+                type="button"
+                onClick={() => bookNow(svc.id)}
+                className="w-full p-3 rounded-xl border flex items-center justify-between text-right active:scale-[0.99] transition-transform"
+                style={{ backgroundColor: themeConfig.colors.surface, borderColor: themeConfig.colors.border }}
+              >
                 <div>
                   <p className="text-sm font-bold" style={{ color: themeConfig.colors.text }}>{svc.name}</p>
                   {svc.description && <p className="text-[11px] mt-0.5" style={{ color: themeConfig.colors.textMuted }}>{svc.description}</p>}
@@ -494,7 +500,7 @@ export default function BarberDetailPage() {
                 <div className="text-left">
                   <p className="text-sm font-bold" style={{ color: themeConfig.colors.primary }}>{money(svc.price)}</p>
                 </div>
-              </div>
+              </button>
             ))}
           </motion.div>
         )}
