@@ -24,11 +24,11 @@ export default function BadgeShowcase() {
         </div>
         <button
           type="button"
-          onClick={() => navigate('badge-manager')}
+          onClick={() => navigate('achievements')}
           className="flex items-center gap-0.5 text-[11px] font-bold"
           style={{ color: themeConfig.colors.primary }}
         >
-          إدارة
+          الكل
           <ChevronLeft size={14} />
         </button>
       </div>

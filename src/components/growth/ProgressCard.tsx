@@ -4,7 +4,7 @@ import { useApp } from '@/contexts/useApp';
 
 /** XP / Level / Streak card — values from Progression Engine only. */
 export default function ProgressCard() {
-  const { themeConfig, navigate } = useApp();
+  const { themeConfig } = useApp();
   const { snapshot } = useGrowth();
   const level = snapshot.level || GROWTH_PROGRESS_MOCK.level;
   const xp = snapshot.xp;
@@ -37,16 +37,12 @@ export default function ProgressCard() {
           <h2 className="text-2xl font-black text-white">Level {level}</h2>
           <p className="text-sm font-semibold mt-1" style={{ color: accent }}>{xp} XP</p>
         </div>
-        <button
-          type="button"
-          onClick={() => navigate('missions')}
-          className="w-14 h-14 rounded-2xl flex items-center justify-center text-xl font-black text-white active:scale-95 transition-transform"
+        <div
+          className="w-14 h-14 rounded-2xl flex items-center justify-center text-xl font-black text-white"
           style={{ background: `linear-gradient(145deg, ${accent}, ${themeConfig.colors.accent})` }}
-          aria-label="المهمات والمستويات"
-          title="المهمات"
         >
           {level}
-        </button>
+        </div>
       </div>
 
       <div className="relative grid grid-cols-2 gap-2 mb-4">

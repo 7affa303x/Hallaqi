@@ -8,7 +8,6 @@ import { badgeCatalogForRole } from '@/lib/progression/badgeAudience';
 import { getMissionCatalogSync } from '@/lib/progression/missionCatalog';
 import { getLevelProgress } from '@/lib/progression/config/levels';
 import { evaluateNewAchievements, toAchievementViews } from '@/lib/progression/engines/achievementEngine';
-import { criteriaProgress } from '@/lib/progression/engines/criteria';
 import { evaluateNewBadges, pinnedBadgeViews, toBadgeViews } from '@/lib/progression/engines/badgeEngine';
 import {
   buildMissionViews,
@@ -160,12 +159,21 @@ export function evaluateProgression(signals: ProgressionSignals, userRole?: stri
     void ProgressionService.unlockBadge(signals.userId, b.id);
   }
 
-  // Achievements — tiered milestones (2 / 5 / 10 coins + XP per tier)
+  // Achievements
   local = ProgressionService.load(signals.userId);
   const newAch = evaluateNewAchievements(signals, local.streak, local.achievements, ACHIEVEMENT_CATALOG);
   for (const a of newAch) {
-    const progress = criteriaProgress(a.criteria, signals, local.streak);
-    void ProgressionService.syncAchievementTiers(signals.userId, a.id, progress);
+    void ProgressionService.unlockAchievement(
+      signals.userId,
+      a.id,
+      a.xpReward,
+      a.criteria.completedBookings
+        ?? a.criteria.reviews
+        ?? a.criteria.forumPosts
+        ?? a.criteria.forumComments
+        ?? a.criteria.referralShares
+        ?? 1,
+    );
   }
 
   local = ProgressionService.load(signals.userId);

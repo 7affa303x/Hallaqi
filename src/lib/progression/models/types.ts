@@ -41,31 +41,12 @@ export interface BadgeDef {
   audience?: readonly BadgeAudience[];
 }
 
-export interface AchievementTier {
-  target: number;
-  coinReward: number;
-  xpReward: number;
-}
-
-export type AchievementCategory =
-  | 'booking'
-  | 'community'
-  | 'growth'
-  | 'streak'
-  | 'barber'
-  | 'marketplace'
-  | 'quality'
-  | 'social';
-
 export interface AchievementDef {
   id: string;
-  category: AchievementCategory;
   titleAr: string;
   descriptionAr: string;
   criteria: CriteriaMap;
-  tiers: readonly AchievementTier[];
-  /** @deprecated legacy single reward — derived from last tier */
-  xpReward?: number;
+  xpReward: number;
 }
 
 export interface MissionDef {
@@ -90,8 +71,6 @@ export interface UserAchievementState {
   achievementId: string;
   progress: number;
   earnedAt: string | null;
-  /** How many tier milestones have been claimed (0–3). */
-  completedTiers?: number;
 }
 
 export interface UserMissionState {
@@ -178,19 +157,10 @@ export interface AchievementView {
   id: string;
   title: string;
   description: string;
-  category: AchievementCategory;
   progress: number;
   target: number;
   earned: boolean;
   xpReward: number;
-  coinReward: number;
-  completedTiers: number;
-  maxTiers: number;
-  activeTier: number;
-  activeTierTarget: number;
-  tierTargets: number[];
-  tierCoinRewards: number[];
-  tierXpRewards: number[];
 }
 
 export interface ProgressionSnapshot {

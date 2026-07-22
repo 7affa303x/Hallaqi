@@ -8,8 +8,6 @@
  */
 
 import { BADGE_CATALOG, MAX_PINNED_BADGES } from '@/lib/progression/config/badges';
-import { ACHIEVEMENT_CATALOG } from '@/lib/progression/config/achievements';
-import { tierState } from '@/lib/progression/engines/achievementEngine';
 import { levelFromXp } from '@/lib/progression/config/levels';
 import type { XpEventType } from '@/lib/progression/config/xpEvents';
 import { applyXpAward, type XpEngineState } from '@/lib/progression/engines/xpEngine';
@@ -195,67 +193,33 @@ export const ProgressionService = {
     return this.load(userId);
   },
 
-  async syncAchievementTiers(
-    userId: string | null | undefined,
-    achievementId: string,
-    progress: number,
-  ): Promise<LocalProgressionState> {
-    const def = ACHIEVEMENT_CATALOG.find(a => a.id === achievementId);
-    if (!def) return this.load(userId);
-
-    const local = this.load(userId);
-    const existing = local.achievements.find(a => a.achievementId === achievementId);
-    const { completedTiers, earned } = tierState(progress, def.tiers);
-    const storedTiers = existing?.completedTiers ?? (existing?.earnedAt ? def.tiers.length : 0);
-
-    if (completedTiers <= storedTiers && existing) {
-      if (existing.progress !== progress) {
-        const row: UserAchievementState = { ...existing, progress };
-        local.achievements = [
-          ...local.achievements.filter(a => a.achievementId !== achievementId),
-          row,
-        ];
-        this.save(userId, local);
-        if (userId) void upsertUserAchievement(userId, row);
-      }
-      return local;
-    }
-
-    for (let i = storedTiers; i < completedTiers; i += 1) {
-      const tier = def.tiers[i];
-      if (!tier) continue;
-      if (tier.xpReward > 0) {
-        void this.awardXP(userId, 'achievement_reward', tier.xpReward, {
-          dedupeKey: `achievement:${achievementId}:tier:${i + 1}`,
-          metadata: { achievementId, tier: i + 1 },
-        });
-      }
-    }
-
-    const row: UserAchievementState = {
-      achievementId,
-      progress,
-      completedTiers,
-      earnedAt: earned ? (existing?.earnedAt ?? new Date().toISOString()) : null,
-    };
-    local.achievements = [
-      ...local.achievements.filter(a => a.achievementId !== achievementId),
-      row,
-    ];
-    this.save(userId, local);
-    if (userId) void upsertUserAchievement(userId, row);
-    return this.load(userId);
-  },
-
-  /** @deprecated Use syncAchievementTiers — kept for legacy callers. */
   async unlockAchievement(
     userId: string | null | undefined,
     achievementId: string,
     xpReward: number,
     progress: number,
   ): Promise<LocalProgressionState> {
-    void xpReward;
-    return this.syncAchievementTiers(userId, achievementId, progress);
+    const local = this.load(userId);
+    const existing = local.achievements.find(a => a.achievementId === achievementId);
+    if (existing?.earnedAt) return local;
+    const row: UserAchievementState = {
+      achievementId,
+      progress,
+      earnedAt: new Date().toISOString(),
+    };
+    local.achievements = [
+      ...local.achievements.filter(a => a.achievementId !== achievementId),
+      row,
+    ];
+    this.save(userId, local);
+    if (xpReward > 0) {
+    void this.awardXP(userId, 'achievement_reward', xpReward, {
+        dedupeKey: `achievement:${achievementId}`,
+        metadata: { achievementId },
+      });
+    }
+    if (userId) void upsertUserAchievement(userId, row);
+    return this.load(userId);
   },
 
   async syncMission(

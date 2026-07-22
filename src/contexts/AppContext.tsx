@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef, type ReactNode } from 'react';
+import { useState, useCallback, useEffect, type ReactNode } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useStore } from '@/store/useStore';
 import { isSupabaseConfigured, isDeveloperMode } from '@/supabase/client';
@@ -25,7 +25,7 @@ import { mockCurrentUser, mockBarbers, mockBookings, mockForumPosts, mockNotific
 import { mapBookingRow, mapForumPost, mapNotificationRow } from '@/lib/mappers';
 import { requiresMfaChallenge } from '@/lib/mfa';
 import { sanitizeAuthRedirectIntent } from '@/lib/authRedirect';
-import { scrollToTop, saveProfileScrollPosition, markProfileScrollRestore, shouldRestoreProfileScroll, clearProfileScrollRestore, restoreProfileScrollPosition } from '@/lib/scroll';
+import { scrollToTop } from '@/lib/scroll';
 import type { Barber, Booking, Chat, ForumPost, AppNotification, TabName, ThemeName, AnimationStyle, AppSettings, ScreenName, ScreenParams, User } from '@/types';
 import type { Database } from '@/types/supabase';
 import type { Profile } from '@/types/supabase-aliases';
@@ -103,11 +103,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   /* ---- Tab ---- */
   const [activeTab, setActiveTabState] = useState<TabName>('booking');
   const [prevTab, setPrevTab] = useState<TabName | null>(null);
-  const activeTabRef = useRef<TabName>('booking');
-
-  useEffect(() => {
-    activeTabRef.current = activeTab;
-  }, [activeTab]);
 
   /** Reset to main tabs shell so bottom nav stays visible and stable. */
   const resetToTabs = useCallback((tab: TabName = 'booking') => {
@@ -184,10 +179,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const navigate = useCallback((nextScreen: ScreenName, params?: ScreenParams) => {
-    if (nextScreen !== 'home' && screen === 'home' && activeTabRef.current === 'profile') {
-      saveProfileScrollPosition();
-      markProfileScrollRestore();
-    }
     // Always reset stack when returning home — fixes auth/register nav glitches
     if (nextScreen === 'home') {
       const tab = (params?.redirectTab as TabName) || 'booking';
@@ -203,12 +194,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setScreenParams(homeParams);
       setHistory([{ screen: 'home', params: homeParams }]);
       window.history.replaceState({ hallaqi: true, tab }, '', '/');
-      if (tab === 'profile' && shouldRestoreProfileScroll()) {
-        clearProfileScrollRestore();
-        restoreProfileScrollPosition();
-      } else {
-        scrollToTop();
-      }
+      scrollToTop();
       return;
     }
     setScreen(nextScreen);
@@ -216,7 +202,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setHistory(prev => [...prev, { screen: nextScreen, params }]);
     window.history.pushState({ hallaqi: true, screen: nextScreen }, '', screenUrl(nextScreen, params));
     scrollToTop();
-  }, [screen]);
+  }, []);
 
   const goBack = useCallback(() => {
     setHistory(prev => {
@@ -225,12 +211,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setScreen('home');
         setScreenParams(undefined);
         window.history.replaceState({ hallaqi: true }, '', '/');
-        if (shouldRestoreProfileScroll()) {
-          clearProfileScrollRestore();
-          restoreProfileScrollPosition();
-        } else {
-          scrollToTop();
-        }
+        scrollToTop();
         return [{ screen: 'home' }];
       }
       const next = prev.slice(0, -1);
@@ -239,12 +220,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setScreenParams(last.params);
       // replaceState avoids back-button loops created by pushState-on-back
       window.history.replaceState({ hallaqi: true, screen: last.screen }, '', screenUrl(last.screen, last.params));
-      if (last.screen === 'home' && shouldRestoreProfileScroll()) {
-        clearProfileScrollRestore();
-        restoreProfileScrollPosition();
-      } else {
-        scrollToTop();
-      }
+      scrollToTop();
       return next;
     });
   }, []);
@@ -260,24 +236,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (prev.length <= 1) {
           setScreen('home');
           setScreenParams(undefined);
-          if (shouldRestoreProfileScroll()) {
-            clearProfileScrollRestore();
-            restoreProfileScrollPosition();
-          } else {
-            scrollToTop();
-          }
+          scrollToTop();
           return [{ screen: 'home' }];
         }
         const next = prev.slice(0, -1);
         const last = next[next.length - 1];
         setScreen(last.screen);
         setScreenParams(last.params);
-        if (last.screen === 'home' && shouldRestoreProfileScroll()) {
-          clearProfileScrollRestore();
-          restoreProfileScrollPosition();
-        } else {
-          scrollToTop();
-        }
+        scrollToTop();
         return next;
       });
     };
